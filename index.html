@@ -733,8 +733,18 @@ tr:hover td{background:var(--surface2)}
              onkeydown="if(event.key==='Enter')tryUnlock()"/>
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
-      <button onclick="emergencyReset()" style="margin-top:12px;background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:var(--font)">忘記密碼？點這裡重置為 12345678</button>
-      <button onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
+      <button onclick="toggleForgotMenu()" id="forgot-btn" style="margin-top:14px;background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:var(--font)">忘記密碼？</button>
+      <div id="forgot-menu" style="display:none;margin-top:10px;background:var(--surface2);border-radius:12px;padding:14px;border:.5px solid var(--border)">
+        <div style="font-size:12px;color:var(--t2);margin-bottom:10px;text-align:center">請輸入公司驗證碼以重設密碼</div>
+        <input id="verify-code-input" type="password" placeholder="公司驗證碼" maxlength="20"
+          style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-family:var(--font);color:var(--t1);box-sizing:border-box;margin-bottom:8px"/>
+        <input id="new-pwd-input" type="password" placeholder="輸入新密碼" maxlength="20"
+          style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-family:var(--font);color:var(--t1);box-sizing:border-box;margin-bottom:8px"/>
+        <input id="new-pwd-confirm" type="password" placeholder="再次確認新密碼" maxlength="20"
+          style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-family:var(--font);color:var(--t1);box-sizing:border-box;margin-bottom:10px"/>
+        <button onclick="verifyAndReset()" style="width:100%;padding:11px;background:var(--accent);border:none;border-radius:8px;font-size:14px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--font)">確認重設密碼</button>
+        <div id="verify-hint" style="font-size:12px;color:var(--danger);margin-top:8px;text-align:center;min-height:16px"></div>
+      </div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -859,6 +869,7 @@ tr:hover td{background:var(--surface2)}
 
       <!-- 重新看說明 -->
       <button onclick="replayGuide()" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:var(--font);padding:4px 0;text-align:center;width:100%">❓ 不知道怎麼打卡？點這裡看說明</button>
+      <div style="text-align:center;padding:2px 0 0;font-size:10px;color:var(--t3);opacity:.45;letter-spacing:.3px;font-variant-numeric:tabular-nums">v1.0.0 &nbsp;|&nbsp; 2026.04 正式上線</div>
 
     </div>
   </div>
@@ -1171,13 +1182,41 @@ const COLORS=['#007aff','#34c759','#ff9f0a','#af52de','#ff6b35','#5ac8fa','#ff3b
 function avatarColor(id){let h=0x811c9dc5;for(const c of id){h^=c.charCodeAt(0);h=(h*0x01000193)>>>0}return COLORS[h%COLORS.length]}
 function initials(name){return name?name.slice(-2):'?'}
 
-function emergencyReset(){
-  if(!confirm('確定要將管理者密碼重置為 12345678 嗎？')) return;
-  localStorage.setItem('admin_pwd_hash','aa8abcd');
-  showToast('密碼已重置為 12345678，請進入後台立即修改','success');
+function toggleForgotMenu(){
+  const menu = $('forgot-menu');
+  const btn  = $('forgot-btn');
+  const open = menu.style.display === 'none';
+  menu.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '收起 ▲' : '忘記密碼？';
+  if(open){
+    // 清空欄位
+    const vi=$('verify-code-input'),np=$('new-pwd-input'),nc=$('new-pwd-confirm'),vh=$('verify-hint');
+    if(vi)vi.value=''; if(np)np.value=''; if(nc)nc.value=''; if(vh)vh.textContent='';
+  }
+}
+
+// 公司驗證碼 hash（a225-7577）
+const COMPANY_VERIFY_HASH = '89abeb98';
+
+function verifyAndReset(){
+  const code    = $('verify-code-input')?.value.trim()||'';
+  const newPwd  = $('new-pwd-input')?.value||'';
+  const confirm = $('new-pwd-confirm')?.value||'';
+  const hint    = $('verify-hint');
+
+  if(!code){ hint.textContent='請輸入公司驗證碼'; return; }
+  if(hashPwd(code) !== COMPANY_VERIFY_HASH){ hint.textContent='驗證碼錯誤，請確認後重試'; return; }
+  if(!newPwd || newPwd.length < 6){ hint.textContent='新密碼至少需要 6 個字元'; return; }
+  if(newPwd !== confirm){ hint.textContent='兩次密碼不一致，請重新輸入'; return; }
+
+  setPwdHash(newPwd);
+  toggleForgotMenu();
+  showToast('密碼已重設，請用新密碼登入 ✓','success');
   $('lock-input').value='';
   $('lock-hint').textContent='';
 }
+
+// emergencyReset 已整合至 verifyAndReset
 
 function hashPwd(s){let h=0x811c9dc5;for(const c of s){h^=c.charCodeAt(0);h=(h*0x01000193)>>>0}return h.toString(16)}
 function getPwdHash(){return localStorage.getItem('admin_pwd_hash')||''}
@@ -1255,7 +1294,7 @@ function updateCfgBar(){
 function loadConfig(){
   // 如果從來沒有設定過密碼，預設密碼為 12345678
   if(!localStorage.getItem('admin_pwd_hash')){
-    localStorage.setItem('admin_pwd_hash','aa8abcd');
+    localStorage.setItem('admin_pwd_hash','8f60bf0e');
   }
   const url=localStorage.getItem('script_url')||'';
   const demo=localStorage.getItem('demo_mode');
