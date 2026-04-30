@@ -66,7 +66,7 @@ html{
 }
 body{
   font-family:var(--font);
-  background: linear-gradient(160deg, #f0f4ff 0%, #f2f2f7 40%, #eef2fb 100%);
+  background: #f2f2f7;
   color:var(--t1);
   min-height: 100dvh;
   -webkit-font-smoothing:antialiased;
@@ -74,7 +74,7 @@ body{
 }
 @media(prefers-color-scheme:dark){
   body{
-    background: linear-gradient(160deg, #000000 0%, #0a0a14 50%, #000810 100%);
+    background: #000000;
   }
 }
 
@@ -143,6 +143,22 @@ nav{
   padding: calc(56px + var(--safe-top) + 16px) calc(18px + var(--safe-left)) calc(20px + var(--safe-bottom)) calc(18px + var(--safe-right));
   gap:14px;
   overflow:hidden;
+}
+
+/* ── 版本標籤 + 系統公告 ── */
+.version-tag{
+  position:fixed;bottom:calc(8px + var(--safe-bottom));right:calc(10px + var(--safe-right));
+  font-size:10px;color:var(--t3);opacity:.55;letter-spacing:.3px;pointer-events:none;z-index:50;
+  font-family:var(--font);
+}
+.announce-bar{
+  background:linear-gradient(90deg,rgba(0,122,255,.08),rgba(0,122,255,.04));
+  border-left:3px solid var(--accent);
+  border-radius:0 10px 10px 0;
+  padding:9px 14px;
+  font-size:13px;color:var(--t2);
+  line-height:1.45;
+  margin-bottom:2px;
 }
 
 /* ── 時鐘卡片（漂亮獨立版） ── */
@@ -270,12 +286,12 @@ nav{
   position:relative;overflow:hidden;
 }
 .bpb-in {
-  background: linear-gradient(145deg, #30d158 0%, #25a244 60%, #1e8f3a 100%);
+  background: #34c759;
   color:#fff;
-  box-shadow: 0 8px 28px rgba(52,199,89,.45), 0 2px 8px rgba(52,199,89,.25), inset 0 1px 0 rgba(255,255,255,.25);
+  box-shadow: 0 4px 20px rgba(52,199,89,.30), inset 0 1px 0 rgba(255,255,255,.20);
 }
 .bpb-out{
-  background: linear-gradient(145deg, #ff453a 0%, #e8342a 60%, #c8251c 100%);
+  background: #ff3b30;
   color:#fff;
   box-shadow: 0 8px 28px rgba(255,59,48,.45), 0 2px 8px rgba(255,59,48,.25), inset 0 1px 0 rgba(255,255,255,.25);
 }
@@ -362,6 +378,7 @@ nav{
   color:var(--t1);background:var(--surface2);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   transition:background .1s,transform .1s;user-select:none;-webkit-user-select:none;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
 }
 .nk sub{font-size:9px;color:var(--t3);letter-spacing:.5px;margin-top:1px;line-height:1}
 .nk:active{background:var(--fill1);transform:scale(.93)}
@@ -457,52 +474,68 @@ nav{
   padding: calc(24px + var(--safe-top)) calc(24px + var(--safe-right)) calc(24px + var(--safe-bottom)) calc(24px + var(--safe-left));
 }
 .lock-box{
-  background:var(--surface);border-radius:22px;padding:40px 32px;
-  max-width:360px;width:100%;box-shadow:var(--sh3);text-align:center;border:.5px solid var(--border);
+  background:var(--surface);border-radius:24px;padding:40px 32px;
+  max-width:360px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.12),0 1px 3px rgba(0,0,0,.06);text-align:center;border:.5px solid var(--border);
 }
 .lock-icon{font-size:48px;margin-bottom:16px}
 .lock-box h2{font-size:22px;font-weight:700;margin-bottom:6px;letter-spacing:-.5px}
 .lock-box p{font-size:16px;color:var(--t2);margin-bottom:28px}
 .lock-input{
-  width:100%;padding:16px;border:1.5px solid var(--border);border-radius:var(--rsm);
+  width:100%;padding:16px;border:1.5px solid var(--border);border-radius:14px;
   font-size:20px;text-align:center;letter-spacing:6px;outline:none;margin-bottom:14px;
-  background:var(--surface2);color:var(--t1);transition:border-color .2s;font-family:var(--font);
+  background:var(--surface2);color:var(--t1);transition:all .2s;font-family:var(--font);
 }
 .lock-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,122,255,.15)}
 .lock-input.shake{animation:shake .4s;border-color:var(--danger)}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-9px)}75%{transform:translateX(9px)}}
 .lock-hint{font-size:14px;color:var(--t3);margin-top:10px}
 .lock-role-btn{
-  flex:1;padding:10px;border-radius:var(--rsm);font-size:14px;font-weight:500;
+  flex:1;padding:11px;border-radius:50px;font-size:14px;font-weight:500;
   border:1.5px solid var(--border);background:var(--surface2);color:var(--t2);
-  cursor:pointer;font-family:var(--font);transition:all .18s;
+  cursor:pointer;font-family:var(--font);transition:all .2s;
+  touch-action:manipulation;
 }
 .lock-role-btn.active{
-  border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface));
-  color:var(--accent);
+  border-color:var(--accent);background:var(--accent);
+  color:#fff;box-shadow:0 2px 12px rgba(0,122,255,.30);
 }
 .btn-unlock{
   width:100%;padding:16px;background:var(--accent);color:#fff;
-  border:none;border-radius:var(--rsm);font-size:18px;font-weight:600;
-  cursor:pointer;font-family:var(--font);transition:filter .15s;
+  border:none;border-radius:14px;font-size:18px;font-weight:600;
+  cursor:pointer;font-family:var(--font);transition:all .18s;
+  letter-spacing:-.2px;
 }
-.btn-unlock:hover{filter:brightness(1.07)}
+.btn-unlock:hover{filter:brightness(1.06)}
+.btn-unlock:active{transform:scale(.98);filter:brightness(.96)}
+
+.pwd-wrap{position:relative;margin-bottom:14px}
+.pwd-wrap .lock-input{margin-bottom:0;padding-right:52px}
+.pwd-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:20px;cursor:pointer;padding:4px 6px;color:var(--t2);line-height:1;border-radius:6px;transition:color .15s}
+.pwd-eye:hover{color:var(--t1)}
 
 .admin-wrap{max-width:920px;margin:0 auto;padding:0 calc(16px + var(--safe-left)) 0 calc(16px + var(--safe-right))}
 .admin-seg{
-  display:flex;gap:2px;background:var(--fill2);border-radius:var(--rsm);
-  padding:3px;width:fit-content;margin-bottom:18px;
+  display:flex;gap:2px;background:var(--fill2);border-radius:50px;
+  padding:3px;margin-bottom:18px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;white-space:nowrap;
+  max-width:100%;
 }
+.admin-seg::-webkit-scrollbar{display:none}
 .seg-btn{
-  padding:8px 20px;border-radius:10px;font-size:14px;font-weight:500;
+  padding:8px 18px;border-radius:50px;font-size:14px;font-weight:500;
   cursor:pointer;border:none;background:transparent;color:var(--t2);
-  transition:all .18s;font-family:var(--font);
+  transition:all .2s;font-family:var(--font);flex-shrink:0;
+  touch-action:manipulation;
 }
-.seg-btn.active{background:var(--surface);color:var(--t1);box-shadow:var(--sh1)}
+.seg-btn.active{
+  background:var(--surface);color:var(--t1);
+  box-shadow:0 1px 4px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06);
+}
 .sub-page{display:none}.sub-page.active{display:block}
 
 .toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px}
-.toolbar-title{font-size:22px;font-weight:700;letter-spacing:-.5px}
+.toolbar-title{font-size:20px;font-weight:600;letter-spacing:-.4px;color:var(--t1)}
 .toolbar-right{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 .fi{padding:9px 12px;border-radius:var(--rxs);border:1px solid var(--border);font-size:14px;background:var(--surface);outline:none;font-family:var(--font);color:var(--t1)}
 .fi:focus{border-color:var(--accent)}
@@ -722,40 +755,51 @@ tr:hover td{background:var(--surface2)}
 
     <!-- 正常登入 -->
     <div id="lock-panel-login">
-      <div class="lock-icon">🔒</div>
-      <h2>管理後台</h2>
-      <p>請選擇身份並輸入密碼</p>
+      <!-- DYS 品牌 -->
+      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:18px">
+        <div style="width:56px;height:56px;background:linear-gradient(135deg,#1a73e8 0%,#0d47a1 100%);border-radius:16px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;box-shadow:0 4px 14px rgba(26,115,232,.30)">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 2L4 7v8c0 6.2 4.7 12 11 13.4C21.3 27 26 21.2 26 15V7L15 2z" fill="white" fill-opacity="0.95"/>
+            <path d="M11 15l2.5 2.5L19 11" stroke="#1a73e8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div style="font-size:13px;font-weight:700;letter-spacing:2px;color:var(--t2);text-transform:uppercase">DYS 大洋保全</div>
+      </div>
+      <h2 style="margin-bottom:4px">管理後台</h2>
+      <p style="margin-bottom:20px">請選擇身份並輸入密碼</p>
       <div style="display:flex;gap:6px;margin-bottom:18px">
         <button class="lock-role-btn active" id="role-admin" onclick="switchRole('admin')">👑 管理員</button>
-        <button class="lock-role-btn" id="role-supervisor" onclick="switchRole('supervisor')">📋 主管</button>
+        <button class="lock-role-btn" id="role-supervisor" onclick="switchRole('supervisor')">📋 幹部</button>
       </div>
-      <input class="lock-input" id="lock-input" type="password" placeholder="••••••" maxlength="20"
-             onkeydown="if(event.key==='Enter')tryUnlock()"/>
+      <!-- 管理員：密碼輸入 -->
+      <div class="pwd-wrap" id="admin-pwd-wrap">
+        <input class="lock-input" id="lock-input" type="password" placeholder="••••••" maxlength="20"
+               onkeydown="if(event.key==='Enter')tryUnlock()"/>
+        <button class="pwd-eye" type="button" tabindex="-1" onclick="togglePwd('lock-input',this)">👁</button>
+      </div>
+      <!-- 幹部：員工編號輸入 -->
+      <div id="sup-id-wrap" style="display:none;margin-bottom:14px">
+        <input class="lock-input" id="sup-emp-input" type="text" inputmode="numeric"
+               placeholder="請輸入員工編號" maxlength="10"
+               onkeydown="if(event.key==='Enter')tryUnlock()"
+               style="margin-bottom:0;letter-spacing:2px;width:100%"/>
+        <div style="font-size:12px;color:var(--t3);margin-top:8px;text-align:center">輸入您的員工編號即可登入</div>
+      </div>
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
-      <button onclick="toggleForgotMenu()" id="forgot-btn" style="margin-top:14px;background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div id="forgot-menu" style="display:none;margin-top:10px;background:var(--surface2);border-radius:12px;padding:14px;border:.5px solid var(--border)">
-        <div style="font-size:12px;color:var(--t2);margin-bottom:10px;text-align:center">請輸入公司驗證碼以重設密碼</div>
-        <input id="verify-code-input" type="password" placeholder="公司驗證碼" maxlength="20"
-          style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-family:var(--font);color:var(--t1);box-sizing:border-box;margin-bottom:8px"/>
-        <input id="new-pwd-input" type="password" placeholder="輸入新密碼" maxlength="20"
-          style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-family:var(--font);color:var(--t1);box-sizing:border-box;margin-bottom:8px"/>
-        <input id="new-pwd-confirm" type="password" placeholder="再次確認新密碼" maxlength="20"
-          style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-family:var(--font);color:var(--t1);box-sizing:border-box;margin-bottom:10px"/>
-        <button onclick="verifyAndReset()" style="width:100%;padding:11px;background:var(--accent);border:none;border-radius:8px;font-size:14px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--font)">確認重設密碼</button>
-        <div id="verify-hint" style="font-size:12px;color:var(--danger);margin-top:8px;text-align:center;min-height:16px"></div>
-      </div>
+      <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.0.0 &nbsp;·&nbsp; 2026.04 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
     <div id="lock-panel-reset" style="display:none">
       <div class="lock-icon">🔑</div>
       <h2>重置密碼</h2>
-      <p>請輸入初始設定時的重置密鑰，驗證後可設定新密碼</p>
+      <p>請輸入公司驗證碼，驗證正確後可設定新密碼</p>
 
       <!-- Step 1：輸入重置密鑰 -->
       <div id="reset-step1">
-        <input class="lock-input" id="reset-key-input" type="password" placeholder="重置密鑰" maxlength="20"
+        <input class="lock-input" id="reset-key-input" type="password" placeholder="公司驗證碼" maxlength="20"
                onkeydown="if(event.key==='Enter')verifyResetKey()"/>
         <button class="btn-unlock" onclick="verifyResetKey()">驗證</button>
         <div class="lock-hint" id="reset-hint"></div>
@@ -805,6 +849,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
+  <div class="version-tag">v1.0.0 &nbsp;|&nbsp; 2026.04 正式上線</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -819,6 +864,11 @@ tr:hover td{background:var(--surface2)}
         <span class="tc-last-label">上次打卡</span>
         <span class="tc-last-val" id="tc-last-val"></span>
       </div>
+    </div>
+
+    <!-- 系統公告 -->
+    <div class="announce-bar" id="announce-bar">
+      📢 系統公告：打卡系統正式上線，有問題請聯絡主管
     </div>
 
     <!-- 主打卡卡片 -->
@@ -869,7 +919,6 @@ tr:hover td{background:var(--surface2)}
 
       <!-- 重新看說明 -->
       <button onclick="replayGuide()" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:var(--font);padding:4px 0;text-align:center;width:100%">❓ 不知道怎麼打卡？點這裡看說明</button>
-      <div style="text-align:center;padding:2px 0 0;font-size:10px;color:var(--t3);opacity:.45;letter-spacing:.3px;font-variant-numeric:tabular-nums">v1.0.0 &nbsp;|&nbsp; 2026.04 正式上線</div>
 
     </div>
   </div>
@@ -878,6 +927,21 @@ tr:hover td{background:var(--surface2)}
 <!-- ══ 管理頁 ══ -->
 <div class="page" id="page-admin">
   <div class="admin-wrap" id="admin-content-wrap">
+
+    <!-- ── 返回列 ── -->
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0 6px">
+      <button onclick="showPage('checkin',document.getElementById('tab-checkin'))"
+        style="display:inline-flex;align-items:center;gap:6px;background:none;border:none;
+               font-size:14px;font-weight:600;color:var(--accent);cursor:pointer;
+               font-family:var(--font);padding:6px 10px 6px 4px;border-radius:8px;
+               transition:background .15s;"
+        onmouseover="this.style.background='var(--fill2)'"
+        onmouseout="this.style.background='none'"
+        title="返回打卡頁面">
+        ← 返回打卡
+      </button>
+      <span style="font-size:13px;color:var(--t3)">管理後台</span>
+    </div>
 
     <div id="cfg-bar-wrap" style="display:none" class="cfg-bar">
       <span style="color:var(--t2);white-space:nowrap">🔗 已連線</span>
@@ -892,6 +956,8 @@ tr:hover td{background:var(--surface2)}
       <button class="seg-btn"        onclick="showSub('anomaly',this)">異常報表</button>
       <button class="seg-btn admin-only" onclick="showSub('attendance-stat',this)">出勤統計</button>
       <button class="seg-btn admin-only" onclick="showSub('employees',this)">員工名單</button>
+      <button class="seg-btn admin-only" onclick="showSub('supervisors',this)">幹部管理</button>
+      <button class="seg-btn" onclick="showSub('qrcode',this)">QR Code</button>
       <button class="seg-btn admin-only" onclick="showSub('settings',this)">設定</button>
     </div>
 
@@ -1093,6 +1159,109 @@ tr:hover td{background:var(--surface2)}
       </div>
     </div>
 
+
+    <!-- 幹部管理（管理員專用） -->
+    <div class="sub-page" id="sub-supervisors">
+      <div class="toolbar"><div class="toolbar-title">幹部管理</div></div>
+
+      <div style="background:var(--surface);border-radius:var(--r);border:.5px solid var(--border);padding:16px;box-shadow:var(--sh1);max-width:560px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:15px;font-weight:600;color:var(--t1)">幹部名單</div>
+          <button onclick="openSupModal(null)"
+            style="background:var(--accent);color:#fff;border:none;border-radius:50px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">
+            ＋ 新增幹部
+          </button>
+        </div>
+        <div id="sup-card-list"></div>
+      </div>
+
+      <!-- 幹部編輯 Modal -->
+      <div id="sup-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:flex-end;justify-content:center">
+        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-width:560px;padding:24px 20px 32px;box-shadow:0 -4px 30px rgba(0,0,0,.18)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <div style="font-size:17px;font-weight:700" id="sup-modal-title">編輯幹部</div>
+            <button onclick="closeSupModal()" style="background:none;border:none;font-size:22px;color:var(--t3);cursor:pointer;line-height:1">✕</button>
+          </div>
+
+          <input type="hidden" id="sup-edit-empid"/>
+
+          <div style="margin-bottom:14px">
+            <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">員工編號</div>
+            <input id="sup-edit-empid-input" class="lock-input" type="text" inputmode="numeric"
+              placeholder="例：10907159" maxlength="10"
+              style="font-size:15px;width:100%;box-sizing:border-box;margin-bottom:0"/>
+          </div>
+
+          <div style="margin-bottom:14px">
+            <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">姓名</div>
+            <input id="sup-edit-name" class="lock-input" type="text" placeholder="例：林佾廷"
+              style="font-size:15px;width:100%;box-sizing:border-box;margin-bottom:0"/>
+          </div>
+
+          <div style="margin-bottom:14px">
+            <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">職稱</div>
+            <select id="sup-edit-title" class="lock-input"
+              style="font-size:15px;width:100%;box-sizing:border-box;margin-bottom:0;-webkit-appearance:none;background:var(--surface2)">
+              <option>協理</option><option>處長</option><option>副理</option>
+              <option>課長</option><option>經理</option><option>主管</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:18px">
+            <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">全覽權限</div>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="sup-edit-viewall"
+                style="width:18px;height:18px;accent-color:var(--accent)"/>
+              <span style="font-size:14px;color:var(--t1)">開啟後可查看所有案場（協理/處長適用）</span>
+            </label>
+          </div>
+
+          <div style="margin-bottom:20px" id="sup-site-section">
+            <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">負責案場</div>
+            <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+              <button onclick="supFilterSites('A')"
+                style="background:var(--surface2);border:none;border-radius:50px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:var(--font);color:var(--t1)">
+                A 樓管
+              </button>
+              <button onclick="supFilterSites('B')"
+                style="background:var(--surface2);border:none;border-radius:50px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:var(--font);color:var(--t1)">
+                B 保全
+              </button>
+              <button onclick="supFilterSites('all')"
+                style="background:var(--accent);color:#fff;border:none;border-radius:50px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:var(--font)">
+                全選
+              </button>
+              <button onclick="supFilterSites('none')"
+                style="background:var(--surface2);border:none;border-radius:50px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:var(--font);color:var(--t1)">
+                清空
+              </button>
+            </div>
+            <div id="sup-site-checkboxes"
+              style="max-height:200px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:2px">
+            </div>
+          </div>
+
+          <button onclick="saveSupEdit()"
+            style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;cursor:pointer;font-family:var(--font)">
+            儲存
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Code 管理（幹部 + 管理員） -->
+    <div class="sub-page" id="sub-qrcode">
+      <div class="toolbar"><div class="toolbar-title">QR Code 管理</div></div>
+      <div style="background:var(--surface);border-radius:var(--r);border:.5px solid var(--border);padding:16px;box-shadow:var(--sh1);max-width:560px">
+        <div style="font-size:13px;color:var(--t2);margin-bottom:14px">掃碼後員工自動帶入案場打卡。若發現異常，可對負責案場更換 QR Code，舊碼即時失效。</div>
+        <div style="margin-bottom:12px">
+          <input id="qr-search" class="lock-input" type="text" placeholder="搜尋案場名稱…"
+            oninput="renderQrList()" style="font-size:14px;margin-bottom:0;width:100%;box-sizing:border-box"/>
+        </div>
+        <div id="qr-list"></div>
+      </div>
+    </div>
+
     <!-- 設定 -->
     <div class="sub-page" id="sub-settings">
       <div class="toolbar"><div class="toolbar-title">系統設定</div></div>
@@ -1147,12 +1316,6 @@ tr:hover td{background:var(--surface2)}
           <input id="s-sup-pwd-new" class="fi" type="password" placeholder="新主管密碼（留空不修改）" style="width:100%"/>
           <span class="mf-hint">主管登入後可查看所有打卡紀錄與報表，但無法修改員工名單和系統設定</span>
         </div>
-        <div class="mf">
-          <label>重置密鑰 <span style="font-size:12px;color:var(--danger);font-weight:400">（忘記密碼時使用，請妥善保管）</span></label>
-          <input id="s-reset-key-old" class="fi" type="password" placeholder="目前重置密鑰（留空代表尚未設定）" style="width:100%;margin-bottom:6px"/>
-          <input id="s-reset-key-new" class="fi" type="password" placeholder="新重置密鑰（留空不修改）" style="width:100%"/>
-          <span class="mf-hint">重置密鑰與管理者密碼不同，建議設定一組易記但不易猜的密鑰，忘記管理者密碼時憑此重置</span>
-        </div>
         <button class="btn-s bs-accent" onclick="saveSettings()" style="width:fit-content;padding:11px 24px">儲存設定</button>
       </div>
     </div>
@@ -1171,52 +1334,174 @@ const pad = n => String(n).padStart(2,'0');
 
 let SCRIPT_URL='', IS_DEMO=false, COMPANY='DYS 大洋保全', ADMIN_UNLOCKED=false;
 let CURRENT_ROLE = 'admin'; // 'admin' | 'supervisor'
+let CURRENT_SUPERVISOR = null; // 登入中的幹部物件
+let CURRENT_SITE_ID = null;   // 從 QR Code URL 取得的案場 ID
 let ABSENT_LIMIT = 7;
 let MSG_IN  = ''; // 上班提醒
 let MSG_OUT = ''; // 下班提醒
 
-let employees = JSON.parse(localStorage.getItem('employees')    ||'[]');
+const _DEFAULT_EMPLOYEES = [{"id":"09402001","name":"劉黃秀"},{"id":"09701001","name":"王興庭"},{"id":"09903001","name":"洪有賀"},{"id":"09903002","name":"胡士勇"},{"id":"10001003","name":"李建興"},{"id":"10104003","name":"歐天賜"},{"id":"10104004","name":"張慶崑"},{"id":"10108014","name":"林瑞峰"},{"id":"10304005","name":"許銘哲"},{"id":"10305007","name":"陳明宗"},{"id":"10306010","name":"柳治國"},{"id":"10309021","name":"董秋祥"},{"id":"10310033","name":"洪榮進"},{"id":"10311040","name":"薛光鴻"},{"id":"10402005","name":"王朝和"},{"id":"10407017","name":"傅美惠"},{"id":"10411123","name":"李季珍"},{"id":"10512336","name":"黃兆賢"},{"id":"10602061","name":"林子霖"},{"id":"10602062","name":"尤華德"},{"id":"10603110","name":"林振峯"},{"id":"10607210","name":"王惠婷"},{"id":"10608236","name":"李冠儀"},{"id":"10612368","name":"黃文俊"},{"id":"10702024","name":"陳武春"},{"id":"10708164","name":"謝黃世美"},{"id":"10711225","name":"劉志明"},{"id":"10712258","name":"馬振祥"},{"id":"10804085","name":"黃家祥"},{"id":"10805096","name":"陸玄基"},{"id":"10805097","name":"趙明哲"},{"id":"10805101","name":"梁興成"},{"id":"10806120","name":"李新福"},{"id":"10806121","name":"鐘明源"},{"id":"10806131","name":"賴正文"},{"id":"10806134","name":"林啟榮"},{"id":"10807153","name":"賴富榮"},{"id":"10810217","name":"趙晉東"},{"id":"10812266","name":"郭德成"},{"id":"10901006","name":"何文山"},{"id":"10902028","name":"霍建南"},{"id":"10905085","name":"陳志德"},{"id":"10905093","name":"周思明"},{"id":"10906115","name":"張雅惠"},{"id":"10906118","name":"顏榮耀"},{"id":"10906131","name":"謝志賢"},{"id":"10906263","name":"鄭玲龍"},{"id":"10907159","name":"林佾廷"},{"id":"10908176","name":"梁東淦"},{"id":"10908178","name":"沈賜民"},{"id":"10908183","name":"謝怡道"},{"id":"10909196","name":"陳連勝"},{"id":"10912251","name":"羅正武"},{"id":"11002012","name":"鄭銘誌"},{"id":"11003037","name":"蔡含昱"},{"id":"11003043","name":"邱識宇"},{"id":"11003052","name":"謝鎮國"},{"id":"11004055","name":"邱志敏"},{"id":"11005077","name":"江佳秋"},{"id":"11005092","name":"連博法"},{"id":"11005093","name":"蔡昆宗"},{"id":"11006112","name":"李來成"},{"id":"11007137","name":"林余錦治"},{"id":"11007140","name":"陳信宇"},{"id":"11007142","name":"黃鈺程"},{"id":"11008167","name":"石祥甫"},{"id":"11009178","name":"朱俊彰"},{"id":"11009188","name":"陳俊欽"},{"id":"11010202","name":"陳權宏"},{"id":"11101006","name":"吳松山"},{"id":"11103062","name":"李慶徽"},{"id":"11103066","name":"蘇晨禾"},{"id":"11103075","name":"林麗玉"},{"id":"11104095","name":"吳升彥"},{"id":"11104101","name":"王秀美"},{"id":"11104102","name":"邱琪淋"},{"id":"11105120","name":"許安富"},{"id":"11106126","name":"袁紹賢"},{"id":"11107158","name":"傅笑翠"},{"id":"11108175","name":"林武宏"},{"id":"11108176","name":"王作團"},{"id":"11108177","name":"黃文清"},{"id":"11109210","name":"蔡登吉"},{"id":"11110237","name":"黃增華"},{"id":"11111250","name":"何思音"},{"id":"11111262","name":"洪建義"},{"id":"11112286","name":"謝華平"},{"id":"11202045","name":"田文豪"},{"id":"11203064","name":"王相鵬"},{"id":"11203087","name":"蕭宇良"},{"id":"11203089","name":"楊士平"},{"id":"11203090","name":"游競翔"},{"id":"11204094","name":"李元齊"},{"id":"11204101","name":"張郁聰"},{"id":"11205132","name":"鍾昕岱"},{"id":"11206160","name":"蔡薇軒"},{"id":"11208188","name":"周庭瑋"},{"id":"11208199","name":"蔡世瑜"},{"id":"11208200","name":"劉昭成"},{"id":"11208202","name":"鄭毓雄"},{"id":"11208206","name":"歐仲豪"},{"id":"11209214","name":"鄭富橙"},{"id":"11209223","name":"陳建男"},{"id":"11209230","name":"柳室豐"},{"id":"11209232","name":"蔡學敏"},{"id":"11209234","name":"程志宏"},{"id":"11210264","name":"陳信宏"},{"id":"11210265","name":"毛鳳珠"},{"id":"11212294","name":"郭瑋"},{"id":"11212301","name":"楊壽生"},{"id":"11212308","name":"蕭素梅"},{"id":"11212311","name":"陳安國"},{"id":"11212316","name":"薛志強"},{"id":"11212317","name":"李俊易"},{"id":"11212318","name":"黃義雄"},{"id":"11212322","name":"鄭秉豐"},{"id":"11212323","name":"鄭凱中"},{"id":"11212324","name":"潘建芃"},{"id":"11212325","name":"謝長清"},{"id":"11212326","name":"栗怡豪"},{"id":"11300001","name":"許恭銘"},{"id":"11300002","name":"毛勝吉"},{"id":"11300003","name":"洪信宏"},{"id":"11300005","name":"蔡正風"},{"id":"11300006","name":"鄭人豪"},{"id":"11300007","name":"陳柏沅"},{"id":"11300008","name":"陳東杰"},{"id":"11300009","name":"劉東桀"},{"id":"11300010","name":"胡仲武"},{"id":"11300011","name":"詹允侖"},{"id":"11300012","name":"吳修齊"},{"id":"11300013","name":"蔡効廷"},{"id":"11300014","name":"許博欽"},{"id":"11300015","name":"鄔書威"},{"id":"11300016","name":"江守國"},{"id":"11300017","name":"陳義芳"},{"id":"11300018","name":"李冠興"},{"id":"11300019","name":"林連翔"},{"id":"11300020","name":"蘇柏煌"},{"id":"11300021","name":"林名揚"},{"id":"11300022","name":"王國斌"},{"id":"11300023","name":"蘇嘉賢"},{"id":"11300024","name":"謝禾瑞"},{"id":"11300025","name":"T趙晉東"},{"id":"11300026","name":"周益鋒"},{"id":"11301009","name":"郭育文"},{"id":"11301015","name":"王祥龍"},{"id":"11301019","name":"張識恩"},{"id":"11303049","name":"陳國誠"},{"id":"11303055","name":"陳思妤"},{"id":"11303058","name":"鄭彥谷"},{"id":"11304066","name":"黃勝郁"},{"id":"11304076","name":"李淮南"},{"id":"11304078","name":"王明和"},{"id":"11305091","name":"陳雪"},{"id":"11305097","name":"王獻文"},{"id":"11305098","name":"劉政賢"},{"id":"11305106","name":"邱晟榮"},{"id":"11305107","name":"徐從文"},{"id":"11306119","name":"裴強"},{"id":"11306122","name":"胡北辰"},{"id":"11307158","name":"林晉褘"},{"id":"11307163","name":"何金財"},{"id":"11307164","name":"林國華"},{"id":"11307165","name":"邢富光"},{"id":"11307166","name":"黃建清"},{"id":"11307167","name":"陳家豪"},{"id":"11308181","name":"苑耀宗"},{"id":"11308183","name":"王建霖"},{"id":"11308187","name":"鄧培道"},{"id":"11308196","name":"蕭任佑"},{"id":"11308198","name":"邱嘉柔"},{"id":"11308201","name":"方澤仁"},{"id":"11308207","name":"陳重瑋"},{"id":"11308208","name":"王文賢"},{"id":"1130828","name":"黃鈺淳"},{"id":"11309213","name":"陳平貴"},{"id":"11309221","name":"陳永訓"},{"id":"11309225","name":"徐崇禧"},{"id":"11309227","name":"蔡俊南"},{"id":"11309233","name":"陳勇吉"},{"id":"11309234","name":"鄭士榮"},{"id":"11310242","name":"李瑞源"},{"id":"11310249","name":"陳炳南"},{"id":"11310251","name":"黃同泰"},{"id":"11311261","name":"林志雄"},{"id":"11311273","name":"陳志惠"},{"id":"11311274","name":"周明禧"},{"id":"11311279","name":"王勝禾"},{"id":"11312280","name":"湯博鈞"},{"id":"11312286","name":"吳坤學"},{"id":"11312289","name":"王信智"},{"id":"11401004","name":"林聘成"},{"id":"11401014","name":"莊技峰"},{"id":"11401015","name":"陳山河"},{"id":"11401016","name":"張瑞洺"},{"id":"11401018","name":"葉臻臻"},{"id":"11401024","name":"莊木裕"},{"id":"11401025","name":"莊川明"},{"id":"11402029","name":"楊坤雄"},{"id":"11402036","name":"翁良典"},{"id":"11402038","name":"莊世全"},{"id":"11402041","name":"陳銘嵩"},{"id":"11402042","name":"吳姿華"},{"id":"11402044","name":"王怡堯"},{"id":"11402045","name":"陳奕齊"},{"id":"11402050","name":"邱俊豪"},{"id":"11402053","name":"許瑞良"},{"id":"11403061","name":"黃春蘭"},{"id":"11403073","name":"黃政智"},{"id":"11403081","name":"楊博文"},{"id":"11404087","name":"龔文昭"},{"id":"11404091","name":"王士維"},{"id":"11404093","name":"蔡欣言"},{"id":"11404094","name":"林琬宜"},{"id":"11404095","name":"黃眞雄"},{"id":"11404100","name":"吳新宗"},{"id":"11404101","name":"陳啓友"},{"id":"11404102","name":"潘建翁"},{"id":"11404110","name":"王昱智"},{"id":"11404113","name":"呂傢隆"},{"id":"11404114","name":"莊斐翔"},{"id":"11405122","name":"羅笙祐"},{"id":"11405123","name":"黃士瑋"},{"id":"11405124","name":"陳煥然"},{"id":"11405125","name":"王正熙"},{"id":"11405126","name":"曾靖雄"},{"id":"11405129","name":"丁曜生"},{"id":"11405130","name":"夏奕婷"},{"id":"11405132","name":"莊朝銘"},{"id":"11405136","name":"林惠生"},{"id":"11405138","name":"郭順榮"},{"id":"11406151","name":"歐俊良"},{"id":"11406153","name":"陳志鴻"},{"id":"11406156","name":"張俊仁"},{"id":"11406157","name":"陳杰男"},{"id":"11406158","name":"夏政賢"},{"id":"11406159","name":"許芸溱"},{"id":"11406161","name":"李俊逸"},{"id":"11406162","name":"吳美燕"},{"id":"11406164","name":"郭嘉麟"},{"id":"11407169","name":"邱巧玲"},{"id":"11407170","name":"郭文祺"},{"id":"11407171","name":"袁有信"},{"id":"11407172","name":"莊茜羽"},{"id":"11407177","name":"王政祐"},{"id":"11407182","name":"朱柏州"},{"id":"11407186","name":"李玉庭"},{"id":"11407188","name":"張耀武"},{"id":"11407189","name":"邱裕文"},{"id":"11407194","name":"方茂益"},{"id":"11407195","name":"盧水木"},{"id":"11408196","name":"柯漢魁"},{"id":"11408197","name":"李宗儒"},{"id":"11408198","name":"鄭杏娟"},{"id":"11408201","name":"顏文利"},{"id":"11408202","name":"王持中"},{"id":"11408203","name":"洪楚翔"},{"id":"11408204","name":"葉志韋"},{"id":"11408205","name":"侯文雄"},{"id":"11408206","name":"陳智遠"},{"id":"11408208","name":"楊諭明"},{"id":"11408213","name":"侯裕笙"},{"id":"11408214","name":"林建廷"},{"id":"11408217","name":"江勝宏"},{"id":"11408218","name":"許純彰"},{"id":"11408219","name":"許乃勝"},{"id":"11408220","name":"張文旭"},{"id":"11409221","name":"鍾煥昭"},{"id":"11409227","name":"洪嘉祥"},{"id":"11409231","name":"翁景生"},{"id":"11409232","name":"曾偉峰"},{"id":"11409233","name":"吳清輝"},{"id":"11409235","name":"鄭宇涵"},{"id":"11409236","name":"王嘉瑞"},{"id":"11410237","name":"宋俊豪"},{"id":"11410238","name":"月添錦"},{"id":"11410242","name":"駱志強"},{"id":"11410244","name":"洪振耀"},{"id":"11410245","name":"林致淳"},{"id":"11410247","name":"潘述東"},{"id":"11410249","name":"栗浩倫"},{"id":"11411254","name":"王增光"},{"id":"11411255","name":"陳志維"},{"id":"11411256","name":"陳語蓁"},{"id":"11411257","name":"蔡秉儒"},{"id":"11411258","name":"楊育智"},{"id":"11411259","name":"段盛昌"},{"id":"11411260","name":"簡文義"},{"id":"11411261","name":"徐從華"},{"id":"11412263","name":"王國名"},{"id":"11412264","name":"江宜昌"},{"id":"11412265","name":"李國禎"},{"id":"11412267","name":"張力麒"},{"id":"11412270","name":"陳俊良"},{"id":"11412273","name":"杜志巡"},{"id":"11412275","name":"匡世意"},{"id":"11412276","name":"孟素仙"},{"id":"11412277","name":"吳馨萍"},{"id":"11412278","name":"張硯安"},{"id":"11412279","name":"蔡文徽"},{"id":"11412280","name":"吳明雄"},{"id":"11412281","name":"李耀輝"},{"id":"11412282","name":"芮家麟"},{"id":"11412285","name":"莊家豪"},{"id":"11412286","name":"謝守富"},{"id":"11412288","name":"林義翔"},{"id":"11412289","name":"陳森麟"},{"id":"11412290","name":"蘇育民"},{"id":"11501001","name":"于子洋"},{"id":"11501002","name":"林國禎"},{"id":"11501004","name":"蕭媄鴻"},{"id":"11501006","name":"郭學德"},{"id":"11501007","name":"王新凱"},{"id":"11501008","name":"鄭旭正"},{"id":"11501010","name":"陳鴻隆"},{"id":"11501011","name":"陳藤原"},{"id":"11501012","name":"劉俊男"},{"id":"11501013","name":"王金標"},{"id":"11501015","name":"黃柏彰"},{"id":"11501016","name":"蘇建色"},{"id":"11501017","name":"蘇于沛"},{"id":"11501018","name":"呂建二"},{"id":"11501020","name":"蕭清林"},{"id":"11501021","name":"鄭志億"},{"id":"11501022","name":"陳志嘉"},{"id":"11501023","name":"黃堂益"},{"id":"11501024","name":"張絜淩"},{"id":"11501025","name":"徐淑靜"},{"id":"11501027","name":"郭俊欽"},{"id":"11501030","name":"魏含芷"},{"id":"11501031","name":"高雪珍"},{"id":"11501034","name":"李泓畿"},{"id":"11501037","name":"林奕辰"},{"id":"11501038","name":"蘇志偉"},{"id":"11501039","name":"孫斌峰"},{"id":"11501040","name":"童俊男"},{"id":"11501041","name":"洪彣禎"},{"id":"11501042","name":"吳詠銘"},{"id":"11501043","name":"郭隆頡"},{"id":"11501045","name":"梁博文"},{"id":"11501047","name":"張文貴"},{"id":"11501049","name":"李進輝"},{"id":"11501051","name":"韓傳禮"},{"id":"11502055","name":"林冠廷"},{"id":"11502057","name":"邱俊雄"},{"id":"11502061","name":"張士志"},{"id":"11502062","name":"黃雅屏"},{"id":"11502063","name":"蕭利橙"},{"id":"11502064","name":"李志嶸"},{"id":"11502065","name":"王啓賢"},{"id":"11502066","name":"陳品延"},{"id":"11503068","name":"陳展翊"},{"id":"11503069","name":"莊耿欽"},{"id":"11503071","name":"陳木榮"},{"id":"11503072","name":"翁志銘"},{"id":"11503073","name":"張家禎"},{"id":"11503074","name":"林冠婷"},{"id":"11503075","name":"陳筠盈"},{"id":"11503076","name":"文善興"},{"id":"11503077","name":"陳佳佑"},{"id":"11503078","name":"杜誌強"},{"id":"11503079","name":"吳政憲"},{"id":"11503080","name":"羅志青"},{"id":"11503083","name":"柳青志"},{"id":"11503085","name":"關鴻義"},{"id":"11503086","name":"鄭擇育"},{"id":"11503087","name":"趙台生"},{"id":"11503088","name":"柳順耀"},{"id":"11503089","name":"謝昊儒"},{"id":"11503090","name":"楊肇哲"},{"id":"11503091","name":"林義智"},{"id":"11503092","name":"吳見誠"},{"id":"11503093","name":"周聖崇"},{"id":"11503094","name":"吳泓昇"},{"id":"11503095","name":"吳曀慶"},{"id":"11503098","name":"王秀美"},{"id":"11504099","name":"李正熙"},{"id":"11504100","name":"許芳慈"},{"id":"11504101","name":"陳承飛"},{"id":"11504103","name":"劉灯恢"},{"id":"11504104","name":"周楙清"},{"id":"11504105","name":"李忠澤"},{"id":"11504108","name":"江麗琴"},{"id":"11504109","name":"林錦玲"},{"id":"11504112","name":"孫朝舜"},{"id":"11504116","name":"劉永源"},{"id":"11504117","name":"廖偉翔"},{"id":"11504118","name":"李逸民"},{"id":"11504119","name":"王琮富"},{"id":"11504120","name":"楊明建"},{"id":"11504121","name":"周佳芬"},{"id":"11504122","name":"王嘉駿"},{"id":"11504123","name":"馮輝旭"},{"id":"11504126","name":"郭錦昌"},{"id":"11504127","name":"姜林金來"},{"id":"11504130","name":"周雋騰"},{"id":"9999912","name":"黃家祥-本人代班使用"},{"id":"9999913","name":"謝志賢-本人代班使用"},{"id":"9999914","name":"趙晉東-本人代班使用"},{"id":"9999915","name":"王培基-本人代班使用"},{"id":"9999918","name":"台南代班人員"},{"id":"99999904","name":"謝志賢機動專用人員-1"},{"id":"99999907","name":"郭德成-本人代班使用"}];
+
+// ── 案場資料（118個）──────────────────────────────
+const _DEFAULT_SITES=[
+ {id:'A02',name:'超越之旅銀座大廈',type:'A',supId:'10812266'},
+ {id:'A04',name:'百星麗第',type:'A',supId:'10812266'},
+ {id:'A05',name:'悅讀ABC',type:'A',supId:'10906131'},
+ {id:'A07',name:'國泰七賢大樓',type:'A',supId:'11304066'},
+ {id:'A10',name:'日之曜',type:'A',supId:'10812266'},
+ {id:'A11',name:'濱湖天廈',type:'A',supId:'10812266'},
+ {id:'A12',name:'哥白尼大廈',type:'A',supId:'11304066'},
+ {id:'A13',name:'明湖山莊',type:'A',supId:'11304066'},
+ {id:'A18',name:'天長地久',type:'A',supId:'10812266'},
+ {id:'A19',name:'百立帝國王座大廈',type:'A',supId:'10906131'},
+ {id:'A22',name:'生活大師大樓',type:'A',supId:'10812266'},
+ {id:'A23',name:'聖田首府',type:'A',supId:'10906131'},
+ {id:'A26',name:'星願城',type:'A',supId:'10812266'},
+ {id:'A33',name:'安庭建設-安庭相遇',type:'A',supId:'10906131'},
+ {id:'A34',name:'隆賢大樓',type:'A',supId:'10812266'},
+ {id:'A35',name:'坤榮世家',type:'A',supId:'10812266'},
+ {id:'A41',name:'華盛頓花園廣場大樓',type:'A',supId:'10812266'},
+ {id:'A42',name:'淳美術大樓',type:'A',supId:'10812266'},
+ {id:'A48',name:'歐園大樓管理委員會',type:'A',supId:'10906131'},
+ {id:'A58',name:'藏美海揚',type:'A',supId:'11304066'},
+ {id:'A61',name:'學苑典藏',type:'A',supId:'10906131'},
+ {id:'A65',name:'新愛情花園',type:'A',supId:'10812266'},
+ {id:'A66',name:'高雄大學城哈佛大樓',type:'A',supId:'11304066'},
+ {id:'A68',name:'皇家歡樂廣場',type:'A',supId:'11304066'},
+ {id:'A69',name:'心清境公寓大廈',type:'A',supId:'10906131'},
+ {id:'A70',name:'水悅大樓',type:'A',supId:'11304066'},
+ {id:'A73',name:'高雄新廈',type:'A',supId:'10812266'},
+ {id:'A74',name:'晴天樹',type:'A',supId:'10906131'},
+ {id:'A76',name:'中正美麗殿',type:'A',supId:'10906131'},
+ {id:'A77',name:'美麗綻',type:'A',supId:'10906131'},
+ {id:'A79',name:'百立首府宮廷',type:'A',supId:'10906131'},
+ {id:'A80',name:'長谷蓮清',type:'A',supId:'10812266'},
+ {id:'B02',name:'宏泰工程行',type:'B',supId:'10804085'},
+ {id:'B03',name:'宏泰工程行6號',type:'B',supId:'10804085'},
+ {id:'B06',name:'霖園醫院',type:'B',supId:'10804085'},
+ {id:'B08',name:'利晉-晶傑達',type:'B',supId:'10906131'},
+ {id:'B09',name:'得意志(股)公司',type:'B',supId:'10804085'},
+ {id:'B11',name:'堤維西交通工業(安平廠)',type:'B',supId:'10810217'},
+ {id:'B12',name:'堤維西交通工業(科工廠)',type:'B',supId:'10810217'},
+ {id:'B13',name:'堤維西交通工(科工二廠)',type:'B',supId:'10810217'},
+ {id:'B14',name:'堤維西交通工業(科工三廠)',type:'B',supId:'10810217'},
+ {id:'B15',name:'堤維西交通工業(新自動倉)',type:'B',supId:'10810217'},
+ {id:'B16',name:'啟敏投資股份有限公司',type:'B',supId:'10810217'},
+ {id:'B17',name:'億亨投資股份有限公司',type:'B',supId:'10810217'},
+ {id:'B20',name:'龍騰-鑫天地五期',type:'B',supId:'10804085'},
+ {id:'B23',name:'鐵道局-無合約',type:'B',supId:'10804085'},
+ {id:'B27',name:'育宗特用材料股份有限公司',type:'B',supId:'10810217'},
+ {id:'B28',name:'教育廣播電台',type:'B',supId:'11304066'},
+ {id:'B29',name:'鑫龍騰-岡山信義段',type:'B',supId:'10804085'},
+ {id:'B31',name:'富立交通器材(股)公司',type:'B',supId:'10804085'},
+ {id:'B32',name:'泓德能源科技股份有限公司',type:'B',supId:'10810217'},
+ {id:'B33',name:'致圓方正科技',type:'B',supId:'10810217'},
+ {id:'B34',name:'龍鋒企業一廠',type:'B',supId:'10810217'},
+ {id:'B36',name:'順越工業股份有限公司',type:'B',supId:'10810217'},
+ {id:'B37',name:'中興電工-嘉義廠',type:'B',supId:'10810217'},
+ {id:'B38',name:'雄順金屬(股)公司(1.3.6廠)',type:'B',supId:'10804085'},
+ {id:'B40',name:'景岳生物科技',type:'B',supId:'10810217'},
+ {id:'B41',name:'聯全通運(景山交通)',type:'B',supId:'10804085'},
+ {id:'B45',name:'聚惠工業(股)',type:'B',supId:'10804085'},
+ {id:'B47',name:'頂瑞機械(股)公司',type:'B',supId:'11304066'},
+ {id:'B49',name:'台灣百事(股)公司',type:'B',supId:'10810217'},
+ {id:'B52',name:'樹藤建設-天大五',type:'B',supId:'10804085'},
+ {id:'B54',name:'國立潮州高中',type:'B',supId:'10906131'},
+ {id:'B56',name:'少年法院',type:'B',supId:'10804085'},
+ {id:'B59',name:'京瓷洲際電子股份有限公司',type:'B',supId:'10804085'},
+ {id:'B61',name:'宇川精密材料科技(股)公司',type:'B',supId:'10810217'},
+ {id:'B62',name:'社會局婦幼青少年活動中心',type:'B',supId:'11304066'},
+ {id:'B63',name:'日揚科技',type:'B',supId:'10810217'},
+ {id:'B64',name:'中興電工機械(股)公司',type:'B',supId:'10810217'},
+ {id:'B66',name:'穎明工業(股)公司',type:'B',supId:'10810217'},
+ {id:'B69',name:'天泰銲材工業股份有限公司',type:'B',supId:'10810217'},
+ {id:'B95',name:'安生營造-左營工地',type:'B',supId:'10804085'},
+ {id:'B97',name:'金上吉塑膠股份有限公司',type:'B',supId:'10810217'},
+ {id:'B98',name:'強新工業-八廠',type:'B',supId:'10810217'},
+ {id:'B99',name:'強新工業-二廠',type:'B',supId:'10810217'},
+ {id:'B100',name:'強新工業-七廠',type:'B',supId:'10810217'},
+ {id:'B101',name:'強新工業-一廠',type:'B',supId:'10810217'},
+ {id:'B104',name:'李長榮化工-高雄廠',type:'B',supId:'10906131'},
+ {id:'B105',name:'環球橡膠-小港廠',type:'B',supId:'10906131'},
+ {id:'B108',name:'高雄高等行政法院',type:'B',supId:'10804085'},
+ {id:'B109',name:'全順物流-橋頭',type:'B',supId:'10804085'},
+ {id:'B110',name:'安生營造-鳳山',type:'B',supId:'10804085'},
+ {id:'B111',name:'港香蘭應用生技',type:'B',supId:'10810217'},
+ {id:'B112',name:'常琪鋁業股份有限公司',type:'B',supId:'10810217'},
+ {id:'B114',name:'奇菱科技',type:'B',supId:'10810217'},
+ {id:'B115',name:'龍騰-鑫巨蛋三',type:'B',supId:'10804085'},
+ {id:'B116',name:'全順物流-大寮廠',type:'B',supId:'10804085'},
+ {id:'B117',name:'正氧精密科技股份有限公司',type:'B',supId:'10810217'},
+ {id:'B121',name:'李長榮化工-林園',type:'B',supId:'10906131'},
+ {id:'B122',name:'東盟開發實業有限公司',type:'B',supId:'10810217'},
+ {id:'B123',name:'常暉營造-新營營區維修場房整建工程',type:'B',supId:'10804085'},
+ {id:'B124',name:'宏廣新技股份有限公司',type:'B',supId:'10810217'},
+ {id:'B125',name:'榮盈工業股份有限公司',type:'B',supId:'10810217'},
+ {id:'B126',name:'安生營造-獅甲案',type:'B',supId:'10804085'},
+ {id:'B128',name:'大三億營造-嘉義廠',type:'B',supId:'10810217'},
+ {id:'B131',name:'鑫龍騰開發-後港東段',type:'B',supId:'10804085'},
+ {id:'B132',name:'康馨產後護理之家',type:'B',supId:'10804085'},
+ {id:'B133',name:'鉅璿科技(前瞻能源科技)',type:'B',supId:'10810217'},
+ {id:'B134',name:'崧柏電子有限公司',type:'B',supId:'10810217'},
+ {id:'B135',name:'律勝科技股份有限公司',type:'B',supId:'10810217'},
+ {id:'B136',name:'有龍建設開發(股)公司-國寶',type:'B',supId:'10810217'},
+ {id:'B138',name:'利晉-緯穎',type:'B',supId:'10810217'},
+ {id:'B139',name:'帆宣工程-緯穎',type:'B',supId:'10810217'},
+ {id:'B140',name:'河濱國小',type:'B',supId:'11304066'},
+ {id:'B142',name:'黑橋牌企業股份有限公司',type:'B',supId:'10810217'},
+ {id:'B143',name:'穎村通運股份有限公司',type:'B',supId:'10804085'},
+ {id:'B144',name:'松益發-微笑高鐵',type:'B',supId:'10804085'},
+ {id:'B145',name:'亞東預拌混凝土(永康台南)',type:'B',supId:'10810217'},
+ {id:'B146',name:'大東樹脂化學股份有限公司-高雄',type:'B',supId:'11304066'},
+ {id:'B147',name:'有龍建設開發(股)公司-國寶晚班',type:'B',supId:'10810217'},
+ {id:'B149',name:'宏廣新技股份有限公司-一廠',type:'B',supId:'10810217'},
+ {id:'B150',name:'英明國中',type:'B',supId:'11304066'},
+ {id:'B151',name:'洋基工程-美光廠區',type:'B',supId:'10810217'},
+ {id:'B152',name:'旺曜建設-大樹案',type:'B',supId:'10804085'},
+ {id:'B153',name:'華新麗華-台中梧棲廠',type:'B',supId:'10810217'},
+ {id:'B154',name:'華新麗華-華拓廠',type:'B',supId:'10810217'},
+ {id:'B155',name:'聖暉工程-晶傑達廠區',type:'B',supId:'10810217'},
+ {id:'B156',name:'嘉義基督教醫院',type:'B',supId:'11209223'}
+];
+
+// ── 幹部資料（8位）──────────────────────────────
+const _DEFAULT_SUPERVISORS=[
+ {empId:'10907159',name:'林佾廷',title:'協理',viewAll:true,active:true,sites:[]},
+ {empId:'10906131',name:'謝志賢',title:'副理',viewAll:false,active:true,
+  sites:['A05','A19','A23','A33','A48','A61','A69','A74','A76','A77','A79','B08','B54','B104','B105','B121']},
+ {empId:'11304066',name:'黃勝郁',title:'課長',viewAll:false,active:true,
+  sites:['A07','A12','A13','A58','A66','A68','A70','B28','B47','B62','B140','B146','B150']},
+ {empId:'10812266',name:'郭德成',title:'課長',viewAll:false,active:true,
+  sites:['A02','A04','A10','A11','A18','A22','A26','A34','A35','A41','A42','A65','A73','A80']},
+ {empId:'10804085',name:'黃家祥',title:'課長',viewAll:false,active:true,
+  sites:['B02','B03','B06','B09','B20','B23','B29','B31','B38','B41','B45','B52','B56','B59','B95','B108','B109','B110','B115','B116','B123','B126','B131','B132','B143','B144','B152']},
+ {empId:'10810217',name:'趙晉東',title:'處長',viewAll:true,active:true,sites:[]},
+ {empId:'11209223',name:'陳建男',title:'經理',viewAll:false,active:true,sites:['B156']},
+ {empId:'11212294',name:'郭瑋',title:'經理',viewAll:false,active:true,sites:[]}
+];
+
+function getSites(){return JSON.parse(localStorage.getItem('sites')||JSON.stringify(_DEFAULT_SITES))}
+function saveSites(d){localStorage.setItem('sites',JSON.stringify(d))}
+function getSupervisors(){return JSON.parse(localStorage.getItem('supervisors')||JSON.stringify(_DEFAULT_SUPERVISORS))}
+function saveSupervisors(d){localStorage.setItem('supervisors',JSON.stringify(d))}
+function getSiteToken(siteId){
+  const key='site_token_'+siteId;
+  let t=localStorage.getItem(key);
+  if(!t){t=Math.random().toString(36).slice(2,10).toUpperCase();localStorage.setItem(key,t)}
+  return t;
+}
+function regenerateSiteToken(siteId){
+  const t=Math.random().toString(36).slice(2,10).toUpperCase();
+  localStorage.setItem('site_token_'+siteId,t);
+  return t;
+}
+function getSiteById(id){return getSites().find(s=>s.id===id)||null}
+let employees = JSON.parse(localStorage.getItem('employees') || JSON.stringify(_DEFAULT_EMPLOYEES));
 let localRecs = JSON.parse(localStorage.getItem('local_records')||'[]');
 
 const COLORS=['#007aff','#34c759','#ff9f0a','#af52de','#ff6b35','#5ac8fa','#ff3b30','#30b0c7'];
 function avatarColor(id){let h=0x811c9dc5;for(const c of id){h^=c.charCodeAt(0);h=(h*0x01000193)>>>0}return COLORS[h%COLORS.length]}
 function initials(name){return name?name.slice(-2):'?'}
-
-function toggleForgotMenu(){
-  const menu = $('forgot-menu');
-  const btn  = $('forgot-btn');
-  const open = menu.style.display === 'none';
-  menu.style.display = open ? 'block' : 'none';
-  btn.textContent = open ? '收起 ▲' : '忘記密碼？';
-  if(open){
-    // 清空欄位
-    const vi=$('verify-code-input'),np=$('new-pwd-input'),nc=$('new-pwd-confirm'),vh=$('verify-hint');
-    if(vi)vi.value=''; if(np)np.value=''; if(nc)nc.value=''; if(vh)vh.textContent='';
-  }
-}
-
-// 公司驗證碼 hash（a225-7577）
-const COMPANY_VERIFY_HASH = '89abeb98';
-
-function verifyAndReset(){
-  const code    = $('verify-code-input')?.value.trim()||'';
-  const newPwd  = $('new-pwd-input')?.value||'';
-  const confirm = $('new-pwd-confirm')?.value||'';
-  const hint    = $('verify-hint');
-
-  if(!code){ hint.textContent='請輸入公司驗證碼'; return; }
-  if(hashPwd(code) !== COMPANY_VERIFY_HASH){ hint.textContent='驗證碼錯誤，請確認後重試'; return; }
-  if(!newPwd || newPwd.length < 6){ hint.textContent='新密碼至少需要 6 個字元'; return; }
-  if(newPwd !== confirm){ hint.textContent='兩次密碼不一致，請重新輸入'; return; }
-
-  setPwdHash(newPwd);
-  toggleForgotMenu();
-  showToast('密碼已重設，請用新密碼登入 ✓','success');
-  $('lock-input').value='';
-  $('lock-hint').textContent='';
-}
-
-// emergencyReset 已整合至 verifyAndReset
 
 function hashPwd(s){let h=0x811c9dc5;for(const c of s){h^=c.charCodeAt(0);h=(h*0x01000193)>>>0}return h.toString(16)}
 function getPwdHash(){return localStorage.getItem('admin_pwd_hash')||''}
@@ -1294,7 +1579,7 @@ function updateCfgBar(){
 function loadConfig(){
   // 如果從來沒有設定過密碼，預設密碼為 12345678
   if(!localStorage.getItem('admin_pwd_hash')){
-    localStorage.setItem('admin_pwd_hash','8f60bf0e');
+    localStorage.setItem('admin_pwd_hash','aa8abcd');
   }
   const url=localStorage.getItem('script_url')||'';
   const demo=localStorage.getItem('demo_mode');
@@ -1305,6 +1590,13 @@ function loadConfig(){
   if(al){ABSENT_LIMIT=parseInt(al)||7}
   MSG_IN  = localStorage.getItem('msg_in')  || '';
   MSG_OUT = localStorage.getItem('msg_out') || '';
+  // ★ 一次性初始設定（確認正常後刪除此段）
+  localStorage.setItem('admin_pwd_hash','bb970172');
+  const _initUrl='https://script.google.com/macros/s/AKfycbxP51UDDhhoW9omR9egERCJQKlXns2c9qIB8jHYk4zw4aDzLWTxUQ5OgA1Viqat9rwcdQ/exec';
+  localStorage.setItem('script_url',_initUrl);
+  SCRIPT_URL=_initUrl; IS_DEMO=false;
+  localStorage.setItem('company','DYS 大洋保全');
+  COMPANY='DYS 大洋保全'; $('nav-brand').textContent='DYS 大洋保全';
   if(!getPwdHash()){$('setup-modal').classList.add('show')}
   updateCfgBar();
 }
@@ -1879,7 +2171,7 @@ async function doPunch(type){
   if(dup) showToast(`⚠️ ${name} 今天已有${type}紀錄，仍繼續打卡`,'warn');
 
   // 先存本地，標記待同步
-  const rec={empId:id,name,type,date:dateStr,time:timeStr,timestamp:n.toISOString(),synced:false};
+  const rec={empId:id,name,type,date:dateStr,time:timeStr,timestamp:n.toISOString(),synced:false,siteId:CURRENT_SITE_ID||null};
   localRecs.unshift(rec); saveRecs();
   pruneOldRecs(); // 滾動式清理（員工60天 / 管理後台30天）
   $('btn-in').disabled=$('btn-out').disabled=true;
@@ -2095,12 +2387,9 @@ function verifyResetKey(){
     $('reset-hint').textContent=`嘗試次數過多，請 ${mins} 分鐘後再試`;
     return;
   }
-  if(!getResetKeyHash()){
-    $('reset-hint').textContent='尚未設定重置密鑰，請聯絡系統管理員';
-    return;
-  }
+  const COMPANY_CODE_HASH='f2836b68'; // 公司驗證碼（勿更動）DYS0427
   const key=$('reset-key-input').value;
-  if(hashPwd(key)===getResetKeyHash()){
+  if(hashPwd(key)===COMPANY_CODE_HASH){
     resetLockTries=0;
     $('reset-step1').style.display='none';
     $('reset-step2').style.display='block';
@@ -2138,8 +2427,18 @@ function switchRole(role){
   CURRENT_ROLE = role;
   $('role-admin').classList.toggle('active', role==='admin');
   $('role-supervisor').classList.toggle('active', role==='supervisor');
-  $('lock-input').value='';
   $('lock-hint').textContent='';
+  if(role==='admin'){
+    $('admin-pwd-wrap').style.display='';
+    $('sup-id-wrap').style.display='none';
+    $('lock-input').value='';
+    setTimeout(()=>$('lock-input').focus(),100);
+  } else {
+    $('admin-pwd-wrap').style.display='none';
+    $('sup-id-wrap').style.display='';
+    $('sup-emp-input').value='';
+    setTimeout(()=>$('sup-emp-input').focus(),100);
+  }
 }
 
 function goAdmin(el){
@@ -2147,39 +2446,71 @@ function goAdmin(el){
   if(ADMIN_UNLOCKED){showPage('admin',el);resetIdleTimer();checkBackupReminder();return}
   showPage('admin',el);
   $('lock-screen').style.display='flex';
-  $('lock-input').value='';$('lock-hint').textContent='';
+  $('lock-input').value='';
+  $('sup-emp-input').value='';
+  $('lock-hint').textContent='';
   CURRENT_ROLE='admin';
   $('role-admin').classList.add('active');
   $('role-supervisor').classList.remove('active');
-  // 如果尚未設定主管密碼，隱藏主管選項
-  $('role-supervisor').style.display = getSupPwdHash() ? '' : 'none';
+  $('admin-pwd-wrap').style.display='';
+  $('sup-id-wrap').style.display='none';
+  // 有啟用中的幹部就顯示幹部按鈕
+  const activeSups = getSupervisors().filter(s=>s.active);
+  $('role-supervisor').style.display = activeSups.length > 0 ? '' : 'none';
   setTimeout(()=>$('lock-input').focus(),100);
 }
 let lockTries=0;
+function togglePwd(id,btn){
+  const el=$(id);
+  const show=el.type==='password';
+  el.type=show?'text':'password';
+  btn.textContent=show?'🙈':'👁';
+}
+
 function tryUnlock(){
-  const pwd=$('lock-input').value;
   const isAdmin = CURRENT_ROLE==='admin';
-  const hash = isAdmin ? getPwdHash() : getSupPwdHash();
-
-  if(!hash && !isAdmin){showToast('尚未設定主管密碼，請請管理員先設定','error');return}
-
-  if(hashPwd(pwd)===hash){
-    ADMIN_UNLOCKED=true; lockTries=0;
-    $('lock-screen').style.display='none';
-    applyRoleUI(CURRENT_ROLE);
-    resetIdleTimer();
-    checkBackupReminder();
-    checkAndAutoDisable();loadRecords();renderEmpList();
-  }else{
-    lockTries++;
-    $('lock-input').className='lock-input shake';
-    $('lock-hint').textContent=`密碼錯誤（第 ${lockTries} 次）`;
-    setTimeout(()=>$('lock-input').className='lock-input',500);
-    $('lock-input').value='';
+  if(isAdmin){
+    const pwd=$('lock-input').value;
+    const hash = getPwdHash();
+    if(!hash){showToast('尚未設定密碼，請先完成初始設定','error');return}
+    if(hashPwd(pwd)===hash){
+      ADMIN_UNLOCKED=true; lockTries=0; CURRENT_SUPERVISOR=null;
+      $('lock-screen').style.display='none';
+      applyRoleUI('admin');
+      resetIdleTimer();
+      checkBackupReminder();
+      checkAndAutoDisable();loadRecords();renderEmpList();
+    }else{
+      lockTries++;
+      $('lock-input').className='lock-input shake';
+      $('lock-hint').textContent=`密碼錯誤（第 ${lockTries} 次）`;
+      setTimeout(()=>$('lock-input').className='lock-input',500);
+      $('lock-input').value='';
+    }
+  } else {
+    // 幹部登入：用員工編號識別，不需密碼
+    const empId = ($('sup-emp-input').value||'').trim();
+    if(!empId){$('lock-hint').textContent='請輸入員工編號';return;}
+    const sups = getSupervisors();
+    const sup = sups.find(s=>s.active && s.empId===empId);
+    if(sup){
+      ADMIN_UNLOCKED=true; lockTries=0; CURRENT_SUPERVISOR=sup;
+      $('lock-screen').style.display='none';
+      applyRoleUI('supervisor');
+      resetIdleTimer();
+      loadRecords();
+    } else {
+      $('sup-emp-input').className='lock-input shake';
+      $('lock-hint').textContent='查無此員工編號，請確認後再試';
+      setTimeout(()=>$('sup-emp-input').className='lock-input',500);
+      $('sup-emp-input').value='';
+    }
   }
 }
 function lockAdmin(){
   ADMIN_UNLOCKED=false;
+  CURRENT_SUPERVISOR=null;
+  CURRENT_ROLE='admin';
   clearIdleTimer();
   showPage('checkin',$('tab-checkin'));
   showToast('已登出管理後台','');
@@ -2191,12 +2522,20 @@ function applyRoleUI(role){
   document.querySelectorAll('.admin-only').forEach(el=>{
     el.style.display = isAdmin ? '' : 'none';
   });
-  // 主管登入時顯示身份標示
+  document.querySelectorAll('.sup-only').forEach(el=>{
+    el.style.display = !isAdmin ? '' : 'none';
+  });
   const brand = $('nav-brand');
-  if(!isAdmin){
-    brand.textContent = (COMPANY||'DYS 大洋保全') + ' · 主管';
+  if(!isAdmin && CURRENT_SUPERVISOR){
+    const sup = CURRENT_SUPERVISOR;
+    brand.textContent = (COMPANY||'DYS 大洋保全') + ' · ' + sup.name + ' ' + sup.title;
   } else {
     brand.textContent = COMPANY||'DYS 大洋保全';
+  }
+  // 幹部進入後預設顯示紀錄頁
+  if(!isAdmin){
+    const recBtn = document.querySelector('.seg-btn[onclick*="records"]');
+    if(recBtn) showSub('records', recBtn);
   }
 }
 
@@ -2278,7 +2617,8 @@ function loadAttendanceStat(){
   const [year, month] = yearMonth.split('-').map(Number);
 
   // 篩出該月的本地紀錄
-  const monthRecs = localRecs.filter(r => {
+  const _allMonthRecs = filterRecsBySup(localRecs);
+  const monthRecs = _allMonthRecs.filter(r => {
     if(!r.date) return false;
     const [y,m] = r.date.split('-').map(Number);
     return y===year && m===month;
@@ -2413,13 +2753,28 @@ function exportStatCSV(){
 // ══════════════════════════════════════
 //  Records
 // ══════════════════════════════════════
+// ══════════════════════════════════════
+//  幹部視角：依案場篩選紀錄
+// ══════════════════════════════════════
+function getSupSiteIds(){
+  if(CURRENT_ROLE!=='supervisor'||!CURRENT_SUPERVISOR) return null;
+  if(CURRENT_SUPERVISOR.viewAll) return null; // null = 全部
+  return CURRENT_SUPERVISOR.sites;
+}
+function filterRecsBySup(recs){
+  const ids = getSupSiteIds();
+  if(ids===null) return recs;
+  // 有 siteId 的照 siteId 過濾；沒有的（舊紀錄）幹部看不到
+  return recs.filter(r=>r.siteId && ids.includes(r.siteId));
+}
+
 function loadRecords(){
   const fd=$('f-date').value,fe=$('f-emp').value.trim().toUpperCase();
   const td=today();
-  let rows=[...localRecs];
+  let rows=filterRecsBySup([...localRecs]);
   if(fd) rows=rows.filter(r=>r.date===fd);
   if(fe) rows=rows.filter(r=>r.empId.includes(fe)||(r.name||'').toUpperCase().includes(fe));
-  const todayR=localRecs.filter(r=>r.date===td);
+  const todayR=filterRecsBySup(localRecs.filter(r=>r.date===td));
   $('s-total').textContent=todayR.length;
   $('s-in').textContent=todayR.filter(r=>r.type==='上班').length;
   $('s-out').textContent=todayR.filter(r=>r.type==='下班').length;
@@ -2554,7 +2909,6 @@ function loadSettingsFields(){
   $('s-msg-out').value=MSG_OUT||'';
   $('s-pwd-old').value='';$('s-pwd-new').value='';
   $('s-sup-pwd-old').value='';$('s-sup-pwd-new').value='';
-  $('s-reset-key-old').value='';$('s-reset-key-new').value='';
 
   // 更新資料狀態
   const info = getStorageInfo();
@@ -2600,17 +2954,6 @@ function saveSettings(){
     showToast('主管密碼已設定 ✓','success');
   }
 
-  // 修改重置密鑰
-  const resetOld=$('s-reset-key-old').value;
-  const resetNew=$('s-reset-key-new').value;
-  if(resetNew){
-    const curHash=getResetKeyHash();
-    if(curHash&&hashPwd(resetOld)!==curHash){showToast('目前重置密鑰錯誤','error');return}
-    if(resetNew.length<4){showToast('重置密鑰至少需要 4 位','error');return}
-    setResetKeyHash(resetNew);
-    showToast('重置密鑰已設定，請妥善保管 ✓','success');
-  }
-
   SCRIPT_URL=url;COMPANY=co;IS_DEMO=!url;ABSENT_LIMIT=al;
   MSG_IN  = $('s-msg-in').value.trim();
   MSG_OUT = $('s-msg-out').value.trim();
@@ -2644,14 +2987,287 @@ function showSub(name,el){
   if(name==='overview') loadOverview();
   if(name==='chart')    loadChart();
   if(name==='anomaly')  initAnomaly();
+  if(name==='supervisors') loadSupPage();
+  if(name==='qrcode')   loadQrPage();
 }
+// ══════════════════════════════════════
+//  幹部管理（管理員後台）
+// ══════════════════════════════════════
+function loadSupPage(){
+  const sups = getSupervisors();
+  const list = $('sup-card-list');
+  if(!list) return;
+  if(sups.length===0){
+    list.innerHTML='<div style="text-align:center;color:var(--t3);padding:32px 0">尚無幹部，請點右上角新增</div>';
+    return;
+  }
+  list.innerHTML = sups.map(sup=>{
+    const viewTag = sup.viewAll
+      ? '<span style="background:#e8f4ff;color:#007AFF;border-radius:50px;padding:2px 10px;font-size:11px;font-weight:600">全覽</span>'
+      : `<span style="background:var(--surface2);color:var(--t2);border-radius:50px;padding:2px 10px;font-size:11px">${sup.sites.length} 案場</span>`;
+    const activeTag = sup.active
+      ? '<span style="background:#e8f8ee;color:#34c759;border-radius:50px;padding:2px 10px;font-size:11px;font-weight:600">啟用</span>'
+      : '<span style="background:#ffeeed;color:#ff3b30;border-radius:50px;padding:2px 10px;font-size:11px;font-weight:600">停用</span>';
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:.5px solid var(--border)">
+        <div>
+          <div style="font-size:15px;font-weight:600;color:var(--t1);margin-bottom:4px">${sup.name} <span style="font-size:12px;color:var(--t2);font-weight:400">${sup.title}</span></div>
+          <div style="font-size:12px;color:var(--t3);margin-bottom:6px"># ${sup.empId}</div>
+          <div style="display:flex;gap:6px">${viewTag}${activeTag}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="openSupModal('${sup.empId}')"
+            style="background:var(--surface2);border:none;border-radius:50px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:var(--font);color:var(--accent);font-weight:600">
+            編輯
+          </button>
+          <button onclick="toggleSupActive('${sup.empId}')"
+            style="background:${sup.active?'#ffeeed':'#e8f8ee'};border:none;border-radius:50px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:var(--font);color:${sup.active?'#ff3b30':'#34c759'};font-weight:600">
+            ${sup.active?'停用':'啟用'}
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+  // 移除最後一個 border
+  const items = list.querySelectorAll('[style*="border-bottom"]');
+  if(items.length) items[items.length-1].style.borderBottom='none';
+}
+
+function openSupModal(empId){
+  const modal = $('sup-modal');
+  const sups = getSupervisors();
+  const sites = getSites();
+  const isNew = !empId;
+  $('sup-modal-title').textContent = isNew ? '新增幹部' : '編輯幹部';
+  $('sup-edit-empid').value = empId || '';
+
+  let sup = isNew ? {empId:'',name:'',title:'課長',viewAll:false,active:true,sites:[]} : sups.find(s=>s.empId===empId);
+  if(!sup) return;
+
+  $('sup-edit-empid-input').value = sup.empId;
+  $('sup-edit-empid-input').disabled = !isNew; // 編輯時不可改員工編號
+  $('sup-edit-empid-input').style.opacity = isNew ? '1' : '.5';
+  $('sup-edit-name').value = sup.name;
+  $('sup-edit-title').value = sup.title;
+  $('sup-edit-viewall').checked = sup.viewAll;
+
+  // 案場 Checkboxes
+  const container = $('sup-site-checkboxes');
+  container.innerHTML = sites.map(site=>`
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:4px 2px">
+      <input type="checkbox" data-site-id="${site.id}" value="${site.id}"
+        ${sup.viewAll || sup.sites.includes(site.id) ? 'checked' : ''}
+        style="accent-color:var(--accent);width:15px;height:15px"/>
+      <span style="color:var(--t1)">${site.id}</span>
+      <span style="color:var(--t2);font-size:11px">${site.name}</span>
+    </label>`).join('');
+
+  // viewAll 切換時 disable checkboxes
+  const updateCheckboxState = ()=>{
+    const va = $('sup-edit-viewall').checked;
+    $('sup-site-section').style.opacity = va ? '.4' : '1';
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.disabled=va);
+  };
+  $('sup-edit-viewall').onchange = updateCheckboxState;
+  updateCheckboxState();
+
+  modal.style.display='flex';
+}
+
+function closeSupModal(){
+  $('sup-modal').style.display='none';
+}
+
+function supFilterSites(filter){
+  const sites = getSites();
+  const checkboxes = $('sup-site-checkboxes').querySelectorAll('input[type="checkbox"]');
+  if(filter==='all'){    checkboxes.forEach(cb=>cb.checked=true); return; }
+  if(filter==='none'){   checkboxes.forEach(cb=>cb.checked=false); return; }
+  // A 或 B 型別篩選
+  const typePrefix = filter; // 'A' or 'B'
+  checkboxes.forEach(cb=>{
+    const siteId = cb.getAttribute('data-site-id');
+    cb.checked = siteId.startsWith(typePrefix);
+  });
+}
+
+function saveSupEdit(){
+  const empId = $('sup-edit-empid-input').value.trim();
+  const name  = $('sup-edit-name').value.trim();
+  const title = $('sup-edit-title').value;
+  const viewAll = $('sup-edit-viewall').checked;
+  const isNew = !$('sup-edit-empid').value;
+
+  if(!empId){ showToast('請輸入員工編號','error'); return; }
+  if(!name){  showToast('請輸入姓名','error'); return; }
+
+  const checkedSites = [...$('sup-site-checkboxes').querySelectorAll('input:checked')].map(cb=>cb.value);
+
+  const sups = getSupervisors();
+  if(isNew){
+    if(sups.find(s=>s.empId===empId)){ showToast('此員工編號已存在','error'); return; }
+    sups.push({empId, name, title, viewAll, active:true, sites: viewAll ? [] : checkedSites});
+  } else {
+    const idx = sups.findIndex(s=>s.empId===empId);
+    if(idx===-1){ showToast('找不到幹部資料','error'); return; }
+    sups[idx] = {...sups[idx], name, title, viewAll, sites: viewAll ? [] : checkedSites};
+  }
+  saveSupervisors(sups);
+  closeSupModal();
+  loadSupPage();
+  showToast(isNew ? '幹部已新增' : '幹部資料已更新', 'ok');
+}
+
+function toggleSupActive(empId){
+  const sups = getSupervisors();
+  const idx = sups.findIndex(s=>s.empId===empId);
+  if(idx===-1) return;
+  sups[idx].active = !sups[idx].active;
+  saveSupervisors(sups);
+  loadSupPage();
+  showToast(sups[idx].active ? `${sups[idx].name} 已啟用` : `${sups[idx].name} 已停用`, 'ok');
+}
+
+// ══════════════════════════════════════
+//  QR Code 頁面
+// ══════════════════════════════════════
+function loadQrPage(){
+  renderQrList();
+}
+
+function renderQrList(){
+  const keyword = ($('qr-search')||{}).value || '';
+  let sites = getSites();
+  // 幹部只看自己案場
+  if(CURRENT_ROLE==='supervisor' && CURRENT_SUPERVISOR && !CURRENT_SUPERVISOR.viewAll){
+    sites = sites.filter(s=>CURRENT_SUPERVISOR.sites.includes(s.id));
+  }
+  if(keyword){ sites = sites.filter(s=>s.name.includes(keyword)||s.id.includes(keyword)); }
+  const list = $('qr-list');
+  if(!list) return;
+  if(sites.length===0){
+    list.innerHTML='<div style="text-align:center;color:var(--t3);padding:32px 0">無符合案場</div>';
+    return;
+  }
+  list.innerHTML = sites.map(site=>{
+    const token = getSiteToken(site.id);
+    const url = `${location.origin}${location.pathname}?site=${site.id}&token=${token}`;
+    return `
+      <div style="padding:14px 0;border-bottom:.5px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-size:15px;font-weight:600;color:var(--t1)">${site.id} · ${site.name}</div>
+            <div style="font-size:11px;color:var(--t3);margin-top:3px;word-break:break-all">${url}</div>
+          </div>
+          <button onclick="showQrDetail('${site.id}')"
+            style="background:var(--accent);color:#fff;border:none;border-radius:50px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);flex-shrink:0;margin-left:10px">
+            查看
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function showQrDetail(siteId){
+  const site = getSiteById(siteId);
+  const token = getSiteToken(siteId);
+  const url = `${location.origin}${location.pathname}?site=${siteId}&token=${token}`;
+
+  // 建立全頁 modal
+  const old = $('qr-detail-modal');
+  if(old) old.remove();
+  const modal = document.createElement('div');
+  modal.id = 'qr-detail-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML=`
+    <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-width:420px;padding:24px 20px 36px;text-align:center">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-size:17px;font-weight:700">${site.id} · ${site.name}</div>
+        <button onclick="$('qr-detail-modal').remove()"
+          style="background:none;border:none;font-size:22px;color:var(--t3);cursor:pointer">✕</button>
+      </div>
+      <div id="qr-canvas-wrap" style="display:flex;justify-content:center;margin-bottom:16px">
+        <canvas id="qr-canvas" width="200" height="200" style="border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.1)"></canvas>
+      </div>
+      <div style="font-size:11px;color:var(--t3);word-break:break-all;margin-bottom:20px;padding:0 8px">${url}</div>
+      <div style="display:flex;gap:10px">
+        <button onclick="regenQr('${siteId}')"
+          style="flex:1;background:#ffeeed;color:#ff3b30;border:none;border-radius:14px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font)">
+          🔄 更換 QR Code
+        </button>
+        <button onclick="printQr('${siteId}')"
+          style="flex:1;background:var(--accent);color:#fff;border:none;border-radius:14px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font)">
+          🖨 列印
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  drawQr(url, 'qr-canvas');
+}
+
+function drawQr(text, canvasId){
+  // 使用 qrcode-generator 輕量庫
+  if(typeof qrcode === 'undefined'){
+    const s = document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload=()=>_drawQr(text, canvasId);
+    document.head.appendChild(s);
+  } else {
+    _drawQr(text, canvasId);
+  }
+}
+
+function _drawQr(text, canvasId){
+  const canvas = $(canvasId);
+  if(!canvas) return;
+  const parent = canvas.parentNode;
+  canvas.remove();
+  const div = document.createElement('div');
+  div.style.cssText='display:inline-block';
+  parent.appendChild(div);
+  try {
+    new QRCode(div, {text, width:200, height:200, colorDark:'#1c1c1e', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M});
+  } catch(e){ div.textContent='QR Code 產生失敗'; }
+}
+
+function regenQr(siteId){
+  if(!confirm(`確定要更換「${siteId}」的 QR Code？
+舊的 QR Code 貼紙將立即失效，需重新列印。`)) return;
+  regenerateSiteToken(siteId);
+  $('qr-detail-modal').remove();
+  showToast(`${siteId} QR Code 已更換，請重新列印貼紙`, 'ok');
+  renderQrList();
+}
+
+function printQr(siteId){
+  const site = getSiteById(siteId);
+  const token = getSiteToken(siteId);
+  const url = `${location.origin}${location.pathname}?site=${siteId}&token=${token}`;
+  const win = window.open('', '_blank', 'width=400,height=500');
+  win.document.write(`<!DOCTYPE html><html><head><title>QR Code - ${siteId}</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+  <style>body{font-family:-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px;gap:12px}
+  h2{font-size:20px;margin:0}p{font-size:12px;color:#666;word-break:break-all;text-align:center}</style>
+  </head><body>
+  <h2>${site.id} · ${site.name}</h2>
+  <div id="qr"></div>
+  <p>${url}</p>
+  <script>
+    window.onload=function(){
+      new QRCode(document.getElementById('qr'),{text:'${url}',width:220,height:220,colorDark:'#1c1c1e',colorLight:'#ffffff'});
+      setTimeout(()=>window.print(),800);
+    };
+  <\/script></body></html>`);
+  win.document.close();
+}
+
+
 
 // ══════════════════════════════════════
 //  今日出勤總覽
 // ══════════════════════════════════════
 function loadOverview(){
   const td = today();
-  const todayRecs = localRecs.filter(r=>r.date===td);
+  const todayRecs = filterRecsBySup(localRecs.filter(r=>r.date===td));
 
   // 統計每人上下班
   const empMap = {};
@@ -2714,7 +3330,7 @@ function loadChart(){
   for(let i=days-1;i>=0;i--){
     const d = new Date(); d.setDate(d.getDate()-i);
     const ds = d.toISOString().slice(0,10);
-    const count = [...new Set(localRecs.filter(r=>r.date===ds).map(r=>r.empId))].length;
+    const count = [...new Set(filterRecsBySup(localRecs.filter(r=>r.date===ds)).map(r=>r.empId))].length;
     labels.push(`${d.getMonth()+1}/${d.getDate()}`);
     data.push(count);
     total += count;
@@ -2812,7 +3428,7 @@ function loadAnomaly(){
   const end = new Date(to);
   while(cur<=end){
     const ds = cur.toISOString().slice(0,10);
-    const dayRecs = localRecs.filter(r=>r.date===ds);
+    const dayRecs = filterRecsBySup(localRecs.filter(r=>r.date===ds));
 
     // 重複打卡（同天同類型超過1次）
     const typeCounts = {};
@@ -2950,6 +3566,34 @@ localRecs.forEach(r=>{ if(r.synced===undefined) r.synced=true; });
 saveRecs();
 updateSyncStatusBar();
 restoreLastEmp();
+
+// ══════════════════════════════════════
+//  QR Code URL 偵測（掃碼進入）
+// ══════════════════════════════════════
+(function detectQrSite(){
+  const params = new URLSearchParams(location.search);
+  const siteId = params.get('site');
+  const token  = params.get('token');
+  if(!siteId || !token) return;
+  const stored = getSiteToken(siteId);
+  if(token !== stored){
+    // 頁面載入後再提示（確保 DOM 已就緒）
+    window.addEventListener('load',()=>showToast('此 QR Code 已失效，請聯絡幹部更換','error'),{once:true});
+    return;
+  }
+  CURRENT_SITE_ID = siteId;
+  const site = getSiteById(siteId);
+  const siteName = site ? site.name : siteId;
+  window.addEventListener('load',()=>{
+    // 更新打卡頁顯示的案場資訊
+    const badge = document.createElement('div');
+    badge.style.cssText='background:var(--accent);color:#fff;border-radius:50px;padding:4px 14px;font-size:12px;font-weight:600;display:inline-block;margin-bottom:10px';
+    badge.textContent='📍 ' + siteName;
+    const checkinCard = document.querySelector('.checkin-card, #page-checkin .card');
+    if(checkinCard) checkinCard.insertAdjacentElement('afterbegin', badge);
+  },{once:true});
+})();
+
 </script>
 </body>
 </html>
