@@ -1590,13 +1590,6 @@ function loadConfig(){
   if(al){ABSENT_LIMIT=parseInt(al)||7}
   MSG_IN  = localStorage.getItem('msg_in')  || '';
   MSG_OUT = localStorage.getItem('msg_out') || '';
-  // ★ 一次性初始設定（確認正常後刪除此段）
-  localStorage.setItem('admin_pwd_hash','bb970172');
-  const _initUrl='https://script.google.com/macros/s/AKfycbxP51UDDhhoW9omR9egERCJQKlXns2c9qIB8jHYk4zw4aDzLWTxUQ5OgA1Viqat9rwcdQ/exec';
-  localStorage.setItem('script_url',_initUrl);
-  SCRIPT_URL=_initUrl; IS_DEMO=false;
-  localStorage.setItem('company','DYS 大洋保全');
-  COMPANY='DYS 大洋保全'; $('nav-brand').textContent='DYS 大洋保全';
   if(!getPwdHash()){$('setup-modal').classList.add('show')}
   updateCfgBar();
 }
@@ -2387,7 +2380,7 @@ function verifyResetKey(){
     $('reset-hint').textContent=`嘗試次數過多，請 ${mins} 分鐘後再試`;
     return;
   }
-  const COMPANY_CODE_HASH='f2836b68'; // 公司驗證碼（勿更動）DYS0427
+  const COMPANY_CODE_HASH='aad12410'; // 公司驗證碼（勿更動）
   const key=$('reset-key-input').value;
   if(hashPwd(key)===COMPANY_CODE_HASH){
     resetLockTries=0;
