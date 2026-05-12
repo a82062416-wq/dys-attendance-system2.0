@@ -657,6 +657,10 @@ tr:hover td{background:var(--surface2)}
   .numpad-grid{gap:7px}
   .punch-row{gap:7px;margin-top:7px}
 }
+    /* 日期快捷按鈕 */
+    .dq-btn { background: var(--surface2); color: var(--t2); border: .5px solid var(--border); }
+    .dq-active { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
+
 </style>
 </head>
 <body>
@@ -966,7 +970,6 @@ tr:hover td{background:var(--surface2)}
       <div class="toolbar">
         <div class="toolbar-title">打卡紀錄</div>
         <div class="toolbar-right">
-          <input type="date" class="fi" id="f-date" onchange="loadRecords()"/>
           <input type="text" class="fi" id="f-emp"  placeholder="編號 / 姓名" style="width:120px" oninput="loadRecords()"/>
           <button class="btn-s bs-ghost"  onclick="loadRecords()">🔄</button>
           <button class="btn-s bs-ghost"  onclick="manualSync()" id="btn-manual-sync">☁️ 同步未上傳</button>
@@ -975,6 +978,20 @@ tr:hover td{background:var(--surface2)}
           <button class="btn-s bs-red"    onclick="clearLocal()">🗑</button>
           <button class="btn-s bs-lock"   onclick="lockAdmin()">🔒 登出</button>
         </div>
+      </div>
+      <!-- 日期區間快捷列 -->
+      <div id="date-filter-bar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 16px;border-bottom:.5px solid var(--border);background:var(--surface)">
+        <button class="btn-s dq-btn dq-active" onclick="setDateQuick('today',this)">今天</button>
+        <button class="btn-s dq-btn" onclick="setDateQuick('week',this)">本週</button>
+        <button class="btn-s dq-btn" onclick="setDateQuick('month',this)">本月</button>
+        <button class="btn-s dq-btn" onclick="setDateQuick('lastmonth',this)">上月</button>
+        <button class="btn-s dq-btn" onclick="setDateQuick('all',this)">全部</button>
+        <button class="btn-s dq-btn" onclick="setDateQuick('custom',this)">自訂 📅</button>
+        <span id="custom-range" style="display:none;gap:6px;align-items:center">
+          <input type="date" class="fi" id="f-date-start" onchange="loadRecords()" style="width:130px"/>
+          <span style="color:var(--t3);font-size:13px">—</span>
+          <input type="date" class="fi" id="f-date-end" onchange="loadRecords()" style="width:130px"/>
+        </span>
       </div>
       <div id="sync-status-bar" style="display:none" class="cfg-bar" style="background:color-mix(in srgb,var(--warn) 8%,var(--surface))">
         <span id="sync-status-msg" style="font-size:13px;color:var(--t1)"></span>
@@ -1251,7 +1268,13 @@ tr:hover td{background:var(--surface2)}
 
     <!-- QR Code 管理（幹部 + 管理員） -->
     <div class="sub-page" id="sub-qrcode">
-      <div class="toolbar"><div class="toolbar-title">QR Code 管理</div></div>
+      <div class="toolbar">
+        <div class="toolbar-title">QR Code 管理</div>
+        <div class="toolbar-right" id="qr-toolbar-admin" style="display:none">
+          <button class="btn-s bs-ghost" onclick="scanIdleSites()">🔍 閒置掃描</button>
+          <button class="btn-s bs-accent" onclick="exportAllQRLinks()">⬇ QR 連結</button>
+        </div>
+      </div>
       <div style="background:var(--surface);border-radius:var(--r);border:.5px solid var(--border);padding:16px;box-shadow:var(--sh1);max-width:560px">
         <div style="font-size:13px;color:var(--t2);margin-bottom:14px">掃碼後員工自動帶入案場打卡。若發現異常，可對負責案場更換 QR Code，舊碼即時失效。</div>
         <div style="margin-bottom:12px">
@@ -1340,7 +1363,7 @@ let ABSENT_LIMIT = 7;
 let MSG_IN  = ''; // 上班提醒
 let MSG_OUT = ''; // 下班提醒
 
-const _DEFAULT_EMPLOYEES = [{"id":"09402001","name":"劉黃秀"},{"id":"09701001","name":"王興庭"},{"id":"09903001","name":"洪有賀"},{"id":"09903002","name":"胡士勇"},{"id":"10001003","name":"李建興"},{"id":"10104003","name":"歐天賜"},{"id":"10104004","name":"張慶崑"},{"id":"10108014","name":"林瑞峰"},{"id":"10304005","name":"許銘哲"},{"id":"10305007","name":"陳明宗"},{"id":"10306010","name":"柳治國"},{"id":"10309021","name":"董秋祥"},{"id":"10310033","name":"洪榮進"},{"id":"10311040","name":"薛光鴻"},{"id":"10402005","name":"王朝和"},{"id":"10407017","name":"傅美惠"},{"id":"10411123","name":"李季珍"},{"id":"10512336","name":"黃兆賢"},{"id":"10602061","name":"林子霖"},{"id":"10602062","name":"尤華德"},{"id":"10603110","name":"林振峯"},{"id":"10607210","name":"王惠婷"},{"id":"10608236","name":"李冠儀"},{"id":"10612368","name":"黃文俊"},{"id":"10702024","name":"陳武春"},{"id":"10708164","name":"謝黃世美"},{"id":"10711225","name":"劉志明"},{"id":"10712258","name":"馬振祥"},{"id":"10804085","name":"黃家祥"},{"id":"10805096","name":"陸玄基"},{"id":"10805097","name":"趙明哲"},{"id":"10805101","name":"梁興成"},{"id":"10806120","name":"李新福"},{"id":"10806121","name":"鐘明源"},{"id":"10806131","name":"賴正文"},{"id":"10806134","name":"林啟榮"},{"id":"10807153","name":"賴富榮"},{"id":"10810217","name":"趙晉東"},{"id":"10812266","name":"郭德成"},{"id":"10901006","name":"何文山"},{"id":"10902028","name":"霍建南"},{"id":"10905085","name":"陳志德"},{"id":"10905093","name":"周思明"},{"id":"10906115","name":"張雅惠"},{"id":"10906118","name":"顏榮耀"},{"id":"10906131","name":"謝志賢"},{"id":"10906263","name":"鄭玲龍"},{"id":"10907159","name":"林佾廷"},{"id":"10908176","name":"梁東淦"},{"id":"10908178","name":"沈賜民"},{"id":"10908183","name":"謝怡道"},{"id":"10909196","name":"陳連勝"},{"id":"10912251","name":"羅正武"},{"id":"11002012","name":"鄭銘誌"},{"id":"11003037","name":"蔡含昱"},{"id":"11003043","name":"邱識宇"},{"id":"11003052","name":"謝鎮國"},{"id":"11004055","name":"邱志敏"},{"id":"11005077","name":"江佳秋"},{"id":"11005092","name":"連博法"},{"id":"11005093","name":"蔡昆宗"},{"id":"11006112","name":"李來成"},{"id":"11007137","name":"林余錦治"},{"id":"11007140","name":"陳信宇"},{"id":"11007142","name":"黃鈺程"},{"id":"11008167","name":"石祥甫"},{"id":"11009178","name":"朱俊彰"},{"id":"11009188","name":"陳俊欽"},{"id":"11010202","name":"陳權宏"},{"id":"11101006","name":"吳松山"},{"id":"11103062","name":"李慶徽"},{"id":"11103066","name":"蘇晨禾"},{"id":"11103075","name":"林麗玉"},{"id":"11104095","name":"吳升彥"},{"id":"11104101","name":"王秀美"},{"id":"11104102","name":"邱琪淋"},{"id":"11105120","name":"許安富"},{"id":"11106126","name":"袁紹賢"},{"id":"11107158","name":"傅笑翠"},{"id":"11108175","name":"林武宏"},{"id":"11108176","name":"王作團"},{"id":"11108177","name":"黃文清"},{"id":"11109210","name":"蔡登吉"},{"id":"11110237","name":"黃增華"},{"id":"11111250","name":"何思音"},{"id":"11111262","name":"洪建義"},{"id":"11112286","name":"謝華平"},{"id":"11202045","name":"田文豪"},{"id":"11203064","name":"王相鵬"},{"id":"11203087","name":"蕭宇良"},{"id":"11203089","name":"楊士平"},{"id":"11203090","name":"游競翔"},{"id":"11204094","name":"李元齊"},{"id":"11204101","name":"張郁聰"},{"id":"11205132","name":"鍾昕岱"},{"id":"11206160","name":"蔡薇軒"},{"id":"11208188","name":"周庭瑋"},{"id":"11208199","name":"蔡世瑜"},{"id":"11208200","name":"劉昭成"},{"id":"11208202","name":"鄭毓雄"},{"id":"11208206","name":"歐仲豪"},{"id":"11209214","name":"鄭富橙"},{"id":"11209223","name":"陳建男"},{"id":"11209230","name":"柳室豐"},{"id":"11209232","name":"蔡學敏"},{"id":"11209234","name":"程志宏"},{"id":"11210264","name":"陳信宏"},{"id":"11210265","name":"毛鳳珠"},{"id":"11212294","name":"郭瑋"},{"id":"11212301","name":"楊壽生"},{"id":"11212308","name":"蕭素梅"},{"id":"11212311","name":"陳安國"},{"id":"11212316","name":"薛志強"},{"id":"11212317","name":"李俊易"},{"id":"11212318","name":"黃義雄"},{"id":"11212322","name":"鄭秉豐"},{"id":"11212323","name":"鄭凱中"},{"id":"11212324","name":"潘建芃"},{"id":"11212325","name":"謝長清"},{"id":"11212326","name":"栗怡豪"},{"id":"11300001","name":"許恭銘"},{"id":"11300002","name":"毛勝吉"},{"id":"11300003","name":"洪信宏"},{"id":"11300005","name":"蔡正風"},{"id":"11300006","name":"鄭人豪"},{"id":"11300007","name":"陳柏沅"},{"id":"11300008","name":"陳東杰"},{"id":"11300009","name":"劉東桀"},{"id":"11300010","name":"胡仲武"},{"id":"11300011","name":"詹允侖"},{"id":"11300012","name":"吳修齊"},{"id":"11300013","name":"蔡効廷"},{"id":"11300014","name":"許博欽"},{"id":"11300015","name":"鄔書威"},{"id":"11300016","name":"江守國"},{"id":"11300017","name":"陳義芳"},{"id":"11300018","name":"李冠興"},{"id":"11300019","name":"林連翔"},{"id":"11300020","name":"蘇柏煌"},{"id":"11300021","name":"林名揚"},{"id":"11300022","name":"王國斌"},{"id":"11300023","name":"蘇嘉賢"},{"id":"11300024","name":"謝禾瑞"},{"id":"11300025","name":"T趙晉東"},{"id":"11300026","name":"周益鋒"},{"id":"11301009","name":"郭育文"},{"id":"11301015","name":"王祥龍"},{"id":"11301019","name":"張識恩"},{"id":"11303049","name":"陳國誠"},{"id":"11303055","name":"陳思妤"},{"id":"11303058","name":"鄭彥谷"},{"id":"11304066","name":"黃勝郁"},{"id":"11304076","name":"李淮南"},{"id":"11304078","name":"王明和"},{"id":"11305091","name":"陳雪"},{"id":"11305097","name":"王獻文"},{"id":"11305098","name":"劉政賢"},{"id":"11305106","name":"邱晟榮"},{"id":"11305107","name":"徐從文"},{"id":"11306119","name":"裴強"},{"id":"11306122","name":"胡北辰"},{"id":"11307158","name":"林晉褘"},{"id":"11307163","name":"何金財"},{"id":"11307164","name":"林國華"},{"id":"11307165","name":"邢富光"},{"id":"11307166","name":"黃建清"},{"id":"11307167","name":"陳家豪"},{"id":"11308181","name":"苑耀宗"},{"id":"11308183","name":"王建霖"},{"id":"11308187","name":"鄧培道"},{"id":"11308196","name":"蕭任佑"},{"id":"11308198","name":"邱嘉柔"},{"id":"11308201","name":"方澤仁"},{"id":"11308207","name":"陳重瑋"},{"id":"11308208","name":"王文賢"},{"id":"1130828","name":"黃鈺淳"},{"id":"11309213","name":"陳平貴"},{"id":"11309221","name":"陳永訓"},{"id":"11309225","name":"徐崇禧"},{"id":"11309227","name":"蔡俊南"},{"id":"11309233","name":"陳勇吉"},{"id":"11309234","name":"鄭士榮"},{"id":"11310242","name":"李瑞源"},{"id":"11310249","name":"陳炳南"},{"id":"11310251","name":"黃同泰"},{"id":"11311261","name":"林志雄"},{"id":"11311273","name":"陳志惠"},{"id":"11311274","name":"周明禧"},{"id":"11311279","name":"王勝禾"},{"id":"11312280","name":"湯博鈞"},{"id":"11312286","name":"吳坤學"},{"id":"11312289","name":"王信智"},{"id":"11401004","name":"林聘成"},{"id":"11401014","name":"莊技峰"},{"id":"11401015","name":"陳山河"},{"id":"11401016","name":"張瑞洺"},{"id":"11401018","name":"葉臻臻"},{"id":"11401024","name":"莊木裕"},{"id":"11401025","name":"莊川明"},{"id":"11402029","name":"楊坤雄"},{"id":"11402036","name":"翁良典"},{"id":"11402038","name":"莊世全"},{"id":"11402041","name":"陳銘嵩"},{"id":"11402042","name":"吳姿華"},{"id":"11402044","name":"王怡堯"},{"id":"11402045","name":"陳奕齊"},{"id":"11402050","name":"邱俊豪"},{"id":"11402053","name":"許瑞良"},{"id":"11403061","name":"黃春蘭"},{"id":"11403073","name":"黃政智"},{"id":"11403081","name":"楊博文"},{"id":"11404087","name":"龔文昭"},{"id":"11404091","name":"王士維"},{"id":"11404093","name":"蔡欣言"},{"id":"11404094","name":"林琬宜"},{"id":"11404095","name":"黃眞雄"},{"id":"11404100","name":"吳新宗"},{"id":"11404101","name":"陳啓友"},{"id":"11404102","name":"潘建翁"},{"id":"11404110","name":"王昱智"},{"id":"11404113","name":"呂傢隆"},{"id":"11404114","name":"莊斐翔"},{"id":"11405122","name":"羅笙祐"},{"id":"11405123","name":"黃士瑋"},{"id":"11405124","name":"陳煥然"},{"id":"11405125","name":"王正熙"},{"id":"11405126","name":"曾靖雄"},{"id":"11405129","name":"丁曜生"},{"id":"11405130","name":"夏奕婷"},{"id":"11405132","name":"莊朝銘"},{"id":"11405136","name":"林惠生"},{"id":"11405138","name":"郭順榮"},{"id":"11406151","name":"歐俊良"},{"id":"11406153","name":"陳志鴻"},{"id":"11406156","name":"張俊仁"},{"id":"11406157","name":"陳杰男"},{"id":"11406158","name":"夏政賢"},{"id":"11406159","name":"許芸溱"},{"id":"11406161","name":"李俊逸"},{"id":"11406162","name":"吳美燕"},{"id":"11406164","name":"郭嘉麟"},{"id":"11407169","name":"邱巧玲"},{"id":"11407170","name":"郭文祺"},{"id":"11407171","name":"袁有信"},{"id":"11407172","name":"莊茜羽"},{"id":"11407177","name":"王政祐"},{"id":"11407182","name":"朱柏州"},{"id":"11407186","name":"李玉庭"},{"id":"11407188","name":"張耀武"},{"id":"11407189","name":"邱裕文"},{"id":"11407194","name":"方茂益"},{"id":"11407195","name":"盧水木"},{"id":"11408196","name":"柯漢魁"},{"id":"11408197","name":"李宗儒"},{"id":"11408198","name":"鄭杏娟"},{"id":"11408201","name":"顏文利"},{"id":"11408202","name":"王持中"},{"id":"11408203","name":"洪楚翔"},{"id":"11408204","name":"葉志韋"},{"id":"11408205","name":"侯文雄"},{"id":"11408206","name":"陳智遠"},{"id":"11408208","name":"楊諭明"},{"id":"11408213","name":"侯裕笙"},{"id":"11408214","name":"林建廷"},{"id":"11408217","name":"江勝宏"},{"id":"11408218","name":"許純彰"},{"id":"11408219","name":"許乃勝"},{"id":"11408220","name":"張文旭"},{"id":"11409221","name":"鍾煥昭"},{"id":"11409227","name":"洪嘉祥"},{"id":"11409231","name":"翁景生"},{"id":"11409232","name":"曾偉峰"},{"id":"11409233","name":"吳清輝"},{"id":"11409235","name":"鄭宇涵"},{"id":"11409236","name":"王嘉瑞"},{"id":"11410237","name":"宋俊豪"},{"id":"11410238","name":"月添錦"},{"id":"11410242","name":"駱志強"},{"id":"11410244","name":"洪振耀"},{"id":"11410245","name":"林致淳"},{"id":"11410247","name":"潘述東"},{"id":"11410249","name":"栗浩倫"},{"id":"11411254","name":"王增光"},{"id":"11411255","name":"陳志維"},{"id":"11411256","name":"陳語蓁"},{"id":"11411257","name":"蔡秉儒"},{"id":"11411258","name":"楊育智"},{"id":"11411259","name":"段盛昌"},{"id":"11411260","name":"簡文義"},{"id":"11411261","name":"徐從華"},{"id":"11412263","name":"王國名"},{"id":"11412264","name":"江宜昌"},{"id":"11412265","name":"李國禎"},{"id":"11412267","name":"張力麒"},{"id":"11412270","name":"陳俊良"},{"id":"11412273","name":"杜志巡"},{"id":"11412275","name":"匡世意"},{"id":"11412276","name":"孟素仙"},{"id":"11412277","name":"吳馨萍"},{"id":"11412278","name":"張硯安"},{"id":"11412279","name":"蔡文徽"},{"id":"11412280","name":"吳明雄"},{"id":"11412281","name":"李耀輝"},{"id":"11412282","name":"芮家麟"},{"id":"11412285","name":"莊家豪"},{"id":"11412286","name":"謝守富"},{"id":"11412288","name":"林義翔"},{"id":"11412289","name":"陳森麟"},{"id":"11412290","name":"蘇育民"},{"id":"11501001","name":"于子洋"},{"id":"11501002","name":"林國禎"},{"id":"11501004","name":"蕭媄鴻"},{"id":"11501006","name":"郭學德"},{"id":"11501007","name":"王新凱"},{"id":"11501008","name":"鄭旭正"},{"id":"11501010","name":"陳鴻隆"},{"id":"11501011","name":"陳藤原"},{"id":"11501012","name":"劉俊男"},{"id":"11501013","name":"王金標"},{"id":"11501015","name":"黃柏彰"},{"id":"11501016","name":"蘇建色"},{"id":"11501017","name":"蘇于沛"},{"id":"11501018","name":"呂建二"},{"id":"11501020","name":"蕭清林"},{"id":"11501021","name":"鄭志億"},{"id":"11501022","name":"陳志嘉"},{"id":"11501023","name":"黃堂益"},{"id":"11501024","name":"張絜淩"},{"id":"11501025","name":"徐淑靜"},{"id":"11501027","name":"郭俊欽"},{"id":"11501030","name":"魏含芷"},{"id":"11501031","name":"高雪珍"},{"id":"11501034","name":"李泓畿"},{"id":"11501037","name":"林奕辰"},{"id":"11501038","name":"蘇志偉"},{"id":"11501039","name":"孫斌峰"},{"id":"11501040","name":"童俊男"},{"id":"11501041","name":"洪彣禎"},{"id":"11501042","name":"吳詠銘"},{"id":"11501043","name":"郭隆頡"},{"id":"11501045","name":"梁博文"},{"id":"11501047","name":"張文貴"},{"id":"11501049","name":"李進輝"},{"id":"11501051","name":"韓傳禮"},{"id":"11502055","name":"林冠廷"},{"id":"11502057","name":"邱俊雄"},{"id":"11502061","name":"張士志"},{"id":"11502062","name":"黃雅屏"},{"id":"11502063","name":"蕭利橙"},{"id":"11502064","name":"李志嶸"},{"id":"11502065","name":"王啓賢"},{"id":"11502066","name":"陳品延"},{"id":"11503068","name":"陳展翊"},{"id":"11503069","name":"莊耿欽"},{"id":"11503071","name":"陳木榮"},{"id":"11503072","name":"翁志銘"},{"id":"11503073","name":"張家禎"},{"id":"11503074","name":"林冠婷"},{"id":"11503075","name":"陳筠盈"},{"id":"11503076","name":"文善興"},{"id":"11503077","name":"陳佳佑"},{"id":"11503078","name":"杜誌強"},{"id":"11503079","name":"吳政憲"},{"id":"11503080","name":"羅志青"},{"id":"11503083","name":"柳青志"},{"id":"11503085","name":"關鴻義"},{"id":"11503086","name":"鄭擇育"},{"id":"11503087","name":"趙台生"},{"id":"11503088","name":"柳順耀"},{"id":"11503089","name":"謝昊儒"},{"id":"11503090","name":"楊肇哲"},{"id":"11503091","name":"林義智"},{"id":"11503092","name":"吳見誠"},{"id":"11503093","name":"周聖崇"},{"id":"11503094","name":"吳泓昇"},{"id":"11503095","name":"吳曀慶"},{"id":"11503098","name":"王秀美"},{"id":"11504099","name":"李正熙"},{"id":"11504100","name":"許芳慈"},{"id":"11504101","name":"陳承飛"},{"id":"11504103","name":"劉灯恢"},{"id":"11504104","name":"周楙清"},{"id":"11504105","name":"李忠澤"},{"id":"11504108","name":"江麗琴"},{"id":"11504109","name":"林錦玲"},{"id":"11504112","name":"孫朝舜"},{"id":"11504116","name":"劉永源"},{"id":"11504117","name":"廖偉翔"},{"id":"11504118","name":"李逸民"},{"id":"11504119","name":"王琮富"},{"id":"11504120","name":"楊明建"},{"id":"11504121","name":"周佳芬"},{"id":"11504122","name":"王嘉駿"},{"id":"11504123","name":"馮輝旭"},{"id":"11504126","name":"郭錦昌"},{"id":"11504127","name":"姜林金來"},{"id":"11504130","name":"周雋騰"},{"id":"9999912","name":"黃家祥-本人代班使用"},{"id":"9999913","name":"謝志賢-本人代班使用"},{"id":"9999914","name":"趙晉東-本人代班使用"},{"id":"9999915","name":"王培基-本人代班使用"},{"id":"9999918","name":"台南代班人員"},{"id":"99999904","name":"謝志賢機動專用人員-1"},{"id":"99999907","name":"郭德成-本人代班使用"}];
+const _DEFAULT_EMPLOYEES = [{"id":"09402001","name":"劉黃秀"},{"id":"09701001","name":"王興庭"},{"id":"09903001","name":"洪有賀"},{"id":"09903002","name":"胡士勇"},{"id":"10001003","name":"李建興"},{"id":"10104003","name":"歐天賜"},{"id":"10104004","name":"張慶崑"},{"id":"10108014","name":"林瑞峰"},{"id":"10304005","name":"許銘哲"},{"id":"10305007","name":"陳明宗"},{"id":"10306010","name":"柳治國"},{"id":"10309021","name":"董秋祥"},{"id":"10310033","name":"洪榮進"},{"id":"10311040","name":"薛光鴻"},{"id":"10402005","name":"王朝和"},{"id":"10407017","name":"傅美惠"},{"id":"10411123","name":"李季珍"},{"id":"10512336","name":"黃兆賢"},{"id":"10602061","name":"林子霖"},{"id":"10602062","name":"尤華德"},{"id":"10603110","name":"林振峯"},{"id":"10607210","name":"王惠婷"},{"id":"10608236","name":"李冠儀"},{"id":"10612368","name":"黃文俊"},{"id":"10702024","name":"陳武春"},{"id":"10708164","name":"謝黃世美"},{"id":"10711225","name":"劉志明"},{"id":"10712258","name":"馬振祥"},{"id":"10804085","name":"黃家祥"},{"id":"10805096","name":"陸玄基"},{"id":"10805097","name":"趙明哲"},{"id":"10805101","name":"梁興成"},{"id":"10806120","name":"李新福"},{"id":"10806121","name":"鐘明源"},{"id":"10806131","name":"賴正文"},{"id":"10806134","name":"林啟榮"},{"id":"10807153","name":"賴富榮"},{"id":"10810217","name":"趙晉東"},{"id":"10812266","name":"郭德成"},{"id":"10901006","name":"何文山"},{"id":"10902028","name":"霍建南"},{"id":"10905085","name":"陳志德"},{"id":"10905093","name":"周思明"},{"id":"10906115","name":"張雅惠"},{"id":"10906118","name":"顏榮耀"},{"id":"10906131","name":"謝志賢"},{"id":"10906263","name":"鄭玲龍"},{"id":"10907159","name":"林佾廷"},{"id":"10908176","name":"梁東淦"},{"id":"10908178","name":"沈賜民"},{"id":"10908183","name":"謝怡道"},{"id":"10909196","name":"陳連勝"},{"id":"10912251","name":"羅正武"},{"id":"11002012","name":"鄭銘誌"},{"id":"11003037","name":"蔡含昱"},{"id":"11003043","name":"邱識宇"},{"id":"11003052","name":"謝鎮國"},{"id":"11004055","name":"邱志敏"},{"id":"11005077","name":"江佳秋"},{"id":"11005092","name":"連博法"},{"id":"11005093","name":"蔡昆宗"},{"id":"11006112","name":"李來成"},{"id":"11007137","name":"林余錦治"},{"id":"11007140","name":"陳信宇"},{"id":"11007142","name":"黃鈺程"},{"id":"11008167","name":"石祥甫"},{"id":"11009178","name":"朱俊彰"},{"id":"11009188","name":"陳俊欽"},{"id":"11010202","name":"陳權宏"},{"id":"11101006","name":"吳松山"},{"id":"11103062","name":"李慶徽"},{"id":"11103066","name":"蘇晨禾"},{"id":"11103075","name":"林麗玉"},{"id":"11104095","name":"吳升彥"},{"id":"11104101","name":"王秀美"},{"id":"11104102","name":"邱琪淋"},{"id":"11105120","name":"許安富"},{"id":"11106126","name":"袁紹賢"},{"id":"11107158","name":"傅笑翠"},{"id":"11108175","name":"林武宏"},{"id":"11108176","name":"王作團"},{"id":"11108177","name":"黃文清"},{"id":"11109210","name":"蔡登吉"},{"id":"11110237","name":"黃增華"},{"id":"11111250","name":"何思音"},{"id":"11111262","name":"洪建義"},{"id":"11112286","name":"謝華平"},{"id":"11202045","name":"田文豪"},{"id":"11203064","name":"王相鵬"},{"id":"11203087","name":"蕭宇良"},{"id":"11203089","name":"楊士平"},{"id":"11203090","name":"游競翔"},{"id":"11204094","name":"李元齊"},{"id":"11204101","name":"張郁聰"},{"id":"11205132","name":"鍾昕岱"},{"id":"11206160","name":"蔡薇軒"},{"id":"11208188","name":"周庭瑋"},{"id":"11208199","name":"蔡世瑜"},{"id":"11208200","name":"劉昭成"},{"id":"11208202","name":"鄭毓雄"},{"id":"11208206","name":"歐仲豪"},{"id":"11209214","name":"鄭富橙"},{"id":"11209223","name":"陳建男"},{"id":"11209230","name":"柳室豐"},{"id":"11209232","name":"蔡學敏"},{"id":"11209234","name":"程志宏"},{"id":"11210264","name":"陳信宏"},{"id":"11210265","name":"毛鳳珠"},{"id":"11212294","name":"郭瑋"},{"id":"11212301","name":"楊壽生"},{"id":"11212308","name":"蕭素梅"},{"id":"11212311","name":"陳安國"},{"id":"11212316","name":"薛志強"},{"id":"11212317","name":"李俊易"},{"id":"11212318","name":"黃義雄"},{"id":"11212322","name":"鄭秉豐"},{"id":"11212323","name":"鄭凱中"},{"id":"11212324","name":"潘建芃"},{"id":"11212325","name":"謝長清"},{"id":"11212326","name":"栗怡豪"},{"id":"11300001","name":"許恭銘"},{"id":"11300002","name":"毛勝吉"},{"id":"11300003","name":"洪信宏"},{"id":"11300005","name":"蔡正風"},{"id":"11300006","name":"鄭人豪"},{"id":"11300007","name":"陳柏沅"},{"id":"11300008","name":"陳東杰"},{"id":"11300009","name":"劉東桀"},{"id":"11300010","name":"胡仲武"},{"id":"11300011","name":"詹允侖"},{"id":"11300012","name":"吳修齊"},{"id":"11300013","name":"蔡効廷"},{"id":"11300014","name":"許博欽"},{"id":"11300015","name":"鄔書威"},{"id":"11300016","name":"江守國"},{"id":"11300017","name":"陳義芳"},{"id":"11300018","name":"李冠興"},{"id":"11300019","name":"林連翔"},{"id":"11300020","name":"蘇柏煌"},{"id":"11300021","name":"林名揚"},{"id":"11300022","name":"王國斌"},{"id":"11300023","name":"蘇嘉賢"},{"id":"11300024","name":"謝禾瑞"},{"id":"11300025","name":"T趙晉東"},{"id":"11300026","name":"周益鋒"},{"id":"11301009","name":"郭育文"},{"id":"11301015","name":"王祥龍"},{"id":"11301019","name":"張識恩"},{"id":"11303049","name":"陳國誠"},{"id":"11303055","name":"陳思妤"},{"id":"11303058","name":"鄭彥谷"},{"id":"11304066","name":"黃勝郁"},{"id":"11304076","name":"李淮南"},{"id":"11304078","name":"王明和"},{"id":"11305091","name":"陳雪"},{"id":"11305097","name":"王獻文"},{"id":"11305098","name":"劉政賢"},{"id":"11305106","name":"邱晟榮"},{"id":"11305107","name":"徐從文"},{"id":"11306119","name":"裴強"},{"id":"11306122","name":"胡北辰"},{"id":"11307158","name":"林晉褘"},{"id":"11307163","name":"何金財"},{"id":"11307164","name":"林國華"},{"id":"11307165","name":"邢富光"},{"id":"11307166","name":"黃建清"},{"id":"11307167","name":"陳家豪"},{"id":"11308181","name":"苑耀宗"},{"id":"11308183","name":"王建霖"},{"id":"11308187","name":"鄧培道"},{"id":"11308196","name":"蕭任佑"},{"id":"11308198","name":"邱嘉柔"},{"id":"11308201","name":"方澤仁"},{"id":"11308207","name":"陳重瑋"},{"id":"11308208","name":"王文賢"},{"id":"1130828","name":"黃鈺淳"},{"id":"11309213","name":"陳平貴"},{"id":"11309221","name":"陳永訓"},{"id":"11309225","name":"徐崇禧"},{"id":"11309227","name":"蔡俊南"},{"id":"11309233","name":"陳勇吉"},{"id":"11309234","name":"鄭士榮"},{"id":"11310242","name":"李瑞源"},{"id":"11310249","name":"陳炳南"},{"id":"11310251","name":"黃同泰"},{"id":"11311261","name":"林志雄"},{"id":"11311273","name":"陳志惠"},{"id":"11311274","name":"周明禧"},{"id":"11311279","name":"王勝禾"},{"id":"11312280","name":"湯博鈞"},{"id":"11312286","name":"吳坤學"},{"id":"11312289","name":"王信智"},{"id":"11401004","name":"林聘成"},{"id":"11401014","name":"莊技峰"},{"id":"11401015","name":"陳山河"},{"id":"11401016","name":"張瑞洺"},{"id":"11401018","name":"葉臻臻"},{"id":"11401024","name":"莊木裕"},{"id":"11401025","name":"莊川明"},{"id":"11402029","name":"楊坤雄"},{"id":"11402036","name":"翁良典"},{"id":"11402038","name":"莊世全"},{"id":"11402041","name":"陳銘嵩"},{"id":"11402042","name":"吳姿華"},{"id":"11402044","name":"王怡堯"},{"id":"11402045","name":"陳奕齊"},{"id":"11402050","name":"邱俊豪"},{"id":"11402053","name":"許瑞良"},{"id":"11403061","name":"黃春蘭"},{"id":"11403073","name":"黃政智"},{"id":"11403081","name":"楊博文"},{"id":"11404087","name":"龔文昭"},{"id":"11404091","name":"王士維"},{"id":"11404093","name":"蔡欣言"},{"id":"11404094","name":"林琬宜"},{"id":"11404095","name":"黃眞雄"},{"id":"11404100","name":"吳新宗"},{"id":"11404101","name":"陳啓友"},{"id":"11404102","name":"潘建翁"},{"id":"11404110","name":"王昱智"},{"id":"11404113","name":"呂傢隆"},{"id":"11404114","name":"莊斐翔"},{"id":"11405122","name":"羅笙祐"},{"id":"11405123","name":"黃士瑋"},{"id":"11405124","name":"陳煥然"},{"id":"11405125","name":"王正熙"},{"id":"11405126","name":"曾靖雄"},{"id":"11405129","name":"丁曜生"},{"id":"11405130","name":"夏奕婷"},{"id":"11405132","name":"莊朝銘"},{"id":"11405136","name":"林惠生"},{"id":"11405138","name":"郭順榮"},{"id":"11406151","name":"歐俊良"},{"id":"11406153","name":"陳志鴻"},{"id":"11406156","name":"張俊仁"},{"id":"11406157","name":"陳杰男"},{"id":"11406158","name":"夏政賢"},{"id":"11406159","name":"許芸溱"},{"id":"11406161","name":"李俊逸"},{"id":"11406162","name":"吳美燕"},{"id":"11406164","name":"郭嘉麟"},{"id":"11407169","name":"邱巧玲"},{"id":"11407170","name":"郭文祺"},{"id":"11407171","name":"袁有信"},{"id":"11407172","name":"莊茜羽"},{"id":"11407177","name":"王政祐"},{"id":"11407182","name":"朱柏州"},{"id":"11407186","name":"李玉庭"},{"id":"11407188","name":"張耀武"},{"id":"11407189","name":"邱裕文"},{"id":"11407194","name":"方茂益"},{"id":"11407195","name":"盧水木"},{"id":"11408196","name":"柯漢魁"},{"id":"11408197","name":"李宗儒"},{"id":"11408198","name":"鄭杏娟"},{"id":"11408201","name":"顏文利"},{"id":"11408202","name":"王持中"},{"id":"11408203","name":"洪楚翔"},{"id":"11408204","name":"葉志韋"},{"id":"11408205","name":"侯文雄"},{"id":"11408206","name":"陳智遠"},{"id":"11408208","name":"楊諭明"},{"id":"11408213","name":"侯裕笙"},{"id":"11408214","name":"林建廷"},{"id":"11408217","name":"江勝宏"},{"id":"11408218","name":"許純彰"},{"id":"11408219","name":"許乃勝"},{"id":"11408220","name":"張文旭"},{"id":"11409221","name":"鍾煥昭"},{"id":"11409227","name":"洪嘉祥"},{"id":"11409231","name":"翁景生"},{"id":"11409232","name":"曾偉峰"},{"id":"11409233","name":"吳清輝"},{"id":"11409235","name":"鄭宇涵"},{"id":"11409236","name":"王嘉瑞"},{"id":"11410237","name":"宋俊豪"},{"id":"11410238","name":"月添錦"},{"id":"11410242","name":"駱志強"},{"id":"11410244","name":"洪振耀"},{"id":"11410245","name":"林致淳"},{"id":"11410247","name":"潘述東"},{"id":"11410249","name":"栗浩倫"},{"id":"11411254","name":"王增光"},{"id":"11411255","name":"陳志維"},{"id":"11411256","name":"陳語蓁"},{"id":"11411257","name":"蔡秉儒"},{"id":"11411258","name":"楊育智"},{"id":"11411259","name":"段盛昌"},{"id":"11411260","name":"簡文義"},{"id":"11411261","name":"徐從華"},{"id":"11412263","name":"王國名"},{"id":"11412264","name":"江宜昌"},{"id":"11412265","name":"李國禎"},{"id":"11412267","name":"張力麒"},{"id":"11412270","name":"陳俊良"},{"id":"11412273","name":"杜志巡"},{"id":"11412275","name":"匡世意"},{"id":"11412276","name":"孟素仙"},{"id":"11412277","name":"吳馨萍"},{"id":"11412278","name":"張硯安"},{"id":"11412279","name":"蔡文徽"},{"id":"11412280","name":"吳明雄"},{"id":"11412281","name":"李耀輝"},{"id":"11412282","name":"芮家麟"},{"id":"11412285","name":"莊家豪"},{"id":"11412286","name":"謝守富"},{"id":"11412288","name":"林義翔"},{"id":"11412289","name":"陳森麟"},{"id":"11412290","name":"蘇育民"},{"id":"11501001","name":"于子洋"},{"id":"11501002","name":"林國禎"},{"id":"11501004","name":"蕭媄鴻"},{"id":"11501006","name":"郭學德"},{"id":"11501007","name":"王新凱"},{"id":"11501008","name":"鄭旭正"},{"id":"11501010","name":"陳鴻隆"},{"id":"11501011","name":"陳藤原"},{"id":"11501012","name":"劉俊男"},{"id":"11501013","name":"王金標"},{"id":"11501015","name":"黃柏彰"},{"id":"11501016","name":"蘇建色"},{"id":"11501017","name":"蘇于沛"},{"id":"11501018","name":"呂建二"},{"id":"11501020","name":"蕭清林"},{"id":"11501021","name":"鄭志億"},{"id":"11501022","name":"陳志嘉"},{"id":"11501023","name":"黃堂益"},{"id":"11501024","name":"張絜淩"},{"id":"11501025","name":"徐淑靜"},{"id":"11501027","name":"郭俊欽"},{"id":"11501030","name":"魏含芷"},{"id":"11501031","name":"高雪珍"},{"id":"11501034","name":"李泓畿"},{"id":"11501037","name":"林奕辰"},{"id":"11501038","name":"蘇志偉"},{"id":"11501039","name":"孫斌峰"},{"id":"11501040","name":"童俊男"},{"id":"11501041","name":"洪彣禎"},{"id":"11501042","name":"吳詠銘"},{"id":"11501043","name":"郭隆頡"},{"id":"11501045","name":"梁博文"},{"id":"11501047","name":"張文貴"},{"id":"11501049","name":"李進輝"},{"id":"11501051","name":"韓傳禮"},{"id":"11502055","name":"林冠廷"},{"id":"11502057","name":"邱俊雄"},{"id":"11502061","name":"張士志"},{"id":"11502062","name":"黃雅屏"},{"id":"11502063","name":"蕭利橙"},{"id":"11502064","name":"李志嶸"},{"id":"11502065","name":"王啓賢"},{"id":"11502066","name":"陳品延"},{"id":"11503068","name":"陳展翊"},{"id":"11503069","name":"莊耿欽"},{"id":"11503071","name":"陳木榮"},{"id":"11503072","name":"翁志銘"},{"id":"11503073","name":"張家禎"},{"id":"11503074","name":"林冠婷"},{"id":"11503075","name":"陳筠盈"},{"id":"11503076","name":"文善興"},{"id":"11503077","name":"陳佳佑"},{"id":"11503078","name":"杜誌強"},{"id":"11503079","name":"吳政憲"},{"id":"11503080","name":"羅志青"},{"id":"11503083","name":"柳青志"},{"id":"11503085","name":"關鴻義"},{"id":"11503086","name":"鄭擇育"},{"id":"11503087","name":"趙台生"},{"id":"11503088","name":"柳順耀"},{"id":"11503089","name":"謝昊儒"},{"id":"11503090","name":"楊肇哲"},{"id":"11503091","name":"林義智"},{"id":"11503092","name":"吳見誠"},{"id":"11503093","name":"周聖崇"},{"id":"11503094","name":"吳泓昇"},{"id":"11503095","name":"吳曀慶"},{"id":"11503098","name":"王秀美"},{"id":"11504099","name":"李正熙"},{"id":"11504100","name":"許芳慈"},{"id":"11504101","name":"陳承飛"},{"id":"11504103","name":"劉灯恢"},{"id":"11504104","name":"周楙清"},{"id":"11504105","name":"李忠澤"},{"id":"11504108","name":"江麗琴"},{"id":"11504109","name":"林錦玲"},{"id":"11504112","name":"孫朝舜"},{"id":"11504116","name":"劉永源"},{"id":"11504117","name":"廖偉翔"},{"id":"11504118","name":"李逸民"},{"id":"11504119","name":"王琮富"},{"id":"11504120","name":"楊明建"},{"id":"11504121","name":"周佳芬"},{"id":"11504122","name":"王嘉駿"},{"id":"11504123","name":"馮輝旭"},{"id":"11504126","name":"郭錦昌"},{"id":"11504127","name":"姜林金來"},{"id":"11504130","name":"周雋騰"},{"id":"9999912","name":"黃家祥-本人代班使用"},{"id":"9999913","name":"謝志賢-本人代班使用"},{"id":"9999914","name":"趙晉東-本人代班使用"},{"id":"9999915","name":"王培基-本人代班使用"},{"id":"9999918","name":"台南代班人員"},{"id":"99999904","name":"謝志賢機動專用人員-1"},{"id":"99999907","name":"郭德成-本人代班使用"},{"id":"11504107","name":"陳青欣"},{"id":"11504110","name":"楊茂興"},{"id":"11504111","name":"萬孟璋"},{"id":"11504113","name":"嚴匱鳳"},{"id":"11504114","name":"黃仲立"},{"id":"11504115","name":"康春貴"},{"id":"11504124","name":"吳承謙"},{"id":"11504128","name":"黃俊鵬"},{"id":"11504129","name":"羅宇宸"},{"id":"11504131","name":"陳柔涵"},{"id":"11504132","name":"曾智敏"},{"id":"11505133","name":"柳博順"},{"id":"11505134","name":"葉建泰"},{"id":"11505135","name":"陳怡妏"},{"id":"11505136","name":"黃順令"},{"id":"11505137","name":"林俊傑"}];
 
 // ── 案場資料（118個）──────────────────────────────
 const _DEFAULT_SITES=[
@@ -1480,22 +1503,53 @@ const _DEFAULT_SUPERVISORS=[
  {empId:'11212294',name:'郭瑋',title:'經理',viewAll:false,active:true,sites:[]}
 ];
 
-function getSites(){return JSON.parse(localStorage.getItem('sites')||JSON.stringify(_DEFAULT_SITES))}
+function getSites(activeOnly=false){
+  const s=JSON.parse(localStorage.getItem('sites')||JSON.stringify(_DEFAULT_SITES));
+  return activeOnly ? s.filter(x=>x.active!==false) : s;
+}
+function saveSites(d){localStorage.setItem('sites',JSON.stringify(d))}
 function saveSites(d){localStorage.setItem('sites',JSON.stringify(d))}
 function getSupervisors(){return JSON.parse(localStorage.getItem('supervisors')||JSON.stringify(_DEFAULT_SUPERVISORS))}
 function saveSupervisors(d){localStorage.setItem('supervisors',JSON.stringify(d))}
+function getSiteV(siteId){
+  return localStorage.getItem('site_token_v_'+siteId)||'0';
+}
 function getSiteToken(siteId){
-  const key='site_token_'+siteId;
-  let t=localStorage.getItem(key);
-  if(!t){t=Math.random().toString(36).slice(2,10).toUpperCase();localStorage.setItem(key,t)}
-  return t;
+  // token 由 案場ID + 公司驗證碼 + 版本號 hash 計算，跨裝置一致
+  return hashPwd(siteId+'DYS0427'+getSiteV(siteId)).slice(0,8).toUpperCase();
 }
 function regenerateSiteToken(siteId){
-  const t=Math.random().toString(36).slice(2,10).toUpperCase();
-  localStorage.setItem('site_token_'+siteId,t);
-  return t;
+  const key='site_token_v_'+siteId;
+  const v=String(parseInt(localStorage.getItem(key)||'0')+1);
+  localStorage.setItem(key,v);
+  return getSiteToken(siteId);
 }
 function getSiteById(id){return getSites().find(s=>s.id===id)||null}
+// ── 員工資料防重合併機制 ───────────────────────
+// DB_VERSION：員工名單有大幅異動時提高版號，強制所有裝置同步預設資料
+const DB_VERSION = '2.1';
+
+function mergeEmployees(newData) {
+  // 以員工編號為唯一鍵，補入不存在的員工，不覆蓋已有資料
+  const existing = JSON.parse(localStorage.getItem('employees') || '[]');
+  const map = new Map(existing.map(e => [e.id, e]));
+  let added = 0;
+  newData.forEach(e => { if(!map.has(e.id)){ map.set(e.id, e); added++; } });
+  const final = Array.from(map.values());
+  localStorage.setItem('employees', JSON.stringify(final));
+  return {added, total: final.length};
+}
+
+function initEmployees() {
+  const savedVer = localStorage.getItem('db_version');
+  if(savedVer !== DB_VERSION) {
+    // 首次載入或版本更新：把預設員工補入（不蓋掉已有資料）
+    mergeEmployees(_DEFAULT_EMPLOYEES);
+    localStorage.setItem('db_version', DB_VERSION);
+  }
+}
+initEmployees();
+
 let employees = JSON.parse(localStorage.getItem('employees') || JSON.stringify(_DEFAULT_EMPLOYEES));
 let localRecs = JSON.parse(localStorage.getItem('local_records')||'[]');
 
@@ -2757,15 +2811,54 @@ function getSupSiteIds(){
 function filterRecsBySup(recs){
   const ids = getSupSiteIds();
   if(ids===null) return recs;
-  // 有 siteId 的照 siteId 過濾；沒有的（舊紀錄）幹部看不到
-  return recs.filter(r=>r.siteId && ids.includes(r.siteId));
+  // 有 siteId 的照 siteId 過濾；siteId 為空的舊紀錄所有幹部都能看到
+  return recs.filter(r=>!r.siteId || ids.includes(r.siteId));
 }
 
+
+// ── 日期區間快捷篩選 ──────────────────────────
+let _dateMode = 'today';
+function setDateQuick(mode, btn){
+  _dateMode = mode;
+  document.querySelectorAll('.dq-btn').forEach(b=>b.classList.remove('dq-active'));
+  btn.classList.add('dq-active');
+  const cr = $('custom-range');
+  if(cr) cr.style.display = (mode==='custom') ? 'flex' : 'none';
+  loadRecords();
+}
+function getDateRange(){
+  const td = today();
+  if(_dateMode==='today')    return {s:td, e:td};
+  if(_dateMode==='week'){
+    const d=new Date(td), day=d.getDay();
+    const mon=new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
+    const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+    return {s:mon.toISOString().slice(0,10), e:sun.toISOString().slice(0,10)};
+  }
+  if(_dateMode==='month'){
+    const [y,m]=td.split('-');
+    return {s:`${y}-${m}-01`, e:td};
+  }
+  if(_dateMode==='lastmonth'){
+    const d=new Date(td); d.setDate(1); d.setMonth(d.getMonth()-1);
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0');
+    const last=new Date(y,d.getMonth()+1,0).getDate();
+    return {s:`${y}-${m}-01`, e:`${y}-${m}-${String(last).padStart(2,'0')}`};
+  }
+  if(_dateMode==='all')      return {s:null, e:null};
+  if(_dateMode==='custom'){
+    const s=$('f-date-start'), e=$('f-date-end');
+    return {s:s?s.value:null, e:e?e.value:null};
+  }
+  return {s:td, e:td};
+}
 function loadRecords(){
-  const fd=$('f-date').value,fe=$('f-emp').value.trim().toUpperCase();
+  const fe=$('f-emp')?$('f-emp').value.trim().toUpperCase():'';
   const td=today();
   let rows=filterRecsBySup([...localRecs]);
-  if(fd) rows=rows.filter(r=>r.date===fd);
+  const {s:ds,e:de}=getDateRange();
+  if(ds) rows=rows.filter(r=>r.date>=ds);
+  if(de) rows=rows.filter(r=>r.date<=de);
   if(fe) rows=rows.filter(r=>r.empId.includes(fe)||(r.name||'').toUpperCase().includes(fe));
   const todayR=filterRecsBySup(localRecs.filter(r=>r.date===td));
   $('s-total').textContent=todayR.length;
@@ -2790,9 +2883,11 @@ function loadRecords(){
     </tr>`}).join('');
 }
 function exportCSV(){
-  const fd=$('f-date').value,fe=$('f-emp').value.trim().toUpperCase();
+  const fe=$('f-emp')?$('f-emp').value.trim().toUpperCase():'';
   let rows=[...localRecs];
-  if(fd)rows=rows.filter(r=>r.date===fd);
+  const {s:ds,e:de}=getDateRange();
+  if(ds)rows=rows.filter(r=>r.date>=ds);
+  if(de)rows=rows.filter(r=>r.date<=de);
   if(fe)rows=rows.filter(r=>r.empId.includes(fe)||(r.name||'').toUpperCase().includes(fe));
   if(!rows.length){showToast('沒有可匯出的資料','error');return}
   const bom='\uFEFF';
@@ -3045,7 +3140,7 @@ function openSupModal(empId){
 
   // 案場 Checkboxes
   const container = $('sup-site-checkboxes');
-  container.innerHTML = sites.map(site=>`
+  container.innerHTML = sites.filter(s=>s.active!==false).map(site=>`
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:4px 2px">
       <input type="checkbox" data-site-id="${site.id}" value="${site.id}"
         ${sup.viewAll || sup.sites.includes(site.id) ? 'checked' : ''}
@@ -3127,43 +3222,137 @@ function loadQrPage(){
   renderQrList();
 }
 
+
+// ── 案場停用管理 ────────────────────────────────
+function toggleSiteActive(siteId){
+  const sites = getSites();
+  const s = sites.find(x=>x.id===siteId);
+  if(!s) return;
+  s.active = s.active===false;
+  saveSites(sites);
+  renderQrList();
+  showToast(s.active ? `${siteId} 已啟用` : `${siteId} 已停用`, 'ok');
+}
+
+function scanIdleSites(){
+  const activeSites = getSites().filter(s=>s.active!==false);
+  const usedIds = new Set(localRecs.filter(r=>r.siteId).map(r=>r.siteId));
+  const idle = activeSites.filter(s=>!usedIds.has(s.id));
+  if(!idle.length){ showToast('本機紀錄中所有案場都有打卡紀錄', 'ok'); return; }
+
+  const old = $('idle-modal'); if(old) old.remove();
+  const modal = document.createElement('div');
+  modal.id = 'idle-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML=`
+    <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-width:480px;padding:20px 20px 36px;max-height:75vh;overflow-y:auto">
+      <div style="font-size:17px;font-weight:700;color:var(--t1);margin-bottom:4px">🔍 閒置案場掃描</div>
+      <div style="font-size:13px;color:var(--t3);margin-bottom:14px">以下案場在本機無任何打卡紀錄，勾選後可批次停用。</div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;color:var(--accent);cursor:pointer">
+          <input type="checkbox" id="idle-select-all" onchange="document.querySelectorAll('.idle-cb').forEach(c=>c.checked=this.checked)" style="accent-color:var(--accent)"/>
+          全選（${idle.length} 個）
+        </label>
+      </div>
+      <div style="max-height:40vh;overflow-y:auto;border:.5px solid var(--border);border-radius:10px;padding:8px 12px">
+        ${idle.map(s=>`
+          <label style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:.5px solid var(--border);cursor:pointer;font-size:14px">
+            <input type="checkbox" class="idle-cb" value="${s.id}" style="accent-color:var(--accent);width:15px;height:15px"/>
+            <span style="font-weight:600;color:var(--t1)">${s.id}</span>
+            <span style="color:var(--t2)">${s.name}</span>
+          </label>`).join('')}
+      </div>
+      <button onclick="batchDisableSites([...document.querySelectorAll('.idle-cb:checked')].map(c=>c.value))"
+        style="margin-top:16px;width:100%;background:var(--warn);color:#fff;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;cursor:pointer;font-family:var(--font)">
+        批次停用選取案場
+      </button>
+      <button onclick="$('idle-modal').remove()"
+        style="margin-top:8px;width:100%;background:var(--surface2);color:var(--t2);border:none;border-radius:14px;padding:12px;font-size:15px;cursor:pointer;font-family:var(--font)">
+        取消
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+
+function exportAllQRLinks(){
+  const sites = getSites().filter(s=>s.active!==false); // 只匯出啟用中案場
+  const base = location.origin + location.pathname;
+  const bom = '\uFEFF';
+  const rows = sites.map(s=>{
+    const token = getSiteToken(s.id);
+    const v = getSiteV(s.id);
+    const url = `${base}?site=${s.id}&token=${token}&v=${v}`;
+    return `${s.id},${s.name},${url}`;
+  });
+  dlFile(bom + '案場ID,案場名稱,QR連結\n' + rows.join('\n'), `DYS_QR連結_${today()}.csv`);
+  showToast(`已匯出 ${sites.length} 個案場 QR 連結 ✓`, 'success');
+}
+function batchDisableSites(ids){
+  if(!ids.length){ showToast('未選取任何案場','error'); return; }
+  const sites = getSites();
+  sites.forEach(s=>{ if(ids.includes(s.id)) s.active=false; });
+  saveSites(sites);
+  const old = $('idle-modal'); if(old) old.remove();
+  renderQrList();
+  showToast(`已停用 ${ids.length} 個閒置案場`, 'ok');
+}
 function renderQrList(){
   const keyword = ($('qr-search')||{}).value || '';
-  let sites = getSites();
-  // 幹部只看自己案場
+  let allSites = getSites(); // 全部（含停用）
+  const isAdmin = CURRENT_ROLE==='admin';
+
+  // 管理員才顯示閒置掃描按鈕
+  const qrAdminBar = $('qr-toolbar-admin');
+  if(qrAdminBar) qrAdminBar.style.display = isAdmin ? 'flex' : 'none';
+
+  // 幹部只看自己案場（且只看啟用的）
   if(CURRENT_ROLE==='supervisor' && CURRENT_SUPERVISOR && !CURRENT_SUPERVISOR.viewAll){
-    sites = sites.filter(s=>CURRENT_SUPERVISOR.sites.includes(s.id));
+    allSites = allSites.filter(s=>CURRENT_SUPERVISOR.sites.includes(s.id) && s.active!==false);
   }
-  if(keyword){ sites = sites.filter(s=>s.name.includes(keyword)||s.id.includes(keyword)); }
+  if(keyword){ allSites = allSites.filter(s=>s.name.includes(keyword)||s.id.includes(keyword)); }
+
+  const activeSites   = allSites.filter(s=>s.active!==false);
+  const disabledSites = isAdmin ? allSites.filter(s=>s.active===false) : [];
+
   const list = $('qr-list');
   if(!list) return;
-  if(sites.length===0){
+  if(activeSites.length===0 && disabledSites.length===0){
     list.innerHTML='<div style="text-align:center;color:var(--t3);padding:32px 0">無符合案場</div>';
     return;
   }
-  list.innerHTML = sites.map(site=>{
+
+  const renderRow = (site) => {
     const token = getSiteToken(site.id);
-    const url = `${location.origin}${location.pathname}?site=${site.id}&token=${token}`;
+    const url = `${location.origin}${location.pathname}?site=${site.id}&token=${token}&v=${getSiteV(site.id)}`;
+    const disabled = site.active===false;
     return `
-      <div style="padding:14px 0;border-bottom:.5px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <div style="font-size:15px;font-weight:600;color:var(--t1)">${site.id} · ${site.name}</div>
-            <div style="font-size:11px;color:var(--t3);margin-top:3px;word-break:break-all">${url}</div>
+      <div style="padding:12px 0;border-bottom:.5px solid var(--border);opacity:${disabled?'.45':'1'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600;color:var(--t1)">${site.id} · ${site.name}${disabled?' <span style="font-size:11px;color:var(--t3)">[停用]</span>':''}</div>
+            ${!disabled?`<div style="font-size:11px;color:var(--t3);margin-top:2px;word-break:break-all">${url}</div>`:''}
           </div>
-          <button onclick="showQrDetail('${site.id}')"
-            style="background:var(--accent);color:#fff;border:none;border-radius:50px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);flex-shrink:0;margin-left:10px">
-            查看
-          </button>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            ${!disabled ? `<button onclick="showQrDetail('${site.id}')" style="background:var(--accent);color:#fff;border:none;border-radius:50px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">查看</button>` : ''}
+            ${isAdmin ? `<button onclick="toggleSiteActive('${site.id}')" style="background:${disabled?'var(--success)':'var(--surface2)'};color:${disabled?'#fff':'var(--t2)'};border:.5px solid var(--border);border-radius:50px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">${disabled?'啟用':'停用'}</button>` : ''}
+          </div>
         </div>
       </div>`;
-  }).join('');
+  };
+
+  let html = activeSites.map(renderRow).join('');
+  if(disabledSites.length>0){
+    html += `<div style="margin-top:16px;font-size:12px;font-weight:600;color:var(--t3);letter-spacing:.5px;padding:8px 0 4px">已停用案場（${disabledSites.length}）</div>`;
+    html += disabledSites.map(renderRow).join('');
+  }
+  list.innerHTML = html;
 }
 
 function showQrDetail(siteId){
   const site = getSiteById(siteId);
   const token = getSiteToken(siteId);
-  const url = `${location.origin}${location.pathname}?site=${siteId}&token=${token}`;
+  const url = `${location.origin}${location.pathname}?site=${siteId}&token=${token}&v=${getSiteV(siteId)}`;
 
   // 建立全頁 modal
   const old = $('qr-detail-modal');
@@ -3234,7 +3423,7 @@ function regenQr(siteId){
 function printQr(siteId){
   const site = getSiteById(siteId);
   const token = getSiteToken(siteId);
-  const url = `${location.origin}${location.pathname}?site=${siteId}&token=${token}`;
+  const url = `${location.origin}${location.pathname}?site=${siteId}&token=${token}&v=${getSiteV(siteId)}`;
   const win = window.open('', '_blank', 'width=400,height=500');
   win.document.write(`<!DOCTYPE html><html><head><title>QR Code - ${siteId}</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
@@ -3568,9 +3757,10 @@ restoreLastEmp();
   const siteId = params.get('site');
   const token  = params.get('token');
   if(!siteId || !token) return;
-  const stored = getSiteToken(siteId);
-  if(token !== stored){
-    // 頁面載入後再提示（確保 DOM 已就緒）
+  // 跨裝置驗證：依 URL 帶入的版本號計算預期 token，不依賴 localStorage
+  const v = params.get('v')||'0';
+  const expected = hashPwd(siteId+'DYS0427'+v).slice(0,8).toUpperCase();
+  if(token !== expected){
     window.addEventListener('load',()=>showToast('此 QR Code 已失效，請聯絡幹部更換','error'),{once:true});
     return;
   }
