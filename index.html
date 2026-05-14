@@ -159,6 +159,26 @@ nav{
   font-size:13px;color:var(--t2);
   line-height:1.45;
   margin-bottom:2px;
+  display:flex;align-items:flex-start;justify-content:space-between;gap:8px;
+}
+.announce-bar.level-important{
+  background:linear-gradient(90deg,rgba(255,149,0,.1),rgba(255,149,0,.04));
+  border-left-color:#ff9500;
+}
+.announce-bar.level-urgent{
+  background:linear-gradient(90deg,rgba(255,59,48,.12),rgba(255,59,48,.05));
+  border-left-color:#ff3b30;
+}
+.announce-text{flex:1}
+.announce-dismiss{
+  cursor:pointer;opacity:.5;font-size:15px;line-height:1;flex-shrink:0;
+  padding:0 2px;transition:opacity .15s;
+}
+.announce-dismiss:hover{opacity:1}
+.badge-anomaly{
+  display:inline-flex;align-items:center;gap:4px;
+  background:rgba(255,59,48,.12);color:#ff3b30;
+  border-radius:6px;padding:2px 7px;font-size:12px;font-weight:600;
 }
 
 /* ── 時鐘卡片（漂亮獨立版） ── */
@@ -839,6 +859,46 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 
+<!-- 補打卡 Modal -->
+<div id="manual-punch-modal" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
+  <div class="modal-box" style="max-width:400px">
+    <h2>➕ 補打卡</h2>
+    <p style="font-size:13px;color:var(--t2);margin-bottom:16px">為員工手動新增一筆打卡紀錄</p>
+    <div class="mf" style="margin-bottom:10px">
+      <label>員工編號 / 姓名</label>
+      <input id="mp-emp" class="fi" type="text" placeholder="輸入員工編號或姓名搜尋" oninput="mpSearchEmp()" style="width:100%" autocomplete="off"/>
+      <div id="mp-emp-list" style="display:none;background:var(--surface);border:.5px solid var(--border);border-radius:8px;max-height:160px;overflow-y:auto;margin-top:4px;box-shadow:var(--sh2)"></div>
+      <input id="mp-emp-id"   type="hidden"/>
+      <input id="mp-emp-name" type="hidden"/>
+    </div>
+    <div class="mf" style="margin-bottom:10px">
+      <label>打卡類型</label>
+      <select id="mp-type" class="fi" style="width:100%">
+        <option value="上班">上班</option>
+        <option value="下班">下班</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="mf">
+        <label>日期</label>
+        <input id="mp-date" class="fi" type="date" style="width:100%"/>
+      </div>
+      <div class="mf">
+        <label>時間</label>
+        <input id="mp-time" class="fi" type="time" style="width:100%"/>
+      </div>
+    </div>
+    <div class="mf" style="margin-bottom:16px">
+      <label>備註</label>
+      <input id="mp-note" class="fi" type="text" placeholder="選填，例如：補登" style="width:100%"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-s bs-accent" onclick="saveManualPunch()" style="flex:1;padding:11px">儲存</button>
+      <button class="btn-s bs-ghost" onclick="closeManualPunch()" style="flex:1;padding:11px">取消</button>
+    </div>
+  </div>
+</div>
+
 <!-- Nav -->
 <nav>
   <div class="nav-brand" id="nav-brand">DYS 大洋保全</div>
@@ -874,6 +934,24 @@ tr:hover td{background:var(--surface2)}
     <div class="announce-bar" id="announce-bar">
       📢 系統公告：打卡系統正式上線，有問題請聯絡主管
     </div>
+    <script>
+      (function(){
+        var bar = document.getElementById('announce-bar');
+        var todayStr = new Date().toISOString().slice(0,10);
+        // 今天已關閉
+        if(sessionStorage.getItem('ann_dismissed') === todayStr){ bar.style.display='none'; return; }
+        // 到期檢查
+        var expiry = localStorage.getItem('site_announcement_expiry');
+        if(expiry && todayStr > expiry){ bar.style.display='none'; return; }
+        var saved  = localStorage.getItem('site_announcement') || '打卡系統正式上線，有問題請聯絡主管';
+        var level  = localStorage.getItem('site_announcement_level') || 'normal';
+        var icon   = level==='urgent' ? '🚨' : level==='important' ? '⚠️' : '📢';
+        if(level==='important') bar.classList.add('level-important');
+        if(level==='urgent')    bar.classList.add('level-urgent');
+        bar.innerHTML = '<span class="announce-text">'+icon+' 系統公告：'+saved+'</span>'
+          + '<span class="announce-dismiss" onclick="dismissAnnouncement()" title="今日不再顯示">✕</span>';
+      })();
+    </script>
 
     <!-- 主打卡卡片 -->
     <div class="main-card">
@@ -972,6 +1050,7 @@ tr:hover td{background:var(--surface2)}
         <div class="toolbar-right">
           <input type="text" class="fi" id="f-emp"  placeholder="編號 / 姓名" style="width:120px" oninput="loadRecords()"/>
           <button class="btn-s bs-ghost"  onclick="loadRecords()">🔄</button>
+          <button class="btn-s bs-ghost admin-only"  onclick="openManualPunch()" id="btn-manual-punch">➕ 補打卡</button>
           <button class="btn-s bs-ghost"  onclick="manualSync()" id="btn-manual-sync">☁️ 同步未上傳</button>
           <button class="btn-s bs-ghost"  onclick="queryHistoryFromSheets()" id="btn-history">📅 查詢舊紀錄</button>
           <button class="btn-s bs-accent" onclick="exportCSV()">⬇ CSV</button>
@@ -1317,6 +1396,21 @@ tr:hover td{background:var(--surface2)}
           <label>全公司預設缺勤上限（天）</label>
           <input id="s-absent-limit" class="fi" type="number" min="1" placeholder="例如：7" style="width:120px"/>
           <span class="mf-hint">超過此天數未打卡的員工將自動停用，個別員工可在名單頁覆寫</span>
+        </div>
+        <div class="mf">
+          <label>📢 系統公告</label>
+          <select id="s-announcement-level" class="fi" style="width:100%;margin-bottom:8px">
+            <option value="normal">📢 一般（藍色）</option>
+            <option value="important">⚠️ 重要（橘色）</option>
+            <option value="urgent">🚨 緊急（紅色）</option>
+          </select>
+          <textarea id="s-announcement" class="fi" rows="3" placeholder="輸入公告內容（空白則顯示預設文字）" style="width:100%;resize:vertical;font-family:var(--font);font-size:14px"></textarea>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <label style="font-size:13px;color:var(--t2);font-weight:400;white-space:nowrap">到期日：</label>
+            <input type="date" id="s-announcement-expiry" class="fi" style="width:160px"/>
+            <span style="font-size:12px;color:var(--t3)">留空 = 永久顯示</span>
+          </div>
+          <span class="mf-hint">員工可按 ✕ 當天關閉。儲存後本裝置立即生效；推上 GitHub 後全員裝置更新。</span>
         </div>
         <div class="mf">
           <label>☀️ 上班打卡提醒</label>
@@ -2866,17 +2960,49 @@ function loadRecords(){
   $('s-out').textContent=todayR.filter(r=>r.type==='下班').length;
   updateSyncStatusBar();
   const tbody=$('records-body');
-  if(!rows.length){tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📋</div><p>目前沒有符合條件的紀錄</p></div></td></tr>`;return}
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div><p>目前沒有符合條件的紀錄</p></div></td></tr>`;return}
+  // 異常偵測：同人同天同類型 > 1次 → 重複；同人同天有上班無下班（非今天）→ 缺下班
+  const td=today();
+  const anomalySet=new Set();
+  // 統計 key = empId+date+type
+  const typeCount={};
+  rows.forEach(r=>{
+    const k=r.empId+'|'+r.date+'|'+r.type;
+    typeCount[k]=(typeCount[k]||0)+1;
+  });
+  // 找缺下班（非今天的資料才標記）
+  const dayEmpIn={};
+  rows.forEach(r=>{
+    if(r.date===td) return;
+    if(r.type==='上班') dayEmpIn[r.empId+'|'+r.date]=true;
+  });
+  const dayEmpOut={};
+  rows.forEach(r=>{
+    if(r.date===td) return;
+    if(r.type==='下班') dayEmpOut[r.empId+'|'+r.date]=true;
+  });
+  rows.forEach(r=>{
+    const k=r.empId+'|'+r.date+'|'+r.type;
+    const dk=r.empId+'|'+r.date;
+    if(typeCount[k]>1) anomalySet.add(r.empId+'|'+r.date+'|'+r.type+'|dup');
+    if(r.date!==td && dayEmpIn[dk] && !dayEmpOut[dk]) anomalySet.add(dk+'|miss');
+  });
   tbody.innerHTML=rows.map(r=>{
     const syncBadge = IS_DEMO||!SCRIPT_URL
       ? '<span style="font-size:12px;color:var(--t3)">–</span>'
       : r.synced===false
         ? '<span class="badge badge-sync"><span class="badge-dot" style="background:var(--warn)"></span>待同步</span>'
         : '<span class="badge badge-synced"><span class="badge-dot" style="background:var(--success)"></span>已同步</span>';
-    return`<tr>
+    const kdup=r.empId+'|'+r.date+'|'+r.type+'|dup';
+    const kmiss=r.empId+'|'+r.date+'|miss';
+    let anomaly='';
+    if(anomalySet.has(kdup)) anomaly='<span class="badge-anomaly">⚠ 重複</span>';
+    else if(r.type==='上班'&&anomalySet.has(kmiss)) anomaly='<span class="badge-anomaly">⚠ 缺下班</span>';
+    const manualTag = r.manual ? '<span style="font-size:11px;color:var(--t3);margin-left:4px">補登</span>' : '';
+    return`<tr${anomaly?' style="background:rgba(255,59,48,.04)"':''}>
       <td><span style="font-family:'SF Mono',monospace;font-size:14px">${r.empId}</span></td>
-      <td>${r.name||'–'}</td>
-      <td><span class="badge badge-${r.type==='上班'?'in':'out'}"><span class="badge-dot"></span>${r.type}</span></td>
+      <td>${r.name||'–'}${manualTag}</td>
+      <td><span class="badge badge-${r.type==='上班'?'in':'out'}"><span class="badge-dot"></span>${r.type}</span>${anomaly}</td>
       <td>${r.date}</td>
       <td style="font-variant-numeric:tabular-nums">${r.time}</td>
       <td>${syncBadge}</td>
@@ -2899,6 +3025,69 @@ function exportCSV(){
 function clearLocal(){
   if(!confirm('確定要清除所有本地打卡紀錄嗎？\nGoogle Sheets 的資料不受影響。'))return;
   localRecs=[];saveRecs();loadRecords();showToast('本地紀錄已清除','');
+}
+
+// ── 關閉公告（今日） ──
+function dismissAnnouncement(){
+  sessionStorage.setItem('ann_dismissed', new Date().toISOString().slice(0,10));
+  const bar=$('announce-bar');
+  if(bar) bar.style.display='none';
+}
+
+// ── 補打卡 ──
+function openManualPunch(){
+  const td=today();
+  $('mp-date').value=td;
+  $('mp-time').value=new Date().toTimeString().slice(0,5);
+  $('mp-emp').value='';$('mp-emp-id').value='';$('mp-emp-name').value='';
+  $('mp-note').value='';
+  $('mp-emp-list').style.display='none';
+  const m=$('manual-punch-modal');m.style.display='flex';
+}
+function closeManualPunch(){
+  $('manual-punch-modal').style.display='none';
+}
+function mpSearchEmp(){
+  const q=$('mp-emp').value.trim().toUpperCase();
+  const list=$('mp-emp-list');
+  if(!q){list.style.display='none';return}
+  const emps=JSON.parse(localStorage.getItem('employees')||'[]');
+  const found=emps.filter(e=>e.id.includes(q)||e.name.toUpperCase().includes(q)).slice(0,8);
+  if(!found.length){list.style.display='none';return}
+  list.innerHTML=found.map(e=>`<div onclick="mpSelectEmp('${e.id}','${e.name}')"
+    style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:.5px solid var(--border)"
+    onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''">
+    <span style="font-family:monospace;color:var(--t3);font-size:12px">${e.id}</span>　${e.name}
+  </div>`).join('');
+  list.style.display='block';
+}
+function mpSelectEmp(id,name){
+  $('mp-emp').value=name+' ('+id+')';
+  $('mp-emp-id').value=id;
+  $('mp-emp-name').value=name;
+  $('mp-emp-list').style.display='none';
+}
+function saveManualPunch(){
+  const empId=$('mp-emp-id').value.trim();
+  const name=$('mp-emp-name').value.trim();
+  const type=$('mp-type').value;
+  const date=$('mp-date').value;
+  const time=$('mp-time').value;
+  const note=$('mp-note').value.trim();
+  if(!empId){showToast('請選擇員工','error');return}
+  if(!date||!time){showToast('請填寫日期與時間','error');return}
+  const rec={
+    empId, name, type, date, time,
+    timestamp: date+'T'+time+':00',
+    synced: false,
+    manual: true,
+    note: note||'補登'
+  };
+  localRecs.unshift(rec);
+  saveRecs();
+  loadRecords();
+  closeManualPunch();
+  showToast(`已為 ${name} 補登 ${type} 打卡 ✓`,'success');
 }
 
 // ══════════════════════════════════════
@@ -2995,6 +3184,9 @@ function loadSettingsFields(){
   $('s-absent-limit').value=ABSENT_LIMIT||'';
   $('s-msg-in').value=MSG_IN||'';
   $('s-msg-out').value=MSG_OUT||'';
+  $('s-announcement').value=localStorage.getItem('site_announcement')||'';
+  $('s-announcement-level').value=localStorage.getItem('site_announcement_level')||'normal';
+  $('s-announcement-expiry').value=localStorage.getItem('site_announcement_expiry')||'';
   $('s-pwd-old').value='';$('s-pwd-new').value='';
   $('s-sup-pwd-old').value='';$('s-sup-pwd-new').value='';
 
@@ -3045,11 +3237,29 @@ function saveSettings(){
   SCRIPT_URL=url;COMPANY=co;IS_DEMO=!url;ABSENT_LIMIT=al;
   MSG_IN  = $('s-msg-in').value.trim();
   MSG_OUT = $('s-msg-out').value.trim();
+  const announcement = $('s-announcement').value.trim();
+  const annLevel  = $('s-announcement-level').value || 'normal';
+  const annExpiry = $('s-announcement-expiry').value || '';
   localStorage.setItem('script_url',url);
   localStorage.setItem('company',co);
   localStorage.setItem('absent_limit',al);
   localStorage.setItem('msg_in',  MSG_IN);
   localStorage.setItem('msg_out', MSG_OUT);
+  if(announcement){ localStorage.setItem('site_announcement', announcement); }
+  else { localStorage.removeItem('site_announcement'); }
+  localStorage.setItem('site_announcement_level', annLevel);
+  if(annExpiry){ localStorage.setItem('site_announcement_expiry', annExpiry); }
+  else { localStorage.removeItem('site_announcement_expiry'); }
+  // 立即更新公告列
+  const bar = $('announce-bar');
+  if(bar){
+    bar.style.display='';
+    bar.className='announce-bar'+(annLevel==='important'?' level-important':annLevel==='urgent'?' level-urgent':'');
+    const icon = annLevel==='urgent'?'🚨':annLevel==='important'?'⚠️':'📢';
+    const txt = announcement||'打卡系統正式上線，有問題請聯絡主管';
+    bar.innerHTML='<span class="announce-text">'+icon+' 系統公告：'+txt+'</span>'
+      +'<span class="announce-dismiss" onclick="dismissAnnouncement()" title="今日不再顯示">✕</span>';
+  }
   $('nav-brand').textContent=co;
   updateCfgBar();
   if(!supNew) showToast('設定已儲存 ✓','success');
