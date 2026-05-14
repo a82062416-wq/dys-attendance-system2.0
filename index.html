@@ -859,6 +859,40 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 
+<!-- 新增案場 Modal -->
+<div id="add-site-modal" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
+  <div class="modal-box" style="max-width:380px">
+    <h2>＋ 新增案場</h2>
+    <p style="font-size:13px;color:var(--t2);margin-bottom:16px">新案場會立即產生 QR Code，可列印給員工使用</p>
+    <div class="mf" style="margin-bottom:10px">
+      <label>案場 ID <span style="font-size:12px;color:var(--t3);font-weight:400">（唯一代碼，例如：A120、B200）</span></label>
+      <input id="ns-id" class="fi" type="text" placeholder="例如：A120" style="width:100%" oninput="this.value=this.value.toUpperCase()"/>
+    </div>
+    <div class="mf" style="margin-bottom:10px">
+      <label>案場名稱</label>
+      <input id="ns-name" class="fi" type="text" placeholder="例如：信義大廈" style="width:100%"/>
+    </div>
+    <div class="mf" style="margin-bottom:10px">
+      <label>類型</label>
+      <select id="ns-type" class="fi" style="width:100%">
+        <option value="A">A 類</option>
+        <option value="B">B 類</option>
+        <option value="C">C 類</option>
+      </select>
+    </div>
+    <div class="mf" style="margin-bottom:16px">
+      <label>負責主管 <span style="font-size:12px;color:var(--t3);font-weight:400">（選填）</span></label>
+      <select id="ns-sup" class="fi" style="width:100%">
+        <option value="">— 不指定 —</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-s bs-accent" onclick="saveNewSite()" style="flex:1;padding:11px">新增</button>
+      <button class="btn-s bs-ghost" onclick="closeAddSite()" style="flex:1;padding:11px">取消</button>
+    </div>
+  </div>
+</div>
+
 <!-- 補打卡 Modal -->
 <div id="manual-punch-modal" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
   <div class="modal-box" style="max-width:400px">
@@ -1213,9 +1247,10 @@ tr:hover td{background:var(--surface2)}
         <div class="toolbar-right">
           <button class="btn-s bs-ghost" onclick="downloadEmpTemplate()">⬇ 下載範本</button>
           <label class="btn-s bs-ghost" style="cursor:pointer;display:inline-flex;align-items:center">
-            📥 匯入 CSV
-            <input type="file" accept=".csv" id="csv-import" style="display:none" onchange="importEmpCSV(this)"/>
+            📥 匯入 Excel/CSV
+            <input type="file" accept=".csv,.xlsx,.xls" id="csv-import" style="display:none" onchange="importEmpFile(this)"/>
           </label>
+          <button class="btn-s bs-ghost" onclick="togglePasteImport()">📋 貼上匯入</button>
           <button class="btn-s bs-ghost"  id="btn-sync" onclick="syncFromSheets()">☁️ Sheets 同步</button>
           <button class="btn-s bs-accent" onclick="exportEmpCSV()">⬇ 匯出</button>
         </div>
@@ -1236,6 +1271,18 @@ tr:hover td{background:var(--surface2)}
             </div>
             <button class="btn-add" onclick="addEmp()">＋ 新增</button>
             <div class="emp-add-hint">留空「缺勤上限」則使用設定頁的全域預設值</div>
+          </div>
+          <!-- 貼上匯入區塊 -->
+          <div id="paste-import-box" style="display:none;padding:12px 14px;border-top:.5px solid var(--border)">
+            <div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">📋 貼上匯入</div>
+            <div style="font-size:12px;color:var(--t3);margin-bottom:7px">每行一筆，格式：<code style="background:var(--bg2);padding:1px 5px;border-radius:4px">員工編號,姓名</code>（逗號分隔）</div>
+            <textarea id="paste-import-text" class="emp-fi" rows="5"
+              placeholder="11505138,王小明&#10;11505139,陳小華&#10;11505140,林大偉"
+              style="width:100%;resize:vertical;font-family:var(--mono,monospace);font-size:13px;line-height:1.6"></textarea>
+            <div style="display:flex;gap:7px;margin-top:8px">
+              <button class="btn-add" onclick="importFromPaste()" style="flex:1">匯入</button>
+              <button class="btn-s bs-ghost" onclick="togglePasteImport()" style="padding:8px 14px">取消</button>
+            </div>
           </div>
         </div>
         <div class="emp-card">
@@ -1350,6 +1397,7 @@ tr:hover td{background:var(--surface2)}
       <div class="toolbar">
         <div class="toolbar-title">QR Code 管理</div>
         <div class="toolbar-right" id="qr-toolbar-admin" style="display:none">
+          <button class="btn-s bs-ghost" onclick="openAddSite()">＋ 新增案場</button>
           <button class="btn-s bs-ghost" onclick="scanIdleSites()">🔍 閒置掃描</button>
           <button class="btn-s bs-accent" onclick="exportAllQRLinks()">⬇ QR 連結</button>
         </div>
@@ -3167,6 +3215,103 @@ async function syncFromSheets(){
   }catch(e){showToast('同步失敗，請確認網址及網路','error')}
   btn.textContent='☁️ 從 Sheets 同步';btn.disabled=false;
 }
+// ── 下載範本 ──
+function downloadEmpTemplate(){
+  const bom='﻿';
+  const csv=bom+'員工編號,姓名\n11505138,王小明\n11505139,陳小華';
+  dlFile(csv,'員工名單範本.csv');
+  showToast('範本已下載，用 Excel 填好後再匯入 ✓','success');
+}
+
+// ── 匯入 Excel / CSV 檔案 ──
+function importEmpFile(input){
+  const file=input.files[0];
+  if(!file){return}
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const text=e.target.result;
+      _processEmpCSVText(text);
+    };
+    reader.readAsText(file,'UTF-8');
+  } else if(ext==='xlsx'||ext==='xls'){
+    // 用 SheetJS 解析 Excel
+    if(typeof XLSX==='undefined'){
+      // 動態載入 SheetJS
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=()=>_readExcelFile(file);
+      s.onerror=()=>showToast('載入 Excel 解析器失敗，請改用 CSV 格式','error');
+      document.head.appendChild(s);
+    } else {
+      _readExcelFile(file);
+    }
+  } else {
+    showToast('請上傳 .xlsx 或 .csv 格式','error');
+  }
+  input.value='';
+}
+function _readExcelFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      // 自動偵測欄位：找「員工編號」和「姓名」欄
+      let idCol=0, nameCol=1;
+      if(rows.length>0){
+        const header=rows[0].map(h=>String(h).trim());
+        const idIdx=header.findIndex(h=>h.includes('編號')||h.includes('ID')||h.includes('id'));
+        const nameIdx=header.findIndex(h=>h.includes('姓名')||h.includes('name')||h.includes('Name'));
+        if(idIdx>=0) idCol=idIdx;
+        if(nameIdx>=0) nameCol=nameIdx;
+      }
+      const startRow=rows[0]&&isNaN(rows[0][idCol])?1:0;
+      const emps=rows.slice(startRow)
+        .map(r=>({id:String(r[idCol]||'').trim(), name:String(r[nameCol]||'').trim()}))
+        .filter(e=>e.id&&e.name&&e.id.length>=4);
+      _applyEmpImport(emps);
+    }catch(err){
+      showToast('Excel 解析失敗：'+err.message,'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function _processEmpCSVText(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  const startIdx=lines[0]&&(lines[0].includes('員工編號')||lines[0].includes('編號')||lines[0].toLowerCase().includes('id'))?1:0;
+  const emps=lines.slice(startIdx).map(l=>{
+    const parts=l.split(',');
+    return {id:(parts[0]||'').trim(), name:(parts[1]||'').trim()};
+  }).filter(e=>e.id&&e.name&&e.id.length>=4);
+  _applyEmpImport(emps);
+}
+function _applyEmpImport(emps){
+  if(!emps.length){showToast('沒有找到有效的員工資料，請確認格式','error');return}
+  mergeEmployees(emps);
+  employees=JSON.parse(localStorage.getItem('employees')||'[]');
+  renderEmpList();
+  showToast(`✓ 成功匯入 ${emps.length} 筆員工資料`,'success');
+}
+
+// ── 貼上匯入 ──
+function togglePasteImport(){
+  const box=$('paste-import-box');
+  if(!box) return;
+  const show=box.style.display==='none';
+  box.style.display=show?'':'none';
+  if(show) $('paste-import-text').focus();
+}
+function importFromPaste(){
+  const text=$('paste-import-text').value.trim();
+  if(!text){showToast('請先貼上員工資料','error');return}
+  _processEmpCSVText(text);
+  $('paste-import-text').value='';
+  $('paste-import-box').style.display='none';
+}
+
 function exportEmpCSV(){
   if(!employees.length){showToast('員工名單為空','error');return}
   const bom='\uFEFF';
@@ -3433,6 +3578,37 @@ function loadQrPage(){
 
 
 // ── 案場停用管理 ────────────────────────────────
+// ── 新增案場 ──
+function openAddSite(){
+  $('ns-id').value=''; $('ns-name').value='';
+  $('ns-type').value='A';
+  // 填入幹部選項
+  const sups=JSON.parse(localStorage.getItem('supervisors')||'[]');
+  $('ns-sup').innerHTML='<option value="">— 不指定 —</option>'
+    +sups.map(s=>`<option value="${s.empId}">${s.name}</option>`).join('');
+  const m=$('add-site-modal'); m.style.display='flex';
+}
+function closeAddSite(){
+  $('add-site-modal').style.display='none';
+}
+function saveNewSite(){
+  const id=$('ns-id').value.trim().toUpperCase();
+  const name=$('ns-name').value.trim();
+  const type=$('ns-type').value;
+  const supId=$('ns-sup').value;
+  if(!id){showToast('請輸入案場 ID','error');return}
+  if(!name){showToast('請輸入案場名稱','error');return}
+  const sites=getSites();
+  if(sites.find(s=>s.id===id)){showToast('此案場 ID 已存在','error');return}
+  const newSite={id, name, type, active:true};
+  if(supId) newSite.supId=supId;
+  sites.push(newSite);
+  localStorage.setItem('sites', JSON.stringify(sites));
+  renderQrList();
+  closeAddSite();
+  showToast(`案場「${name}」已新增，QR Code 已產生 ✓`,'success');
+}
+
 function toggleSiteActive(siteId){
   const sites = getSites();
   const s = sites.find(x=>x.id===siteId);
