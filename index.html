@@ -4163,66 +4163,6 @@ function importEmpCSV(input){
 //  Toast & utils
 // ══════════════════════════════════════
 let _tt;
-// MARKER_PLACEHOLDER (銀座/物業雲格式)
-// ══════════════════════════════════════
-
-      const dateStr  = year + '-' + String(month).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-      const nextDate = new Date(year, month-1, d+1).toISOString().slice(0,10);
-
-      const dayRecs  = allRecs.filter(r => r.empId===emp.id && r.date===dateStr);
-      const nextRecs = allRecs.filter(r => r.empId===emp.id && r.date===nextDate);
-
-      let inRec  = dayRecs.find(r => r.type==='上班');
-      let outRec = dayRecs.find(r => r.type==='下班');
-      let crossDay = false;
-
-      // 跨日：當天有上班但無下班，找隔天 12:00 前第一筆下班
-      if(inRec && !outRec){
-        const candidate = nextRecs
-          .filter(r => r.type==='下班' && r.time < '12:00:00')
-          .sort((a,b) => a.time.localeCompare(b.time))[0];
-        if(candidate){ outRec = candidate; crossDay = true; crossdayCount++; }
-      }
-
-      if(inRec && outRec){
-        const raw   = calcRawDiff(inRec.time, outRec.time, crossDay);
-        const step  = getDYSStepHours(raw);
-        monthlyTotal += step;
-        totalHours   += step;
-        let n = crossDay ? `${d}日跨日` : '';
-        if(raw > 12.5){ n += (n?'/':'') + `${d}日超時(${raw.toFixed(1)}h)`; anomalyCount++; }
-        dayData.push({h: step > 0 ? step.toFixed(1) : '', note: n});
-      } else if(inRec || outRec){
-        const miss = inRec ? '缺下班' : '缺上班';
-        notes.push(`${d}日${miss}`); anomalyCount++;
-        dayData.push({h:'0.0', note:`${d}日${miss}`});
-      } else {
-        dayData.push({h:'', note:''});
-      }
-    }
-
-    // 收集跨日/超時備註
-    dayData.forEach(d => { if(d.note) notes.push(d.note); });
-    rows.push({emp, dayData, monthlyTotal, notes});
-  });
-
-  return {rows, daysInMonth, year, month, totalHours, anomalyCount, crossdayCount};
-}
-
-  $('monthly-preview-body').innerHTML = preview.map(({emp, dayData, monthlyTotal, notes}) => {
-    const cells = dayData.map(d => {
-      const cls = d.note ? 'style="background:color-mix(in srgb,var(--warn) 15%,var(--surface));color:var(--t1)"' : '';
-      return `<td ${cls}>${d.h}</td>`;
-    }).join('');
-    return `<tr>
-      <td style="font-size:10px;white-space:nowrap">${emp.id}</td>
-      <td style="white-space:nowrap;font-weight:600">${emp.name}</td>
-      ${cells}
-      <td style="font-weight:700;color:var(--accent)">${monthlyTotal.toFixed(1)}</td>
-      <td style="font-size:10px;color:var(--t3);max-width:120px;word-break:break-all">${notes.join('；')}</td>
-    </tr>`;
-  }).join('');
-}
 
 // ══════════════════════════════════════
 //  月度考勤報表引擎 v2 (銀座/物業雲格式 + 案場篩選)
