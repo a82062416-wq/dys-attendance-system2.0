@@ -1700,7 +1700,6 @@ function getSites(activeOnly=false){
   return activeOnly ? s.filter(x=>x.active!==false) : s;
 }
 function saveSites(d){localStorage.setItem('sites',JSON.stringify(d))}
-function saveSites(d){localStorage.setItem('sites',JSON.stringify(d))}
 function getSupervisors(){return JSON.parse(localStorage.getItem('supervisors')||JSON.stringify(_DEFAULT_SUPERVISORS))}
 function saveSupervisors(d){localStorage.setItem('supervisors',JSON.stringify(d))}
 function getSiteV(siteId){
