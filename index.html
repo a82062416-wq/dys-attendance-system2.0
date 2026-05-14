@@ -1074,6 +1074,7 @@ tr:hover td{background:var(--surface2)}
       <button class="seg-btn admin-only" onclick="showSub('employees',this)">員工名單</button>
       <button class="seg-btn admin-only" onclick="showSub('supervisors',this)">幹部管理</button>
       <button class="seg-btn" onclick="showSub('qrcode',this)">QR Code</button>
+      <button class="seg-btn admin-only" onclick="showSub('monthly-report',this)">月度報表</button>
       <button class="seg-btn admin-only" onclick="showSub('settings',this)">設定</button>
     </div>
 
@@ -1238,6 +1239,55 @@ tr:hover td{background:var(--surface2)}
             <tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📊</div><p>請選擇月份後查詢</p></div></td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ══ 月度考勤報表 (銀座格式) ══ -->
+    <div class="sub-page" id="sub-monthly-report">
+      <div class="toolbar">
+        <div class="toolbar-title">月度報表</div>
+        <div class="toolbar-right">
+          <select class="fi" id="exportSiteSelect" style="max-width:150px" onchange="previewMonthlyReport()">
+            <option value="">全部案場</option>
+          </select>
+          <input type="month" class="fi" id="monthly-report-month"/>
+          <button class="btn-s bs-ghost" onclick="previewMonthlyReport()">🔍 預覽</button>
+          <button class="btn-s bs-accent" onclick="handleExportClick()">⬇ 匯出 CSV</button>
+          <button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button>
+        </div>
+      </div>
+
+      <!-- 說明區塊 -->
+      <div style="font-size:12px;color:var(--t3);padding:10px 16px 4px;line-height:1.8;background:var(--surface);border-bottom:.5px solid var(--border)">
+        📋 <strong style="color:var(--t1)">銀座格式月度考勤表</strong>：橫向展開 1~31 日，每日填入階梯工時（8/9/10/11/12h）<br>
+        🌙 跨日班（當天無下班）自動抓隔日中午前之下班紀錄 &nbsp;｜&nbsp; ⚠️ 超過 12.5h 自動標記備註欄
+      </div>
+
+      <!-- 預覽摘要卡片 -->
+      <div id="monthly-preview-cards" style="display:none">
+        <div class="stats-row" style="margin:12px 0 0">
+          <div class="stat-card"><div class="stat-val" id="mr-emp-count">–</div><div class="stat-lbl">出勤人數</div></div>
+          <div class="stat-card"><div class="stat-val" id="mr-total-hours">–</div><div class="stat-lbl">總工時(h)</div></div>
+          <div class="stat-card"><div class="stat-val" id="mr-anomaly-count">–</div><div class="stat-lbl">異常筆數</div></div>
+          <div class="stat-card"><div class="stat-val" id="mr-crossday-count">–</div><div class="stat-lbl">跨日班次</div></div>
+        </div>
+        <!-- 預覽表格 -->
+        <div class="table-wrap" style="margin-top:10px;overflow-x:auto">
+          <table id="monthly-preview-table" style="min-width:900px;font-size:11px">
+            <thead id="monthly-preview-thead"></thead>
+            <tbody id="monthly-preview-body">
+              <tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📅</div><p>請選擇月份後按預覽</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="padding:8px 16px;font-size:11px;color:var(--t3)">
+          ＊預覽僅顯示有出勤紀錄的員工前 20 筆。完整資料請點「匯出 CSV」。
+        </div>
+      </div>
+
+      <!-- 空狀態 -->
+      <div id="monthly-empty-state" style="padding:40px 0">
+        <div class="empty-state"><div class="empty-icon">📊</div><p>請選擇月份後按「預覽」或「匯出 CSV」</p></div>
       </div>
     </div>
 
@@ -3424,6 +3474,7 @@ function showSub(name,el){
   $('sub-'+name).classList.add('active');el.classList.add('active');
   if(name==='records')         loadRecords();
   if(name==='attendance-stat'){ initStatMonth(); loadAttendanceStat(); }
+  if(name==='monthly-report'){ initExportSiteSelect(); const el=$('monthly-report-month'); if(el&&!el.value){const n=new Date();el.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0');} }
   if(name==='employees'){ const s=$('emp-search'); if(s) s.value=''; renderEmpList(); }
   if(name==='settings') loadSettingsFields();
   if(name==='overview') loadOverview();
@@ -4113,6 +4164,248 @@ function importEmpCSV(input){
 //  Toast & utils
 // ══════════════════════════════════════
 let _tt;
+// MARKER_PLACEHOLDER (銀座/物業雲格式)
+// ══════════════════════════════════════
+
+      const dateStr  = year + '-' + String(month).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      const nextDate = new Date(year, month-1, d+1).toISOString().slice(0,10);
+
+      const dayRecs  = allRecs.filter(r => r.empId===emp.id && r.date===dateStr);
+      const nextRecs = allRecs.filter(r => r.empId===emp.id && r.date===nextDate);
+
+      let inRec  = dayRecs.find(r => r.type==='上班');
+      let outRec = dayRecs.find(r => r.type==='下班');
+      let crossDay = false;
+
+      // 跨日：當天有上班但無下班，找隔天 12:00 前第一筆下班
+      if(inRec && !outRec){
+        const candidate = nextRecs
+          .filter(r => r.type==='下班' && r.time < '12:00:00')
+          .sort((a,b) => a.time.localeCompare(b.time))[0];
+        if(candidate){ outRec = candidate; crossDay = true; crossdayCount++; }
+      }
+
+      if(inRec && outRec){
+        const raw   = calcRawDiff(inRec.time, outRec.time, crossDay);
+        const step  = getDYSStepHours(raw);
+        monthlyTotal += step;
+        totalHours   += step;
+        let n = crossDay ? `${d}日跨日` : '';
+        if(raw > 12.5){ n += (n?'/':'') + `${d}日超時(${raw.toFixed(1)}h)`; anomalyCount++; }
+        dayData.push({h: step > 0 ? step.toFixed(1) : '', note: n});
+      } else if(inRec || outRec){
+        const miss = inRec ? '缺下班' : '缺上班';
+        notes.push(`${d}日${miss}`); anomalyCount++;
+        dayData.push({h:'0.0', note:`${d}日${miss}`});
+      } else {
+        dayData.push({h:'', note:''});
+      }
+    }
+
+    // 收集跨日/超時備註
+    dayData.forEach(d => { if(d.note) notes.push(d.note); });
+    rows.push({emp, dayData, monthlyTotal, notes});
+  });
+
+  return {rows, daysInMonth, year, month, totalHours, anomalyCount, crossdayCount};
+}
+
+  $('monthly-preview-body').innerHTML = preview.map(({emp, dayData, monthlyTotal, notes}) => {
+    const cells = dayData.map(d => {
+      const cls = d.note ? 'style="background:color-mix(in srgb,var(--warn) 15%,var(--surface));color:var(--t1)"' : '';
+      return `<td ${cls}>${d.h}</td>`;
+    }).join('');
+    return `<tr>
+      <td style="font-size:10px;white-space:nowrap">${emp.id}</td>
+      <td style="white-space:nowrap;font-weight:600">${emp.name}</td>
+      ${cells}
+      <td style="font-weight:700;color:var(--accent)">${monthlyTotal.toFixed(1)}</td>
+      <td style="font-size:10px;color:var(--t3);max-width:120px;word-break:break-all">${notes.join('；')}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+//  月度考勤報表引擎 v2 (銀座/物業雲格式 + 案場篩選)
+// ══════════════════════════════════════
+
+/** 初始化案場下拉選單（切換到月度報表頁時呼叫） */
+function initExportSiteSelect(){
+  const sel = $('exportSiteSelect');
+  if(!sel) return;
+  const sites = JSON.parse(localStorage.getItem('sites') || '[]').filter(s => s.active !== false);
+  sel.innerHTML = '<option value="">全部案場</option>'
+    + sites.map(s => `<option value="${s.id}">${s.id} ${s.name}</option>`).join('');
+}
+
+/** 點擊匯出按鈕的入口 */
+function handleExportClick(){
+  const ym     = ($('monthly-report-month')||{}).value || getDefaultYM();
+  const siteId = ($('exportSiteSelect')||{}).value || '';
+  if(!ym){ showToast('請選擇月份','error'); return; }
+  exportDYSReportFinal(ym, siteId);
+}
+
+/** 取得預設年月（本月） */
+function getDefaultYM(){
+  const n = new Date();
+  return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0');
+}
+
+/** 原始工時計算（支援跨日） */
+function calculateRawHours(start, end, isCross){
+  const s = new Date('2000/01/01 ' + start);
+  const e = new Date('2000/01/' + (isCross ? '02' : '01') + ' ' + end);
+  return Math.max(0, (e - s) / 1000 / 60 / 60);
+}
+
+/** 階梯式工時判定 (8 / 9 / 10 / 11 / 12h) */
+function getDYSStepHours(h){
+  if(h <= 0)  return 0;
+  if(h >= 12) return 12.0;
+  if(h >= 11) return 11.0;
+  if(h >= 10) return 10.0;
+  if(h >= 9)  return 9.0;
+  if(h >= 8)  return 8.0;
+  return parseFloat(h.toFixed(1)); // 低於 8h 按實際計
+}
+
+/** 建立月度矩陣資料（含案場過濾） */
+function buildMonthlyMatrix(targetYM, filterSiteId){
+  const [year, month] = targetYM.split('-').map(Number);
+  const daysInMonth   = new Date(year, month, 0).getDate();
+  const emps          = JSON.parse(localStorage.getItem('employees') || '[]');
+  const allRecs       = JSON.parse(localStorage.getItem('local_records') || '[]');
+
+  let totalHours = 0, anomalyCount = 0, crossdayCount = 0;
+  const rows = [];
+
+  emps.forEach(emp => {
+    let monthlyTotal = 0;
+    const notes = [];
+    const dayData = [];
+    let hasRecord = false;
+
+    for(let d = 1; d <= 31; d++){
+      if(d > daysInMonth){ dayData.push({h:'', note:''}); continue; }
+
+      const dateStr  = year + '-' + String(month).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      const nextDate = new Date(year, month-1, d+1).toISOString().slice(0,10);
+
+      let dayRecs  = allRecs.filter(r => r.empId===emp.id && r.date===dateStr);
+      let nextRecs = allRecs.filter(r => r.empId===emp.id && r.date===nextDate);
+
+      // 案場過濾
+      if(filterSiteId){
+        dayRecs  = dayRecs.filter(r  => r.siteId===filterSiteId);
+        nextRecs = nextRecs.filter(r => r.siteId===filterSiteId);
+      }
+
+      let inRec  = dayRecs.find(r  => r.type==='上班');
+      let outRec = dayRecs.find(r  => r.type==='下班');
+      let crossDay = false;
+
+      // 跨日：當天有上班無下班 → 找隔天中午前第一筆下班
+      if(inRec && !outRec){
+        const candidate = nextRecs
+          .filter(r => r.type==='下班' && r.time < '12:00:00')
+          .sort((a,b) => a.time.localeCompare(b.time))[0];
+        if(candidate){ outRec = candidate; crossDay = true; crossdayCount++; }
+      }
+
+      if(inRec && outRec){
+        hasRecord = true;
+        const raw  = calculateRawHours(inRec.time, outRec.time, crossDay);
+        const step = getDYSStepHours(raw);
+        monthlyTotal += step; totalHours += step;
+        const n = (crossDay ? `${d}日跨日` : '') + (raw > 12.5 ? (crossDay?'/':'') + `${d}日超時(${raw.toFixed(1)}h)` : '');
+        if(raw > 12.5) anomalyCount++;
+        dayData.push({h: step > 0 ? step.toFixed(1) : '', note: n});
+      } else if(inRec || outRec){
+        hasRecord = true;
+        const miss = inRec ? '缺下班' : '缺上班';
+        notes.push(`${d}日${miss}`); anomalyCount++;
+        dayData.push({h:'0.0', note:`${d}日${miss}`});
+      } else {
+        dayData.push({h:'', note:''});
+      }
+    }
+
+    // 有案場篩選時，沒到該案場的員工不列入
+    if(filterSiteId && !hasRecord) return;
+
+    dayData.forEach(d => { if(d.note) notes.push(d.note); });
+    rows.push({emp, dayData, monthlyTotal, notes});
+  });
+
+  return {rows, daysInMonth, year, month, totalHours, anomalyCount, crossdayCount};
+}
+
+/** 預覽月度報表（前 20 人） */
+function previewMonthlyReport(){
+  const ym     = ($('monthly-report-month')||{}).value || getDefaultYM();
+  const siteId = ($('exportSiteSelect')||{}).value || '';
+  const {rows, daysInMonth, totalHours, anomalyCount, crossdayCount} = buildMonthlyMatrix(ym, siteId);
+
+  $('monthly-empty-state').style.display   = 'none';
+  $('monthly-preview-cards').style.display = 'block';
+
+  $('mr-emp-count').textContent      = rows.length;
+  $('mr-total-hours').textContent    = totalHours.toFixed(0);
+  $('mr-anomaly-count').textContent  = anomalyCount;
+  $('mr-crossday-count').textContent = crossdayCount;
+
+  const dayHeaders = Array.from({length: daysInMonth}, (_,i) =>
+    `<th style="min-width:26px;padding:3px 1px;font-size:10px">${i+1}</th>`).join('');
+  $('monthly-preview-thead').innerHTML =
+    `<tr><th>編號</th><th>姓名</th>${dayHeaders}<th>小計</th><th>備註</th></tr>`;
+
+  const preview = rows.slice(0, 20);
+  if(!preview.length){
+    $('monthly-preview-body').innerHTML =
+      '<tr><td colspan="35"><div class="empty-state"><div class="empty-icon">📭</div><p>本月（此案場）無出勤紀錄</p></div></td></tr>';
+    return;
+  }
+
+  $('monthly-preview-body').innerHTML = preview.map(({emp, dayData, monthlyTotal, notes}) => {
+    const cells = dayData.map(d => {
+      const warn = d.note ? 'style="background:color-mix(in srgb,var(--warn) 15%,var(--surface))"' : '';
+      return `<td ${warn} style="font-size:10px;text-align:center;padding:2px 1px">${d.h}</td>`;
+    }).join('');
+    return `<tr>
+      <td style="font-size:10px;white-space:nowrap;padding:4px 6px">${emp.id}</td>
+      <td style="white-space:nowrap;font-weight:600;padding:4px 6px">${emp.name}</td>
+      ${cells}
+      <td style="font-weight:700;color:var(--accent);text-align:center">${monthlyTotal.toFixed(1)}</td>
+      <td style="font-size:10px;color:var(--t3);max-width:130px;word-break:break-all;padding:4px 6px">${notes.join('；')}</td>
+    </tr>`;
+  }).join('');
+}
+
+/** 完整匯出月度報表 CSV（銀座格式：每日 時/哨 雙欄） */
+function exportDYSReportFinal(targetYM, filterSiteId){
+  filterSiteId = filterSiteId || '';
+  const {rows, daysInMonth} = buildMonthlyMatrix(targetYM, filterSiteId);
+
+  if(!rows.length){ showToast('本月（此案場）無出勤紀錄可匯出', 'error'); return; }
+
+  let headers = ['員工編號','姓名'];
+  for(let i=1; i<=31; i++) headers.push(`${i}時`, `${i}哨`);
+  headers.push('排班時數','備註','應上時數','支援類別','支援時薪');
+
+  const csvRows = rows.map(({emp, dayData, monthlyTotal, notes}) => {
+    let row = [emp.id, emp.name];
+    dayData.forEach(d => row.push(d.h, ''));
+    row.push(monthlyTotal.toFixed(1), '"' + notes.join('；') + '"', '176', '', '');
+    return row.join(',');
+  });
+
+  const siteSuffix = filterSiteId || '全部';
+  const csvContent = '﻿' + headers.join(',') + '\n' + csvRows.join('\n');
+  dlFile(csvContent, `DYS_月考勤表_${targetYM}_${siteSuffix}.csv`);
+  showToast(`已匯出 ${rows.length} 人 × ${targetYM}（${siteSuffix}）✓`, 'success');
+}
+
 function showToast(msg,type){
   const t=$('toast');t.textContent=msg;
   t.className=type?`show ${type}`:'show';
