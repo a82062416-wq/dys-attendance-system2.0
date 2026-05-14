@@ -2962,7 +2962,6 @@ function loadRecords(){
   const tbody=$('records-body');
   if(!rows.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div><p>目前沒有符合條件的紀錄</p></div></td></tr>`;return}
   // 異常偵測：同人同天同類型 > 1次 → 重複；同人同天有上班無下班（非今天）→ 缺下班
-  const td=today();
   const anomalySet=new Set();
   // 統計 key = empId+date+type
   const typeCount={};
