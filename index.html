@@ -782,6 +782,19 @@ tr:hover td{background:var(--surface2)}
 }
 .print-header { display: none; font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #000; }
 
+/* ══ 月度報表 案場 Chip 標籤 ══ */
+.site-chip{display:inline-flex;align-items:center;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;border:1.5px solid var(--border);background:var(--surface2);color:var(--t2);cursor:pointer;transition:background .15s,border-color .15s,color .15s;white-space:nowrap;user-select:none;-webkit-tap-highlight-color:transparent}
+.site-chip:active{opacity:.7}
+.site-chip.sc-selected{background:var(--accent);border-color:var(--accent);color:#fff}
+.site-chip.sc-type-a{border-color:color-mix(in srgb,var(--accent) 40%,var(--border))}
+.site-chip.sc-type-b{border-color:color-mix(in srgb,var(--success) 40%,var(--border))}
+.site-chip.sc-type-a.sc-selected{background:var(--accent);border-color:var(--accent)}
+.site-chip.sc-type-b.sc-selected{background:var(--success);border-color:var(--success)}
+#site-selector-section{padding:10px 16px 12px;background:var(--surface);border-bottom:.5px solid var(--border)}
+#site-chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#site-chip-search{font-size:12px;padding:4px 10px;height:28px;width:110px}
+.site-sel-summary{font-size:12px;color:var(--t3);margin-top:8px;padding-top:6px;border-top:.5px solid var(--border2)}
+
 </style>
 </head>
 <body>
@@ -1422,31 +1435,26 @@ tr:hover td{background:var(--surface2)}
       <div class="toolbar">
         <div class="toolbar-title">月度報表</div>
         <div class="toolbar-right">
-          <!-- 多案場勾選按鈕 -->
-          <div style="position:relative;display:inline-block" id="site-filter-wrapper">
-            <button class="btn-s bs-ghost" id="site-filter-btn" onclick="toggleSitePanel(event)" style="min-width:110px;text-align:left">
-              📍 全部案場 ▾
-            </button>
-            <div id="site-filter-panel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;min-width:240px;max-height:300px;overflow-y:auto;box-shadow:0 6px 24px rgba(0,0,0,.16)">
-              <!-- 快選按鈕列 -->
-              <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">
-                <button class="btn-s bs-ghost" style="font-size:11px;padding:2px 8px" onclick="selectAllSites()">全選</button>
-                <button class="btn-s bs-ghost" style="font-size:11px;padding:2px 8px" onclick="clearSiteSelection()">清除</button>
-                <button class="btn-s bs-ghost" style="font-size:11px;padding:2px 8px" onclick="selectSitesByType('A')">銀座</button>
-                <button class="btn-s bs-ghost" style="font-size:11px;padding:2px 8px" onclick="selectSitesByType('B')">物業</button>
-              </div>
-              <!-- 搜尋框 -->
-              <input type="text" class="fi" id="site-filter-search" placeholder="搜尋案場…" style="width:100%;box-sizing:border-box;font-size:12px;margin-bottom:6px" oninput="filterSiteList(this.value)"/>
-              <!-- checkbox 清單 -->
-              <div id="site-checkbox-list" style="display:flex;flex-direction:column;gap:4px"></div>
-            </div>
-          </div>
           <input type="month" class="fi" id="monthly-report-month"/>
           <button class="btn-s bs-ghost" onclick="previewMonthlyReport()">🔍 預覽</button>
           <button class="btn-s bs-ghost" onclick="printMonthlyReport()">🖨️ 列印</button>
           <button class="btn-s bs-accent" onclick="handleExportClick()">⬇ 匯出 CSV</button>
           <button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button>
         </div>
+      </div>
+
+      <!-- 案場選擇區（Chip 標籤） -->
+      <div id="site-selector-section">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:600;color:var(--t2);white-space:nowrap">📍 選擇案場</span>
+          <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px" onclick="selectAllSites()">全選</button>
+          <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px" onclick="clearSiteSelection()">清除</button>
+          <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--border))" onclick="selectSitesByType('A')">銀座</button>
+          <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px;color:var(--success);border-color:color-mix(in srgb,var(--success) 40%,var(--border))" onclick="selectSitesByType('B')">物業</button>
+          <input type="text" class="fi site-chip-search" id="site-chip-search" placeholder="搜尋案場…" oninput="filterSiteChips(this.value)"/>
+        </div>
+        <div id="site-chip-list"></div>
+        <div class="site-sel-summary" id="site-sel-summary">已選：全部案場</div>
       </div>
 
       <!-- 說明區塊 -->
@@ -4610,66 +4618,72 @@ let _tt;
 let _selectedSiteIds = new Set(); // 空 = 全部案場
 
 /** 更新案場篩選按鈕文字 */
+/** ── 案場 Chip 選擇 ───────────────────────── **/
+
+/** 更新選取摘要文字 */
 function updateSiteFilterBtn(){
-  const btn = $('site-filter-btn');
-  if(!btn) return;
   const n = _selectedSiteIds.size;
-  btn.textContent = n === 0 ? '📍 全部案場 ▾'
-                 : n === 1  ? `📍 ${[..._selectedSiteIds][0]} ▾`
-                            : `📍 已選 ${n} 個案場 ▾`;
-}
-
-/** 開關浮動面板 */
-function toggleSitePanel(e){
-  if(e) e.stopPropagation();
-  const panel = $('site-filter-panel');
-  if(!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  panel.style.display = isOpen ? 'none' : 'block';
-  if(!isOpen){
-    const s = $('site-filter-search'); if(s){ s.value=''; filterSiteList(''); }
-    setTimeout(()=>{ document.addEventListener('click', _closeSitePanel, {once:true}); }, 0);
+  const el = $('site-sel-summary');
+  if(!el) return;
+  if(n === 0){
+    el.textContent = '已選：全部案場';
+  } else {
+    const names = [..._selectedSiteIds].join('、');
+    el.textContent = `已選 ${n} 個案場：${names}`;
   }
-}
-function _closeSitePanel(e){
-  const wrapper = $('site-filter-wrapper');
-  if(wrapper && wrapper.contains(e.target)) return;
-  const panel = $('site-filter-panel');
-  if(panel) panel.style.display = 'none';
-}
-
-/** 搜尋過濾 checkbox 清單 */
-function filterSiteList(q){
-  const items = document.querySelectorAll('#site-checkbox-list .site-cb-item');
-  const lq = q.trim().toLowerCase();
-  items.forEach(item => {
-    item.style.display = (!lq || item.dataset.label.toLowerCase().includes(lq)) ? '' : 'none';
+  // 同步 chip 選取狀態
+  document.querySelectorAll('#site-chip-list .site-chip').forEach(chip => {
+    chip.classList.toggle('sc-selected', _selectedSiteIds.has(chip.dataset.id));
   });
 }
 
+/** 點擊 chip 切換選取 */
+function toggleSiteChip(id, el){
+  if(_selectedSiteIds.has(id)){
+    _selectedSiteIds.delete(id);
+    el.classList.remove('sc-selected');
+  } else {
+    _selectedSiteIds.add(id);
+    el.classList.add('sc-selected');
+  }
+  updateSiteFilterBtn();
+}
+
+/** 搜尋過濾 chips */
+function filterSiteChips(q){
+  const lq = q.trim().toLowerCase();
+  document.querySelectorAll('#site-chip-list .site-chip').forEach(chip => {
+    chip.style.display = (!lq || chip.dataset.label.toLowerCase().includes(lq)) ? '' : 'none';
+  });
+}
+// 保留舊名稱相容性
+function filterSiteList(q){ filterSiteChips(q); }
+
 /** 全選 */
 function selectAllSites(){
-  document.querySelectorAll('#site-checkbox-list input[type=checkbox]').forEach(cb => {
-    cb.checked = true;
-    _selectedSiteIds.add(cb.value);
+  document.querySelectorAll('#site-chip-list .site-chip').forEach(chip => {
+    _selectedSiteIds.add(chip.dataset.id);
+    chip.classList.add('sc-selected');
   });
   updateSiteFilterBtn();
 }
 
-/** 清除全部 */
+/** 清除全選 */
 function clearSiteSelection(){
-  document.querySelectorAll('#site-checkbox-list input[type=checkbox]').forEach(cb => cb.checked = false);
   _selectedSiteIds.clear();
+  document.querySelectorAll('#site-chip-list .site-chip').forEach(chip => {
+    chip.classList.remove('sc-selected');
+  });
   updateSiteFilterBtn();
 }
 
 /** 依類型快選（A=銀座 / B=物業） */
 function selectSitesByType(type){
-  document.querySelectorAll('#site-checkbox-list input[type=checkbox]').forEach(cb => {
-    const match = cb.value.startsWith(type);
-    cb.checked = match;
-    if(match) _selectedSiteIds.add(cb.value);
-    else _selectedSiteIds.delete(cb.value);
+  _selectedSiteIds.clear();
+  document.querySelectorAll('#site-chip-list .site-chip').forEach(chip => {
+    const match = chip.dataset.id.startsWith(type);
+    chip.classList.toggle('sc-selected', match);
+    if(match) _selectedSiteIds.add(chip.dataset.id);
   });
   updateSiteFilterBtn();
 }
@@ -4679,24 +4693,28 @@ function getSelectedSiteIds(){
   return [..._selectedSiteIds];
 }
 
-/** 初始化案場勾選清單（切換到月度報表頁時呼叫） */
+/** 初始化案場 Chip 清單（切換到月度報表頁時呼叫） */
 function initExportSiteSelect(){
-  const list = $('site-checkbox-list');
+  const list = $('site-chip-list');
   if(!list) return;
   const sites = JSON.parse(localStorage.getItem('sites') || '[]').filter(s => s.active !== false);
+  if(!sites.length){
+    list.innerHTML = '<span style="font-size:12px;color:var(--t3)">尚無案場資料</span>';
+    updateSiteFilterBtn();
+    return;
+  }
   list.innerHTML = sites.map(s => {
-    const checked = _selectedSiteIds.has(s.id) ? 'checked' : '';
     const label   = `${s.id} ${s.name}`;
-    return `<label class="site-cb-item" data-label="${label}" style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 2px;cursor:pointer;user-select:none">
-      <input type="checkbox" value="${s.id}" ${checked} onchange="
-        this.checked ? _selectedSiteIds.add(this.value) : _selectedSiteIds.delete(this.value);
-        updateSiteFilterBtn();
-      " style="width:15px;height:15px;accent-color:var(--accent)"/>
-      <span>${label}</span>
-    </label>`;
+    const typeClass = s.type ? `sc-type-${s.type.toLowerCase()}` : '';
+    const selClass  = _selectedSiteIds.has(s.id) ? 'sc-selected' : '';
+    return `<button class="site-chip ${typeClass} ${selClass}" data-id="${s.id}" data-label="${label.toLowerCase()}" onclick="toggleSiteChip('${s.id}', this)">${label}</button>`;
   }).join('');
   updateSiteFilterBtn();
 }
+
+/** 舊的浮動面板函式（保留空殼，避免 onclick 引用錯誤） */
+function toggleSitePanel(e){ /* deprecated */ }
+function _closeSitePanel(e){ /* deprecated */ }
 
 /** 點擊匯出按鈕的入口 */
 function handleExportClick(){
