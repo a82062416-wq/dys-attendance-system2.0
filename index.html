@@ -1288,6 +1288,9 @@ tr:hover td{background:var(--surface2)}
           <span style="color:var(--t3);font-size:13px">—</span>
           <input type="date" class="fi" id="f-date-end" onchange="loadRecords()" style="width:130px"/>
         </span>
+        <select class="fi" id="f-site" style="font-size:12px;height:28px;padding:0 6px" onchange="loadRecords()">
+          <option value="">📍 全部案場</option>
+        </select>
       </div>
       <div id="sync-status-bar" style="display:none" class="cfg-bar" style="background:color-mix(in srgb,var(--warn) 8%,var(--surface))">
         <span id="sync-status-msg" style="font-size:13px;color:var(--t1)"></span>
@@ -1305,8 +1308,8 @@ tr:hover td{background:var(--surface2)}
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>員工編號</th><th>姓名</th><th>類型</th><th>日期</th><th>時間</th><th>同步</th></tr></thead>
-          <tbody id="records-body"><tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📋</div><p>尚無打卡紀錄</p></div></td></tr></tbody>
+          <thead><tr><th>員工編號</th><th>姓名</th><th>類型</th><th>日期</th><th>時間</th><th>案場</th><th>同步</th></tr></thead>
+          <tbody id="records-body"><tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div><p>尚無打卡紀錄</p></div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1328,8 +1331,8 @@ tr:hover td{background:var(--surface2)}
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>員工</th><th>編號</th><th>狀態</th><th>上班時間</th><th>下班時間</th></tr></thead>
-          <tbody id="overview-body"><tr><td colspan="5"><div class="empty-state"><div class="empty-icon">👥</div><p>載入中…</p></div></td></tr></tbody>
+          <thead><tr><th>員工</th><th>編號</th><th>狀態</th><th>上班時間</th><th>下班時間</th><th>案場</th></tr></thead>
+          <tbody id="overview-body"><tr><td colspan="6"><div class="empty-state"><div class="empty-icon">👥</div><p>載入中…</p></div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1376,8 +1379,8 @@ tr:hover td{background:var(--surface2)}
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>員工</th><th>日期</th><th>異常類型</th><th>說明</th></tr></thead>
-          <tbody id="anomaly-body"><tr><td colspan="4"><div class="empty-state"><div class="empty-icon">✅</div><p>請選擇日期範圍後查詢</p></div></td></tr></tbody>
+          <thead><tr><th>員工</th><th>日期</th><th>異常類型</th><th>說明</th><th>案場</th></tr></thead>
+          <tbody id="anomaly-body"><tr><td colspan="5"><div class="empty-state"><div class="empty-icon">✅</div><p>請選擇日期範圍後查詢</p></div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1388,6 +1391,9 @@ tr:hover td{background:var(--surface2)}
         <div class="toolbar-title">出勤統計</div>
         <div class="toolbar-right">
           <input type="month" class="fi" id="stat-month"/>
+          <select class="fi" id="stat-site" style="font-size:12px;height:32px;padding:0 6px" onchange="loadAttendanceStat()">
+            <option value="">📍 全部案場</option>
+          </select>
           <button class="btn-s bs-ghost" onclick="loadAttendanceStat()">🔄 查詢</button>
           <button class="btn-s bs-accent" onclick="exportStatCSV()">⬇ CSV</button>
           <button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button>
@@ -3183,12 +3189,24 @@ function loadAttendanceStat(){
 
   const [year, month] = yearMonth.split('-').map(Number);
 
+  // 初始化案場下拉
+  const statSiteSel = $('stat-site');
+  if(statSiteSel){
+    const sites = JSON.parse(localStorage.getItem('sites')||'[]').filter(s=>s.active!==false);
+    const curSite = statSiteSel.value;
+    statSiteSel.innerHTML = '<option value="">📍 全部案場</option>'
+      + sites.map(s=>`<option value="${s.id}"${s.id===curSite?' selected':''}>${s.id} ${s.name}</option>`).join('');
+  }
+  const filterSiteId = statSiteSel ? statSiteSel.value : '';
+
   // 篩出該月的本地紀錄
   const _allMonthRecs = filterRecsBySup(localRecs);
   const monthRecs = _allMonthRecs.filter(r => {
     if(!r.date) return false;
     const [y,m] = r.date.split('-').map(Number);
-    return y===year && m===month;
+    if(y!==year || m!==month) return false;
+    if(filterSiteId && r.siteId !== filterSiteId) return false;
+    return true;
   });
 
   if(!monthRecs.length){
@@ -3372,6 +3390,30 @@ function getDateRange(){
   }
   return {s:td, e:td};
 }
+// ── 案場輔助函式 ──────────────────────────────────────────────
+let _siteMap = null; // siteId → name 快取
+function getSiteMap(){
+  if(!_siteMap){
+    const sites = JSON.parse(localStorage.getItem('sites')||'[]');
+    _siteMap = {};
+    sites.forEach(s => { _siteMap[s.id] = s.name || s.id; });
+  }
+  return _siteMap;
+}
+function getSiteName(siteId){
+  if(!siteId) return '–';
+  const m = getSiteMap();
+  return m[siteId] ? `${siteId} ${m[siteId]}` : siteId;
+}
+function initSiteFilter(){
+  const sel = $('f-site');
+  if(!sel) return;
+  const sites = JSON.parse(localStorage.getItem('sites')||'[]').filter(s=>s.active!==false);
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">📍 全部案場</option>'
+    + sites.map(s=>`<option value="${s.id}"${s.id===cur?' selected':''}>${s.id} ${s.name}</option>`).join('');
+}
+
 function loadRecords(){
   const fe=$('f-emp')?$('f-emp').value.trim().toUpperCase():'';
   const td=today();
@@ -3380,6 +3422,10 @@ function loadRecords(){
   if(ds) rows=rows.filter(r=>r.date>=ds);
   if(de) rows=rows.filter(r=>r.date<=de);
   if(fe) rows=rows.filter(r=>r.empId.includes(fe)||(r.name||'').toUpperCase().includes(fe));
+  const fs=$('f-site')?$('f-site').value:'';
+  if(fs) rows=rows.filter(r=>r.siteId===fs);
+  initSiteFilter(); // 更新案場選單（案場可能有變動）
+  _siteMap = null;  // 清快取讓 getSiteName 重讀
   const todayR=filterRecsBySup(localRecs.filter(r=>r.date===td));
   $('s-total').textContent=todayR.length;
   $('s-in').textContent=todayR.filter(r=>r.type==='上班').length;
@@ -3424,12 +3470,14 @@ function loadRecords(){
     if(anomalySet.has(kdup)) anomaly='<span class="badge-anomaly">⚠ 重複</span>';
     else if(r.type==='上班'&&anomalySet.has(kmiss)) anomaly='<span class="badge-anomaly">⚠ 缺下班</span>';
     const manualTag = r.manual ? '<span style="font-size:11px;color:var(--t3);margin-left:4px">補登</span>' : '';
+    const siteDisplay = r.siteId ? `<span style="font-size:11px;color:var(--t2);white-space:nowrap">${getSiteName(r.siteId)}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
     return`<tr${anomaly?' style="background:rgba(255,59,48,.04)"':''}>
       <td><span style="font-family:'SF Mono',monospace;font-size:14px">${r.empId}</span></td>
       <td>${r.name||'–'}${manualTag}</td>
       <td><span class="badge badge-${r.type==='上班'?'in':'out'}"><span class="badge-dot"></span>${r.type}</span>${anomaly}</td>
       <td>${r.date}</td>
       <td style="font-variant-numeric:tabular-nums">${r.time}</td>
+      <td>${siteDisplay}</td>
       <td>${syncBadge}</td>
     </tr>`}).join('');
 }
@@ -3901,7 +3949,7 @@ function showSub(name,el){
   if(backBtn) backBtn.style.display = '';
   if(titleEl) titleEl.textContent = _labels[name] || name;
   // 資料載入
-  if(name==='records')         loadRecords();
+  if(name==='records'){         initSiteFilter(); loadRecords(); }
   if(name==='attendance-stat'){ initStatMonth(); loadAttendanceStat(); }
   if(name==='monthly-report'){ initExportSiteSelect(); const _el=$('monthly-report-month'); if(_el&&!_el.value){const _n=new Date();_el.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');} }
   if(name==='employees'){ const _s=$('emp-search'); if(_s) _s.value=''; renderEmpList(); }
@@ -4335,8 +4383,8 @@ function loadOverview(){
   // 統計每人上下班
   const empMap = {};
   todayRecs.forEach(r=>{
-    if(!empMap[r.empId]) empMap[r.empId] = {name:r.name||r.empId, in:null, out:null};
-    if(r.type==='上班' && !empMap[r.empId].in)  empMap[r.empId].in  = r.time;
+    if(!empMap[r.empId]) empMap[r.empId] = {name:r.name||r.empId, in:null, out:null, siteId:null};
+    if(r.type==='上班' && !empMap[r.empId].in){ empMap[r.empId].in=r.time; empMap[r.empId].siteId=r.siteId||null; }
     if(r.type==='下班' && !empMap[r.empId].out) empMap[r.empId].out = r.time;
   });
 
@@ -4358,12 +4406,14 @@ function loadOverview(){
   Object.entries(empMap).forEach(([id,data])=>{
     const status = data.out ? '✅ 已下班' : data.in ? '☀️ 上班中' : '–';
     const cls    = data.out ? 'badge-in' : 'badge-warn';
+    const siteCell = data.siteId ? `<span style="font-size:11px;color:var(--t2)">${getSiteName(data.siteId)}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
     rows.push(`<tr>
       <td><strong>${data.name}</strong></td>
       <td style="font-family:'SF Mono',monospace;font-size:13px">${id}</td>
       <td><span class="badge ${cls}"><span class="badge-dot"></span>${status}</span></td>
       <td style="font-variant-numeric:tabular-nums">${data.in||'–'}</td>
       <td style="font-variant-numeric:tabular-nums">${data.out||'–'}</td>
+      <td>${siteCell}</td>
     </tr>`);
   });
 
@@ -4373,13 +4423,13 @@ function loadOverview(){
       <td><strong>${e.name}</strong></td>
       <td style="font-family:'SF Mono',monospace;font-size:13px">${e.id}</td>
       <td><span class="badge badge-out"><span class="badge-dot"></span>❌ 未打卡</span></td>
-      <td>–</td><td>–</td>
+      <td>–</td><td>–</td><td>–</td>
     </tr>`);
   });
 
   tbody.innerHTML = rows.length
     ? rows.join('')
-    : `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">✅</div><p>今日尚無打卡紀錄</p></div></td></tr>`;
+    : `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">✅</div><p>今日尚無打卡紀錄</p></div></td></tr>`;
 }
 
 // ══════════════════════════════════════
@@ -4481,7 +4531,7 @@ function initAnomaly(){
 function loadAnomaly(){
   const from = $('an-date-from').value;
   const to   = $('an-date-to').value;
-  if(!from||!to){ $('anomaly-body').innerHTML=`<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">📅</div><p>請選擇日期範圍</p></div></td></tr>`; return; }
+  if(!from||!to){ $('anomaly-body').innerHTML=`<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📅</div><p>請選擇日期範圍</p></div></td></tr>`; return; }
 
   const anomalies = [];
   const dupCount = {}, noOutCount = {};
@@ -4503,7 +4553,8 @@ function loadAnomaly(){
       if(cnt>1){
         const [id,type]=k.split('_');
         const emp=findEmp(id);
-        anomalies.push({name:emp?.name||id, empId:id, date:ds, type:'⚠️ 重複打卡', desc:`${type}打卡 ${cnt} 次`});
+        const dupRec = dayRecs.find(r=>r.empId===id&&r.type===type);
+        anomalies.push({name:emp?.name||id, empId:id, date:ds, type:'⚠️ 重複打卡', desc:`${type}打卡 ${cnt} 次`, siteId:dupRec?.siteId||null});
         dupCount[k]=true;
       }
     });
@@ -4516,7 +4567,8 @@ function loadAnomaly(){
         const hasOut = dayRecs.some(r=>r.empId===id&&r.type==='下班');
         if(hasIn&&!hasOut){
           const emp=findEmp(id);
-          anomalies.push({name:emp?.name||id, empId:id, date:ds, type:'🔸 未打下班', desc:'有上班無下班紀錄'});
+          const inRec = dayRecs.find(r=>r.empId===id&&r.type==='上班');
+          anomalies.push({name:emp?.name||id, empId:id, date:ds, type:'🔸 未打下班', desc:'有上班無下班紀錄', siteId:inRec?.siteId||null});
         }
       });
     }
@@ -4526,7 +4578,7 @@ function loadAnomaly(){
       employees.filter(e=>!e.disabled).forEach(e=>{
         const hasPunch = dayRecs.some(r=>r.empId===e.id);
         if(!hasPunch){
-          anomalies.push({name:e.name, empId:e.id, date:ds, type:'❌ 缺勤', desc:'當日無任何打卡紀錄'});
+          anomalies.push({name:e.name, empId:e.id, date:ds, type:'❌ 缺勤', desc:'當日無任何打卡紀錄', siteId:null});
         }
       });
     }
@@ -4540,7 +4592,7 @@ function loadAnomaly(){
 
   const tbody = $('anomaly-body');
   if(!anomalies.length){
-    tbody.innerHTML=`<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">✅</div><p>此期間無異常紀錄</p></div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">✅</div><p>此期間無異常紀錄</p></div></td></tr>`;
     return;
   }
   tbody.innerHTML = anomalies.map(a=>`
@@ -4549,6 +4601,7 @@ function loadAnomaly(){
       <td>${a.date}</td>
       <td>${a.type}</td>
       <td style="font-size:13px;color:var(--t2)">${a.desc}</td>
+      <td style="font-size:11px;color:var(--t2)">${a.siteId ? getSiteName(a.siteId) : '<span style="color:var(--t4)">–</span>'}</td>
     </tr>`).join('');
 }
 
