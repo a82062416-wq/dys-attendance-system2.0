@@ -11,6 +11,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
+<!-- Firebase Realtime Database (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
   // 註冊 Service Worker
   if ('serviceWorker' in navigator) {
@@ -484,6 +487,11 @@ nav{
 .so-hint{font-size:15px;color:rgba(255,255,255,.5);margin-top:6px;animation:fadeUp .35s .34s ease both}
 .so-reminder{display:none;background:rgba(0,0,0,.25);border:1.5px solid rgba(255,255,255,.4);border-radius:14px;padding:14px 22px;font-size:17px;font-weight:600;color:#fff;text-align:center;max-width:300px;line-height:1.6;letter-spacing:.2px;text-shadow:0 1px 4px rgba(0,0,0,.3);animation:fadeUp .35s .3s ease both;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes checkDraw{to{stroke-dashoffset:0}}
+@keyframes bgPulse{0%{transform:scale(1)}50%{transform:scale(1.04)}100%{transform:scale(1)}}
+.check-svg{width:72px;height:72px;filter:drop-shadow(0 0 12px rgba(255,255,255,.4))}
+.check-path{stroke-dasharray:56;stroke-dashoffset:56;animation:checkDraw .45s .25s cubic-bezier(.4,0,.2,1) forwards}
+.so-bg.pulse{animation:bgPulse .5s ease}
 
 /* ══════════════════════════════════════
    管理後台
@@ -724,6 +732,55 @@ tr:hover td{background:var(--surface2)}
     /* 日期快捷按鈕 */
     .dq-btn { background: var(--surface2); color: var(--t2); border: .5px solid var(--border); }
     .dq-active { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
+
+/* ══ 深色模式 ══ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:       #000000;
+    --bg2:      #1c1c1e;
+    --surface:  #1c1c1e;
+    --surface2: #2c2c2e;
+    --surface3: #3a3a3c;
+    --border:   rgba(255,255,255,.12);
+    --border2:  rgba(255,255,255,.07);
+    --t1: #ffffff;
+    --t2: rgba(235,235,245,.78);
+    --t3: rgba(235,235,245,.55);
+    --t4: rgba(235,235,245,.22);
+    --accent:  #0a84ff;
+    --success: #30d158;
+    --danger:  #ff453a;
+    --warn:    #ffd60a;
+    --orange:  #ff9f0a;
+    --fill1:   rgba(120,120,128,.36);
+    --fill2:   rgba(120,120,128,.24);
+    --sh1: 0 1px 4px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+    --sh2: 0 8px 32px rgba(0,0,0,.5);
+    --sh3: 0 20px 56px rgba(0,0,0,.6);
+  }
+  input, select, textarea { color-scheme: dark; }
+  .modal-box { background: #2c2c2e; }
+  .fi { background: var(--surface3) !important; }
+  .btn-s { color: var(--t2); }
+  .bpb-in  { background: linear-gradient(145deg,#0a5a2f,#1a7a3f) !important; }
+  .bpb-out { background: linear-gradient(145deg,#7a1020,#9a2030) !important; }
+}
+
+/* ══ 列印模式 ══ */
+@media print {
+  nav, .version-tag, #admin-page-header, .toolbar,
+  #anomaly-banner, #pwa-banner, #setup-modal,
+  #page-checkin, #success-overlay { display: none !important; }
+  body, #page-admin { background: #fff !important; padding-top: 0 !important; }
+  .sub-page { display: none !important; }
+  #sub-monthly-report { display: block !important; padding: 4px !important; }
+  #monthly-preview-cards { display: block !important; overflow: visible !important; }
+  .table-wrap { overflow: visible !important; max-height: none !important; }
+  table { font-size: 10px !important; }
+  th, td { padding: 3px 4px !important; }
+  .print-header { display: block !important; }
+}
+.print-header { display: none; font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #000; }
 
 </style>
 </head>
@@ -1106,6 +1163,17 @@ tr:hover td{background:var(--surface2)}
     <!-- ══ 分類清單選單 ══ -->
     <div id="admin-menu">
 
+      <!-- 今日異常橫幅 -->
+      <div id="anomaly-banner" style="display:none;margin:12px 16px 4px;background:color-mix(in srgb,var(--warn) 14%,var(--surface2));border:1.5px solid color-mix(in srgb,var(--warn) 35%,transparent);border-radius:12px;padding:12px 16px;cursor:pointer" onclick="navigateTo('anomaly')">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">⚠️</span>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;color:var(--t1)" id="anomaly-banner-text">今日偵測到異常紀錄</div>
+            <div style="font-size:12px;color:var(--t3);margin-top:2px">點此前往異常報表 →</div>
+          </div>
+        </div>
+      </div>
+
       <!-- 查詢 -->
       <div class="admin-menu-section">
         <div class="admin-menu-hd">查詢</div>
@@ -1129,7 +1197,7 @@ tr:hover td{background:var(--surface2)}
           <span class="ami-label">異常報表</span>
           <span class="ami-chevron">›</span>
         </div>
-        <div class="admin-menu-item admin-only" onclick="showSub('attendance-stat',this)">
+        <div class="admin-menu-item" id="menu-item-attendance-stat" style="display:none" onclick="showSub('attendance-stat',this)">
           <div class="ami-icon" style="background:rgba(0,122,255,.08)">📅</div>
           <span class="ami-label">出勤統計</span>
           <span class="ami-chevron">›</span>
@@ -1137,7 +1205,7 @@ tr:hover td{background:var(--surface2)}
       </div>
 
       <!-- 報表（管理員專用） -->
-      <div class="admin-menu-section admin-only">
+      <div class="admin-menu-section admin-only" id="admin-section-report">
         <div class="admin-menu-hd">報表</div>
         <div class="admin-menu-item" onclick="showSub('monthly-report',this)">
           <div class="ami-icon" style="background:rgba(88,86,214,.10)">🗓️</div>
@@ -1185,10 +1253,11 @@ tr:hover td{background:var(--surface2)}
         <div class="toolbar-right">
           <input type="text" class="fi" id="f-emp"  placeholder="編號 / 姓名" style="width:120px" oninput="loadRecords()"/>
           <button class="btn-s bs-ghost"  onclick="loadRecords()">🔄</button>
-          <button class="btn-s bs-ghost admin-only"  onclick="openManualPunch()" id="btn-manual-punch">➕ 補打卡</button>
+          <button class="btn-s bs-ghost"  onclick="openManualPunch()" id="btn-manual-punch" style="display:none">➕ 補打卡</button>
           <button class="btn-s bs-ghost"  onclick="manualSync()" id="btn-manual-sync">☁️ 同步未上傳</button>
+          <button class="btn-s bs-ghost"  onclick="syncFromFirebase()" id="btn-fb-sync">🔥 雲端同步</button>
           <button class="btn-s bs-ghost"  onclick="queryHistoryFromSheets()" id="btn-history">📅 查詢舊紀錄</button>
-          <button class="btn-s bs-accent" onclick="exportCSV()">⬇ CSV</button>
+          <button class="btn-s bs-accent" onclick="exportCSV()" id="btn-csv-export">⬇ CSV</button>
           <button class="btn-s bs-red"    onclick="clearLocal()">🗑</button>
           <button class="btn-s bs-lock"   onclick="lockAdmin()">🔒 登出</button>
         </div>
@@ -1211,6 +1280,11 @@ tr:hover td{background:var(--surface2)}
         <span id="sync-status-msg" style="font-size:13px;color:var(--t1)"></span>
         <button class="btn-recfg" onclick="manualSync()">立即同步</button>
       </div>
+      <!-- Firebase 離線待補傳狀態列 -->
+      <div id="fb-status-bar" style="display:none" class="cfg-bar" style="background:color-mix(in srgb,var(--accent) 8%,var(--surface))">
+        <span id="fb-status-msg" style="font-size:13px;color:var(--t1)"></span>
+        <button class="btn-recfg" onclick="retryFirebaseSync()">立即補傳</button>
+      </div>
       <div class="stats-row">
         <div class="stat-card"><div class="stat-val" id="s-total">–</div><div class="stat-lbl">今日總打卡</div></div>
         <div class="stat-card"><div class="stat-val" id="s-in">–</div><div class="stat-lbl">上班</div></div>
@@ -1230,6 +1304,7 @@ tr:hover td{background:var(--surface2)}
         <div class="toolbar-title">今日出勤總覽</div>
         <div class="toolbar-right">
           <button class="btn-s bs-ghost" onclick="loadOverview()">🔄</button>
+          <button class="btn-s bs-ghost" onclick="syncFromFirebase()">🔥 雲端更新</button>
           <button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button>
         </div>
       </div>
@@ -1368,6 +1443,7 @@ tr:hover td{background:var(--surface2)}
           </div>
           <input type="month" class="fi" id="monthly-report-month"/>
           <button class="btn-s bs-ghost" onclick="previewMonthlyReport()">🔍 預覽</button>
+          <button class="btn-s bs-ghost" onclick="printMonthlyReport()">🖨️ 列印</button>
           <button class="btn-s bs-accent" onclick="handleExportClick()">⬇ 匯出 CSV</button>
           <button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button>
         </div>
@@ -1380,6 +1456,7 @@ tr:hover td{background:var(--surface2)}
       </div>
 
       <!-- 預覽摘要卡片 -->
+      <div class="print-header" id="print-report-title"></div>
       <div id="monthly-preview-cards" style="display:none">
         <div class="stats-row" style="margin:12px 0 0">
           <div class="stat-card"><div class="stat-val" id="mr-emp-count">–</div><div class="stat-lbl">出勤人數</div></div>
@@ -1550,6 +1627,29 @@ tr:hover td{background:var(--surface2)}
             </div>
           </div>
 
+          <!-- 功能授權 -->
+          <div style="margin-bottom:20px" id="sup-perm-section">
+            <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">功能授權</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
+                <input type="checkbox" id="perm-manual-punch" style="width:16px;height:16px;accent-color:var(--accent)"/>
+                <span>➕ 補打卡</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
+                <input type="checkbox" id="perm-csv-export" style="width:16px;height:16px;accent-color:var(--accent)"/>
+                <span>⬇ CSV 匯出</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
+                <input type="checkbox" id="perm-monthly-report" style="width:16px;height:16px;accent-color:var(--accent)"/>
+                <span>🗓️ 月度報表</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
+                <input type="checkbox" id="perm-attendance-stat" style="width:16px;height:16px;accent-color:var(--accent)"/>
+                <span>📅 出勤統計</span>
+              </label>
+            </div>
+          </div>
+
           <button onclick="saveSupEdit()"
             style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;cursor:pointer;font-family:var(--font)">
             儲存
@@ -1664,6 +1764,30 @@ const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2,'0');
 
 let SCRIPT_URL='', IS_DEMO=false, COMPANY='DYS 大洋保全', ADMIN_UNLOCKED=false;
+
+// ══════════════════════════════════════
+//  Firebase Realtime Database 設定
+// ══════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyDUCopxTkIv35osbcs8oH5aPJ71qtTIRk4',
+  authDomain: 'dys-attendance-a5be6.firebaseapp.com',
+  databaseURL: 'https://dys-attendance-a5be6-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId: 'dys-attendance-a5be6',
+  storageBucket: 'dys-attendance-a5be6.firebasestorage.app',
+  messagingSenderId: '154006700150',
+  appId: '1:154006700150:web:13b6e6c31c43f5e5fd9f57'
+};
+let FB_APP = null, FB_DB = null, _fbTodayUnsub = null;
+
+function initFirebase(){
+  try{
+    if(typeof firebase === 'undefined'){ console.warn('Firebase SDK 未載入'); return; }
+    FB_APP = firebase.initializeApp(FIREBASE_CONFIG);
+    FB_DB  = firebase.database();
+    startTodayListener();
+    console.log('Firebase 初始化成功 ✓');
+  }catch(e){ console.warn('Firebase 初始化失敗:', e); }
+}
 let CURRENT_ROLE = 'admin'; // 'admin' | 'supervisor'
 let CURRENT_SUPERVISOR = null; // 登入中的幹部物件
 let CURRENT_SITE_ID = null;   // 從 QR Code URL 取得的案場 ID
@@ -2525,8 +2649,9 @@ async function doPunch(type){
   if(dup) showToast(`⚠️ ${name} 今天已有${type}紀錄，仍繼續打卡`,'warn');
 
   // 先存本地，標記待同步
-  const rec={empId:id,name,type,date:dateStr,time:timeStr,timestamp:n.toISOString(),synced:false,siteId:CURRENT_SITE_ID||null};
+  const rec={empId:id,name,type,date:dateStr,time:timeStr,timestamp:n.toISOString(),synced:false,fbSynced:false,siteId:CURRENT_SITE_ID||null};
   localRecs.unshift(rec); saveRecs();
+  uploadToFirebase(rec); // 同步至雲端
   pruneOldRecs(); // 滾動式清理（員工60天 / 管理後台30天）
   $('btn-in').disabled=$('btn-out').disabled=true;
   vibratePunch();
@@ -2556,7 +2681,15 @@ async function uploadRec(rec){
 function showSuccess(name,type,time,isIn){
   const ov=$('success-overlay');
   ov.className=isIn?'show so-in':'show so-out';
-  $('so-circle').textContent='✓';
+  // 動態 SVG 勾選動畫（每次重新注入以觸發動畫）
+  $('so-circle').innerHTML=`<svg class="check-svg" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="26" cy="26" r="24" fill="rgba(255,255,255,.18)" stroke="rgba(255,255,255,.5)" stroke-width="1.5"/>
+    <path class="check-path" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M13 27 L22 36 L39 16"/>
+  </svg>`;
+  // 背景脈衝
+  setTimeout(()=>{ const bg=$('success-overlay')?.querySelector('.so-bg'); if(bg){bg.classList.add('pulse');setTimeout(()=>bg.classList.remove('pulse'),500);} },50);
+  // 震動：成功打卡用更有感的模式
+  if('vibrate' in navigator) navigator.vibrate(isIn ? [80,0,80] : [120]);
   $('so-name').textContent=name;
   $('so-type').textContent=`${isIn?'☀️':'🌙'} ${type}打卡成功`;
   $('so-time').textContent=time;
@@ -2596,7 +2729,7 @@ function pruneOldRecs(){
   const cutoffStr = cutoff.toISOString().slice(0,10);
   const before = localRecs.length;
   // 只刪除「已同步」且「超過保留期限」的紀錄，未同步的保留
-  localRecs = localRecs.filter(r => r.date >= cutoffStr || r.synced === false);
+  localRecs = localRecs.filter(r => r.date >= cutoffStr || r.synced === false || r.fbSynced === false);
   const pruned = before - localRecs.length;
   if(pruned > 0){
     saveRecs();
@@ -2701,15 +2834,65 @@ async function manualSync(){
 }
 
 // 自動補傳：網路恢復時觸發
-window.addEventListener('online', async ()=>{
-  if(!SCRIPT_URL||IS_DEMO) return;
-  const pending = getPendingRecs();
+
+// Firebase 離線補傳佇列
+function getFbPendingRecs(){
+  return localRecs.filter(r => r.fbSynced !== true);
+}
+
+async function retryFirebaseSync(){
+  if(!FB_DB) return;
+  const pending = getFbPendingRecs();
   if(!pending.length) return;
-  showToast(`網路恢復，正在補傳 ${pending.length} 筆紀錄…`,'');
-  for(const rec of pending){ await uploadRec(rec); }
-  const stillPending = getPendingRecs().length;
-  if(!stillPending) showToast('所有離線紀錄已補傳 ✓','success');
-  updateSyncStatusBar();
+  showToast(`網路恢復，Firebase 補傳 ${pending.length} 筆中…`,'');
+  let ok = 0;
+  for(const rec of pending){
+    try{
+      const key = rec.timestamp.replace(/[.#$\[\]/]/g,'_');
+      await FB_DB.ref('punches/'+rec.date+'/'+key).set({
+        empId: rec.empId, name: rec.name, type: rec.type,
+        date: rec.date, time: rec.time, timestamp: rec.timestamp,
+        siteId: rec.siteId||null, uploadedAt: Date.now()
+      });
+      const idx = localRecs.findIndex(r=>r.timestamp===rec.timestamp);
+      if(idx>=0){ localRecs[idx].fbSynced=true; }
+      ok++;
+    }catch(e){ /* 失敗留待下次 */ }
+  }
+  if(ok > 0){ saveRecs(); updateFbStatusBar(); }
+  const still = getFbPendingRecs().length;
+  if(!still) showToast('所有離線紀錄已補傳至雲端 ✓','success');
+  else showToast(`已補傳 ${ok} 筆，仍有 ${still} 筆失敗`,'warn');
+}
+
+function updateFbStatusBar(){
+  const pending = getFbPendingRecs();
+  const bar = $('fb-status-bar');
+  if(!bar) return;
+  if(!FB_DB){ bar.style.display='none'; return; }
+  if(pending.length > 0){
+    bar.style.display = 'flex';
+    const msg = bar.querySelector('#fb-status-msg');
+    if(msg) msg.textContent = `☁️ 有 ${pending.length} 筆打卡尚未同步至雲端（無網路時打卡）`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+window.addEventListener('online', async ()=>{
+  // Google Sheets 補傳
+  if(SCRIPT_URL && !IS_DEMO){
+    const pending = getPendingRecs();
+    if(pending.length){
+      showToast(`網路恢復，正在補傳 ${pending.length} 筆紀錄…`,'');
+      for(const rec of pending){ await uploadRec(rec); }
+      const stillPending = getPendingRecs().length;
+      if(!stillPending) showToast('所有離線紀錄已補傳 ✓','success');
+      updateSyncStatusBar();
+    }
+  }
+  // Firebase 補傳
+  retryFirebaseSync();
 });
 
 // ══════════════════════════════════════
@@ -2862,7 +3045,7 @@ function tryUnlock(){
   }
 }
 function lockAdmin(){
-  ADMIN_UNLOCKED=false;
+  ADMIN_UNLOCKED=false; stopTodayListener();
   CURRENT_SUPERVISOR=null;
   CURRENT_ROLE='admin';
   clearIdleTimer();
@@ -2889,6 +3072,26 @@ function applyRoleUI(role){
   } else {
     brand.textContent = COMPANY||'DYS 大洋保全';
   }
+
+  // ── 幹部功能授權控制 ──────────────────────────────────
+  const perms = (!isAdmin && CURRENT_SUPERVISOR && CURRENT_SUPERVISOR.permissions) || [];
+
+  // 補打卡按鈕
+  const mpBtn = $('btn-manual-punch');
+  if(mpBtn) mpBtn.style.display = (isAdmin || perms.includes('manual-punch')) ? '' : 'none';
+
+  // CSV 匯出按鈕
+  const csvBtn = $('btn-csv-export');
+  if(csvBtn) csvBtn.style.display = (isAdmin || perms.includes('csv-export')) ? '' : 'none';
+
+  // 月度報表 section（admin-only 已隱藏；幹部有權限時顯示）
+  const reportSec = $('admin-section-report');
+  if(reportSec && !isAdmin) reportSec.style.display = perms.includes('monthly-report') ? '' : 'none';
+
+  // 出勤統計 menu item（預設 display:none；按權限顯示）
+  const attItem = $('menu-item-attendance-stat');
+  if(attItem) attItem.style.display = (isAdmin || perms.includes('attendance-stat')) ? '' : 'none';
+
   // 幹部進入後預設顯示紀錄頁（分類清單選單不含 seg-btn，直接傳 null）
   if(!isAdmin){
     showSub('records', null);
@@ -3294,11 +3497,13 @@ function saveManualPunch(){
     empId, name, type, date, time,
     timestamp: date+'T'+time+':00',
     synced: false,
+    fbSynced: false,
     manual: true,
     note: note||'補登'
   };
   localRecs.unshift(rec);
   saveRecs();
+  uploadToFirebase(rec); // 同步至雲端
   loadRecords();
   closeManualPunch();
   showToast(`已為 ${name} 補登 ${type} 打卡 ✓`,'success');
@@ -3602,6 +3807,37 @@ function navigateTo(pageName){
 /**
  * 返回管理後台分類清單（從子頁面呼叫）
  */
+// 今日異常橫幅：自動掃描缺下班 + 重複打卡
+function updateAnomalyBanner(){
+  const banner = $('anomaly-banner');
+  if(!banner || !ADMIN_UNLOCKED) return;
+  const td = today();
+  const todayRecs = localRecs.filter(r => r.date === td);
+
+  // 統計每人上/下班次數
+  const empMap = {};
+  todayRecs.forEach(r => {
+    if(!empMap[r.empId]) empMap[r.empId] = {inCnt:0, outCnt:0};
+    if(r.type==='上班') empMap[r.empId].inCnt++;
+    if(r.type==='下班') empMap[r.empId].outCnt++;
+  });
+
+  const missingOut = Object.values(empMap).filter(e => e.inCnt>0 && e.outCnt===0).length;
+  const dupPunch   = Object.values(empMap).filter(e => e.inCnt>1 || e.outCnt>1).length;
+  const total = missingOut + dupPunch;
+
+  if(total > 0){
+    const parts = [];
+    if(missingOut > 0) parts.push(`缺下班 ${missingOut} 人`);
+    if(dupPunch   > 0) parts.push(`重複打卡 ${dupPunch} 人`);
+    const el = $('anomaly-banner-text');
+    if(el) el.textContent = `今日偵測到 ${total} 筆異常：${parts.join('、')}`;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
 function showAdminMenu(){
   adminViewState = 'menu';
   document.querySelectorAll('.sub-page').forEach(p => p.classList.remove('active'));
@@ -3613,6 +3849,7 @@ function showAdminMenu(){
   if(backBtn) backBtn.style.display = 'none';
   if(titleEl) titleEl.textContent = '管理後台';
   updateNavBackBtn();
+  updateAnomalyBanner(); // 每次回到首頁都更新異常橫幅
 }
 
 /** 返回上一頁（如已在首頁則無動作） */
@@ -3685,12 +3922,17 @@ function loadSupPage(){
     const activeTag = sup.active
       ? '<span style="background:#e8f8ee;color:#34c759;border-radius:50px;padding:2px 10px;font-size:11px;font-weight:600">啟用</span>'
       : '<span style="background:#ffeeed;color:#ff3b30;border-radius:50px;padding:2px 10px;font-size:11px;font-weight:600">停用</span>';
+    // 功能授權標籤
+    const permLabels = {'manual-punch':'補打卡','csv-export':'CSV','monthly-report':'月度報表','attendance-stat':'出勤統計'};
+    const permTags = (sup.permissions||[]).map(k=>
+      `<span style="background:#fff8e1;color:#f59e0b;border-radius:50px;padding:2px 8px;font-size:10px;font-weight:600">${permLabels[k]||k}</span>`
+    ).join('');
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:.5px solid var(--border)">
         <div>
           <div style="font-size:15px;font-weight:600;color:var(--t1);margin-bottom:4px">${sup.name} <span style="font-size:12px;color:var(--t2);font-weight:400">${sup.title}</span></div>
           <div style="font-size:12px;color:var(--t3);margin-bottom:6px"># ${sup.empId}</div>
-          <div style="display:flex;gap:6px">${viewTag}${activeTag}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">${viewTag}${activeTag}${permTags}</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <button onclick="openSupModal('${sup.empId}')"
@@ -3747,6 +3989,13 @@ function openSupModal(empId){
   $('sup-edit-viewall').onchange = updateCheckboxState;
   updateCheckboxState();
 
+  // 功能授權 checkboxes
+  const perms = sup.permissions || [];
+  ['manual-punch','csv-export','monthly-report','attendance-stat'].forEach(key=>{
+    const cb = $('perm-' + key);
+    if(cb) cb.checked = perms.includes(key);
+  });
+
   modal.style.display='flex';
 }
 
@@ -3779,14 +4028,18 @@ function saveSupEdit(){
 
   const checkedSites = [...$('sup-site-checkboxes').querySelectorAll('input:checked')].map(cb=>cb.value);
 
+  // 讀取功能授權
+  const permissions = ['manual-punch','csv-export','monthly-report','attendance-stat']
+    .filter(key=>{ const cb=$('perm-'+key); return cb && cb.checked; });
+
   const sups = getSupervisors();
   if(isNew){
     if(sups.find(s=>s.empId===empId)){ showToast('此員工編號已存在','error'); return; }
-    sups.push({empId, name, title, viewAll, active:true, sites: viewAll ? [] : checkedSites});
+    sups.push({empId, name, title, viewAll, active:true, sites: viewAll ? [] : checkedSites, permissions});
   } else {
     const idx = sups.findIndex(s=>s.empId===empId);
     if(idx===-1){ showToast('找不到幹部資料','error'); return; }
-    sups[idx] = {...sups[idx], name, title, viewAll, sites: viewAll ? [] : checkedSites};
+    sups[idx] = {...sups[idx], name, title, viewAll, sites: viewAll ? [] : checkedSites, permissions};
   }
   saveSupervisors(sups);
   closeSupModal();
@@ -4558,6 +4811,18 @@ function buildMonthlyMatrix(targetYM, filterSiteIds){
 }
 
 /** 預覽月度報表（前 20 人） */
+// 月度報表列印
+function printMonthlyReport(){
+  const ym = $('monthly-report-month') ? $('monthly-report-month').value : '';
+  if(!ym){ showToast('請先選擇年月','error'); return; }
+  // 更新列印標題
+  const hdr = $('print-report-title');
+  if(hdr) hdr.textContent = `DYS 大洋保全 ${ym} 月度出勤報表`;
+  // 確保預覽已產生
+  previewMonthlyReport();
+  setTimeout(()=>{ window.print(); }, 400);
+}
+
 function previewMonthlyReport(){
   const ym  = ($('monthly-report-month')||{}).value || getDefaultYM();
   const ids = getSelectedSiteIds();
@@ -4644,11 +4909,107 @@ function dlFile(content,filename){
   a.download=filename;a.click();
 }
 
+
+// ══════════════════════════════════════
+//  Firebase 上傳 / 同步 / 即時監聽
+// ══════════════════════════════════════
+
+// 單筆打卡記錄上傳至 Firebase（背景執行，不阻擋打卡）
+function uploadToFirebase(rec){
+  if(!FB_DB) return;
+  try{
+    const key = rec.timestamp.replace(/[.#$\[\]/]/g,'_');
+    FB_DB.ref('punches/'+rec.date+'/'+key).set({
+      empId: rec.empId,
+      name:  rec.name,
+      type:  rec.type,
+      date:  rec.date,
+      time:  rec.time,
+      timestamp: rec.timestamp,
+      siteId: rec.siteId||null,
+      uploadedAt: Date.now()
+    }).then(()=>{
+      const idx = localRecs.findIndex(r=>r.timestamp===rec.timestamp);
+      if(idx>=0){ localRecs[idx].fbSynced=true; saveRecs(); }
+    }).catch(()=>{});
+  }catch(e){
+    console.warn('Firebase 上傳失敗:', e);
+    // fbSynced 保持 false，等待補傳
+    updateFbStatusBar();
+  }
+}
+
+// 從 Firebase 拉取所有紀錄合併入 localStorage（管理員手動觸發）
+async function syncFromFirebase(){
+  if(!FB_DB){ showToast('Firebase 未連線','error'); return; }
+  try{
+    showToast('正在同步雲端資料…','info');
+    const snap = await FB_DB.ref('punches').once('value');
+    const data = snap.val();
+    if(!data){ showToast('雲端目前無資料','warn'); return; }
+    let added = 0;
+    Object.values(data).forEach(dayData=>{
+      if(!dayData) return;
+      Object.values(dayData).forEach(rec=>{
+        if(!rec||!rec.timestamp) return;
+        const exists = localRecs.some(r=>r.timestamp===rec.timestamp);
+        if(!exists){
+          localRecs.push({...rec, fbSynced:true, fromCloud:true, synced:true});
+          added++;
+        }
+      });
+    });
+    if(added>0){
+      localRecs.sort((a,b)=>b.timestamp.localeCompare(a.timestamp));
+      saveRecs();
+      if(ADMIN_UNLOCKED){ loadRecords(); loadOverview(); }
+    }
+    showToast('已同步 '+added+' 筆新紀錄'+(added===0?' （已是最新）':' ✓'), 'success');
+  }catch(e){
+    showToast('同步失敗：'+e.message,'error');
+    console.error('syncFromFirebase error:', e);
+  }
+}
+
+// 今日即時監聽：有新打卡自動更新 localStorage + 總覽頁
+function startTodayListener(){
+  if(!FB_DB || _fbTodayUnsub) return;
+  const todayRef = FB_DB.ref('punches/'+today());
+  todayRef.on('value', snap=>{
+    const data = snap.val();
+    if(!data) return;
+    let added = 0;
+    Object.values(data).forEach(rec=>{
+      if(!rec||!rec.timestamp) return;
+      const exists = localRecs.some(r=>r.timestamp===rec.timestamp);
+      if(!exists){
+        localRecs.push({...rec, fbSynced:true, fromCloud:true, synced:true});
+        added++;
+      }
+    });
+    if(added>0){
+      localRecs.sort((a,b)=>b.timestamp.localeCompare(a.timestamp));
+      saveRecs();
+      // 若管理員正在看今日總覽，自動刷新
+      const ovEl = $('sub-overview');
+      if(ADMIN_UNLOCKED && ovEl && ovEl.style.display!=='none'){ loadOverview(); }
+    }
+  });
+  _fbTodayUnsub = ()=>{ todayRef.off('value'); _fbTodayUnsub=null; };
+}
+
+// 停止今日監聽（登出時呼叫）
+function stopTodayListener(){
+  if(_fbTodayUnsub){ _fbTodayUnsub(); }
+}
+
 // ══════════════════════════════════════
 //  Init
 // ══════════════════════════════════════
 loadConfig();
+initFirebase(); // 連接 Firebase
 updateLastPunch();
+updateFbStatusBar(); // Firebase 離線待補傳狀態
 localRecs.forEach(r=>{ if(r.synced===undefined) r.synced=true; });
 saveRecs();
 updateSyncStatusBar();
