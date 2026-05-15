@@ -935,10 +935,13 @@ tr:hover td{background:var(--surface2)}
 
 <!-- Nav -->
 <nav>
+  <button id="globalBackBtn" onclick="goBack()"
+    style="visibility:hidden;background:none;border:none;color:var(--accent);font-size:15px;font-weight:600;cursor:pointer;padding:6px 10px 6px 2px;border-radius:8px;font-family:var(--font);display:inline-flex;align-items:center;gap:2px;transition:background .15s;white-space:nowrap;min-width:64px;"
+    onmouseover="this.style.background='var(--fill2)'"
+    onmouseout="this.style.background='none'">‹ 返回</button>
+  <!-- 保留隱藏的 tab-checkin 供舊有程式碼相容使用 -->
+  <button id="tab-checkin" style="display:none"></button>
   <div class="nav-brand" id="nav-brand">DYS 大洋保全</div>
-  <div class="nav-tabs">
-    <button class="nav-tab active" id="tab-checkin" onclick="showPage('checkin',this)">打卡</button>
-  </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="nav-time" id="nav-time">--:--</div>
     <button class="nav-admin-btn" id="tab-admin" onclick="goAdmin(this)" title="管理後台">🔒</button>
@@ -1044,19 +1047,9 @@ tr:hover td{background:var(--surface2)}
 <div class="page" id="page-admin">
   <div class="admin-wrap" id="admin-content-wrap">
 
-    <!-- ── 返回列 ── -->
+    <!-- ── 返回列（已由全局 nav 返回按鈕取代，保留為標題列） ── -->
     <div style="display:flex;align-items:center;gap:10px;padding:10px 0 6px">
-      <button onclick="showPage('checkin',document.getElementById('tab-checkin'))"
-        style="display:inline-flex;align-items:center;gap:6px;background:none;border:none;
-               font-size:14px;font-weight:600;color:var(--accent);cursor:pointer;
-               font-family:var(--font);padding:6px 10px 6px 4px;border-radius:8px;
-               transition:background .15s;"
-        onmouseover="this.style.background='var(--fill2)'"
-        onmouseout="this.style.background='none'"
-        title="返回打卡頁面">
-        ← 返回打卡
-      </button>
-      <span style="font-size:13px;color:var(--t3)">管理後台</span>
+      <span style="font-size:13px;color:var(--t3);font-weight:600">管理後台</span>
     </div>
 
     <div id="cfg-bar-wrap" style="display:none" class="cfg-bar">
@@ -2681,8 +2674,8 @@ function switchRole(role){
 
 function goAdmin(el){
   if(!getPwdHash()){openSetup();return}
-  if(ADMIN_UNLOCKED){showPage('admin',el);resetIdleTimer();checkBackupReminder();return}
-  showPage('admin',el);
+  if(ADMIN_UNLOCKED){navigateTo('admin');resetIdleTimer();checkBackupReminder();return}
+  navigateTo('admin');
   $('lock-screen').style.display='flex';
   $('lock-input').value='';
   $('sup-emp-input').value='';
@@ -2750,7 +2743,9 @@ function lockAdmin(){
   CURRENT_SUPERVISOR=null;
   CURRENT_ROLE='admin';
   clearIdleTimer();
-  showPage('checkin',$('tab-checkin'));
+  pageHistory = ['checkin']; // 重置導覽歷史
+  showPage('checkin', null);
+  updateNavBackBtn();
   showToast('已登出管理後台','');
 }
 
@@ -3265,13 +3260,6 @@ async function syncFromSheets(){
   btn.textContent='☁️ 從 Sheets 同步';btn.disabled=false;
 }
 // ── 下載範本 ──
-function downloadEmpTemplate(){
-  const bom='﻿';
-  const csv=bom+'員工編號,姓名\n11505138,王小明\n11505139,陳小華';
-  dlFile(csv,'員工名單範本.csv');
-  showToast('範本已下載，用 Excel 填好後再匯入 ✓','success');
-}
-
 // ── 匯入 Excel / CSV 檔案 ──
 function importEmpFile(input){
   const file=input.files[0];
@@ -3459,13 +3447,47 @@ function saveSettings(){
 }
 
 // ══════════════════════════════════════
-//  Navigation
+//  Navigation（含頁面歷史 / 全局返回鍵）
 // ══════════════════════════════════════
+
+/** 頁面歷史堆疊，初始為打卡首頁 */
+let pageHistory = ['checkin'];
+
+/** 更新全局返回按鈕可見度 */
+function updateNavBackBtn(){
+  const btn = $('globalBackBtn');
+  if(!btn) return;
+  const isHome = (pageHistory.length <= 1 || pageHistory[pageHistory.length-1] === 'checkin');
+  btn.style.visibility = isHome ? 'hidden' : 'visible';
+}
+
+/**
+ * 導覽至指定頁面，並推入歷史堆疊。
+ * @param {string} pageName - 'checkin' 或 'admin'
+ */
+function navigateTo(pageName){
+  showPage(pageName, null);
+  if(pageHistory[pageHistory.length-1] !== pageName){
+    pageHistory.push(pageName);
+  }
+  updateNavBackBtn();
+}
+
+/** 返回上一頁（如已在首頁則無動作） */
+function goBack(){
+  if(pageHistory.length <= 1) return;
+  pageHistory.pop();
+  const prev = pageHistory[pageHistory.length-1];
+  showPage(prev, null);
+  updateNavBackBtn();
+}
+
 function showPage(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   $('page-'+name).classList.add('active');
   if(el) el.classList.add('active');
+  updateNavBackBtn();
 }
 function showSub(name,el){
   document.querySelectorAll('.sub-page').forEach(p=>p.classList.remove('active'));
