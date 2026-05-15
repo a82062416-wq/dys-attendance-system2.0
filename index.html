@@ -554,6 +554,50 @@ nav{
 }
 .sub-page{display:none}.sub-page.active{display:block}
 
+/* ══ 管理後台：分類清單選單 ══ */
+#admin-menu{padding-bottom:8px}
+.admin-menu-section{
+  background:var(--surface);
+  border-radius:var(--r);
+  border:.5px solid var(--border);
+  overflow:hidden;
+  margin-bottom:12px;
+  box-shadow:var(--sh1);
+}
+.admin-menu-hd{
+  font-size:11px;font-weight:600;color:var(--t3);
+  letter-spacing:.7px;text-transform:uppercase;
+  padding:10px 16px 7px;
+}
+.admin-menu-item{
+  display:flex;align-items:center;
+  padding:13px 16px;
+  border-top:.5px solid var(--border2);
+  cursor:pointer;
+  transition:background .12s;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+.admin-menu-item:active{background:var(--fill2)}
+@media(hover:hover){.admin-menu-item:hover{background:var(--fill2)}}
+.ami-icon{
+  width:34px;height:34px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;margin-right:13px;
+}
+.ami-label{flex:1;font-size:15px;font-weight:500;color:var(--t1);line-height:1.2}
+.ami-chevron{color:var(--t4);font-size:22px;font-weight:300;line-height:1}
+/* 子頁面標題列 */
+.sub-back-btn{
+  display:inline-flex;align-items:center;gap:3px;
+  background:none;border:none;color:var(--accent);
+  font-size:15px;font-weight:600;cursor:pointer;
+  font-family:var(--font);padding:5px 10px 5px 0;
+  border-radius:8px;transition:background .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.sub-back-btn:hover{background:var(--fill2)}
+
 .toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px}
 .toolbar-title{font-size:20px;font-weight:600;letter-spacing:-.4px;color:var(--t1)}
 .toolbar-right{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
@@ -1047,9 +1091,10 @@ tr:hover td{background:var(--surface2)}
 <div class="page" id="page-admin">
   <div class="admin-wrap" id="admin-content-wrap">
 
-    <!-- ── 返回列（已由全局 nav 返回按鈕取代，保留為標題列） ── -->
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 0 6px">
-      <span style="font-size:13px;color:var(--t3);font-weight:600">管理後台</span>
+    <!-- ── 頁面標題列（選單 / 子頁共用） ── -->
+    <div id="admin-page-header" style="display:flex;align-items:center;gap:6px;padding:8px 0 10px;min-height:40px">
+      <button id="sub-back-btn" class="sub-back-btn" onclick="showAdminMenu()" style="display:none">‹ 列表</button>
+      <span id="admin-page-title" style="font-size:15px;color:var(--t2);font-weight:600">管理後台</span>
     </div>
 
     <div id="cfg-bar-wrap" style="display:none" class="cfg-bar">
@@ -1058,18 +1103,80 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-recfg" onclick="openSetup()">重設</button>
     </div>
 
-    <div class="admin-seg">
-      <button class="seg-btn active" onclick="showSub('records',this)">打卡紀錄</button>
-      <button class="seg-btn"        onclick="showSub('overview',this)">今日總覽</button>
-      <button class="seg-btn"        onclick="showSub('chart',this)">統計圖表</button>
-      <button class="seg-btn"        onclick="showSub('anomaly',this)">異常報表</button>
-      <button class="seg-btn admin-only" onclick="showSub('attendance-stat',this)">出勤統計</button>
-      <button class="seg-btn admin-only" onclick="showSub('employees',this)">員工名單</button>
-      <button class="seg-btn admin-only" onclick="showSub('supervisors',this)">幹部管理</button>
-      <button class="seg-btn" onclick="showSub('qrcode',this)">QR Code</button>
-      <button class="seg-btn admin-only" onclick="showSub('monthly-report',this)">月度報表</button>
-      <button class="seg-btn admin-only" onclick="showSub('settings',this)">設定</button>
-    </div>
+    <!-- ══ 分類清單選單 ══ -->
+    <div id="admin-menu">
+
+      <!-- 查詢 -->
+      <div class="admin-menu-section">
+        <div class="admin-menu-hd">查詢</div>
+        <div class="admin-menu-item" onclick="showSub('records',this)">
+          <div class="ami-icon" style="background:rgba(0,122,255,.10)">📋</div>
+          <span class="ami-label">打卡紀錄</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item" onclick="showSub('overview',this)">
+          <div class="ami-icon" style="background:rgba(52,199,89,.10)">📊</div>
+          <span class="ami-label">今日總覽</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item" onclick="showSub('chart',this)">
+          <div class="ami-icon" style="background:rgba(0,122,255,.08)">📈</div>
+          <span class="ami-label">統計圖表</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item" onclick="showSub('anomaly',this)">
+          <div class="ami-icon" style="background:rgba(255,159,10,.10)">⚠️</div>
+          <span class="ami-label">異常報表</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item admin-only" onclick="showSub('attendance-stat',this)">
+          <div class="ami-icon" style="background:rgba(0,122,255,.08)">📅</div>
+          <span class="ami-label">出勤統計</span>
+          <span class="ami-chevron">›</span>
+        </div>
+      </div>
+
+      <!-- 報表（管理員專用） -->
+      <div class="admin-menu-section admin-only">
+        <div class="admin-menu-hd">報表</div>
+        <div class="admin-menu-item" onclick="showSub('monthly-report',this)">
+          <div class="ami-icon" style="background:rgba(88,86,214,.10)">🗓️</div>
+          <span class="ami-label">月度報表</span>
+          <span class="ami-chevron">›</span>
+        </div>
+      </div>
+
+      <!-- 人員管理（管理員專用） -->
+      <div class="admin-menu-section admin-only">
+        <div class="admin-menu-hd">人員管理</div>
+        <div class="admin-menu-item" onclick="showSub('employees',this)">
+          <div class="ami-icon" style="background:rgba(52,199,89,.10)">👥</div>
+          <span class="ami-label">員工名單</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item" onclick="showSub('supervisors',this)">
+          <div class="ami-icon" style="background:rgba(255,149,0,.10)">🎖️</div>
+          <span class="ami-label">幹部管理</span>
+          <span class="ami-chevron">›</span>
+        </div>
+      </div>
+
+      <!-- 系統 -->
+      <div class="admin-menu-section">
+        <div class="admin-menu-hd">系統</div>
+        <div class="admin-menu-item" onclick="showSub('qrcode',this)">
+          <div class="ami-icon" style="background:rgba(142,142,147,.12)">📷</div>
+          <span class="ami-label">QR Code</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item admin-only" onclick="showSub('settings',this)">
+          <div class="ami-icon" style="background:rgba(142,142,147,.12)">⚙️</div>
+          <span class="ami-label">設定</span>
+          <span class="ami-chevron">›</span>
+        </div>
+      </div>
+
+    </div><!-- /#admin-menu -->
 
     <!-- 紀錄 -->
     <div class="sub-page active" id="sub-records">
@@ -1240,9 +1347,25 @@ tr:hover td{background:var(--surface2)}
       <div class="toolbar">
         <div class="toolbar-title">月度報表</div>
         <div class="toolbar-right">
-          <select class="fi" id="exportSiteSelect" style="max-width:150px" onchange="previewMonthlyReport()">
-            <option value="">全部案場</option>
-          </select>
+          <!-- 多案場勾選按鈕 -->
+          <div style="position:relative;display:inline-block" id="site-filter-wrapper">
+            <button class="btn-s bs-ghost" id="site-filter-btn" onclick="toggleSitePanel(event)" style="min-width:110px;text-align:left">
+              📍 全部案場 ▾
+            </button>
+            <div id="site-filter-panel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;min-width:240px;max-height:300px;overflow-y:auto;box-shadow:0 6px 24px rgba(0,0,0,.16)">
+              <!-- 快選按鈕列 -->
+              <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">
+                <button class="btn-s bs-ghost" style="font-size:11px;padding:2px 8px" onclick="selectAllSites()">全選</button>
+                <button class="btn-s bs-ghost" style="font-size:11px;padding:2px 8px" onclick="clearSiteSelection()">清除</button>
+                <button class="btn-s bs-ghost" style="font-size:11px;padding:2px 8px" onclick="selectSitesByType('A')">銀座</button>
+                <button class="btn-s bs-ghost" style="font-size:11px;padding:2px 8px" onclick="selectSitesByType('B')">物業</button>
+              </div>
+              <!-- 搜尋框 -->
+              <input type="text" class="fi" id="site-filter-search" placeholder="搜尋案場…" style="width:100%;box-sizing:border-box;font-size:12px;margin-bottom:6px" oninput="filterSiteList(this.value)"/>
+              <!-- checkbox 清單 -->
+              <div id="site-checkbox-list" style="display:flex;flex-direction:column;gap:4px"></div>
+            </div>
+          </div>
           <input type="month" class="fi" id="monthly-report-month"/>
           <button class="btn-s bs-ghost" onclick="previewMonthlyReport()">🔍 預覽</button>
           <button class="btn-s bs-accent" onclick="handleExportClick()">⬇ 匯出 CSV</button>
@@ -2674,8 +2797,8 @@ function switchRole(role){
 
 function goAdmin(el){
   if(!getPwdHash()){openSetup();return}
-  if(ADMIN_UNLOCKED){navigateTo('admin');resetIdleTimer();checkBackupReminder();return}
-  navigateTo('admin');
+  if(ADMIN_UNLOCKED){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();return}
+  navigateTo('admin');showAdminMenu();
   $('lock-screen').style.display='flex';
   $('lock-input').value='';
   $('sup-emp-input').value='';
@@ -2744,6 +2867,7 @@ function lockAdmin(){
   CURRENT_ROLE='admin';
   clearIdleTimer();
   pageHistory = ['checkin']; // 重置導覽歷史
+  adminViewState = 'menu';  // 重置子頁狀態
   showPage('checkin', null);
   updateNavBackBtn();
   showToast('已登出管理後台','');
@@ -2765,10 +2889,9 @@ function applyRoleUI(role){
   } else {
     brand.textContent = COMPANY||'DYS 大洋保全';
   }
-  // 幹部進入後預設顯示紀錄頁
+  // 幹部進入後預設顯示紀錄頁（分類清單選單不含 seg-btn，直接傳 null）
   if(!isAdmin){
-    const recBtn = document.querySelector('.seg-btn[onclick*="records"]');
-    if(recBtn) showSub('records', recBtn);
+    showSub('records', null);
   }
 }
 
@@ -3453,6 +3576,9 @@ function saveSettings(){
 /** 頁面歷史堆疊，初始為打卡首頁 */
 let pageHistory = ['checkin'];
 
+/** 管理後台子頁狀態：'menu' 顯示清單，'sub' 顯示子頁面 */
+let adminViewState = 'menu';
+
 /** 更新全局返回按鈕可見度 */
 function updateNavBackBtn(){
   const btn = $('globalBackBtn');
@@ -3473,8 +3599,29 @@ function navigateTo(pageName){
   updateNavBackBtn();
 }
 
+/**
+ * 返回管理後台分類清單（從子頁面呼叫）
+ */
+function showAdminMenu(){
+  adminViewState = 'menu';
+  document.querySelectorAll('.sub-page').forEach(p => p.classList.remove('active'));
+  const menu = $('admin-menu');
+  if(menu) menu.style.display = '';
+  // 標題列：隱藏返回鍵，顯示「管理後台」
+  const backBtn = $('sub-back-btn');
+  const titleEl = $('admin-page-title');
+  if(backBtn) backBtn.style.display = 'none';
+  if(titleEl) titleEl.textContent = '管理後台';
+  updateNavBackBtn();
+}
+
 /** 返回上一頁（如已在首頁則無動作） */
 function goBack(){
+  // 在管理後台子頁面 → 返回清單
+  if(pageHistory[pageHistory.length-1] === 'admin' && adminViewState === 'sub'){
+    showAdminMenu();
+    return;
+  }
   if(pageHistory.length <= 1) return;
   pageHistory.pop();
   const prev = pageHistory[pageHistory.length-1];
@@ -3490,13 +3637,29 @@ function showPage(name,el){
   updateNavBackBtn();
 }
 function showSub(name,el){
+  adminViewState = 'sub';
+  // 隱藏分類清單，顯示子頁面
+  const menu = $('admin-menu');
+  if(menu) menu.style.display = 'none';
   document.querySelectorAll('.sub-page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));
-  $('sub-'+name).classList.add('active');el.classList.add('active');
+  $('sub-'+name).classList.add('active');
+  if(el) el.classList.add('active');
+  // 更新標題列
+  const _labels = {
+    'records':'打卡紀錄','overview':'今日總覽','chart':'統計圖表',
+    'anomaly':'異常報表','attendance-stat':'出勤統計','monthly-report':'月度報表',
+    'employees':'員工名單','supervisors':'幹部管理','qrcode':'QR Code','settings':'設定'
+  };
+  const backBtn = $('sub-back-btn');
+  const titleEl = $('admin-page-title');
+  if(backBtn) backBtn.style.display = '';
+  if(titleEl) titleEl.textContent = _labels[name] || name;
+  // 資料載入
   if(name==='records')         loadRecords();
   if(name==='attendance-stat'){ initStatMonth(); loadAttendanceStat(); }
-  if(name==='monthly-report'){ initExportSiteSelect(); const el=$('monthly-report-month'); if(el&&!el.value){const n=new Date();el.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0');} }
-  if(name==='employees'){ const s=$('emp-search'); if(s) s.value=''; renderEmpList(); }
+  if(name==='monthly-report'){ initExportSiteSelect(); const _el=$('monthly-report-month'); if(_el&&!_el.value){const _n=new Date();_el.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');} }
+  if(name==='employees'){ const _s=$('emp-search'); if(_s) _s.value=''; renderEmpList(); }
   if(name==='settings') loadSettingsFields();
   if(name==='overview') loadOverview();
   if(name==='chart')    loadChart();
@@ -4190,21 +4353,104 @@ let _tt;
 //  月度考勤報表引擎 v2 (銀座/物業雲格式 + 案場篩選)
 // ══════════════════════════════════════
 
-/** 初始化案場下拉選單（切換到月度報表頁時呼叫） */
+// ── 月度報表：多案場勾選 ─────────────────────────────────
+let _selectedSiteIds = new Set(); // 空 = 全部案場
+
+/** 更新案場篩選按鈕文字 */
+function updateSiteFilterBtn(){
+  const btn = $('site-filter-btn');
+  if(!btn) return;
+  const n = _selectedSiteIds.size;
+  btn.textContent = n === 0 ? '📍 全部案場 ▾'
+                 : n === 1  ? `📍 ${[..._selectedSiteIds][0]} ▾`
+                            : `📍 已選 ${n} 個案場 ▾`;
+}
+
+/** 開關浮動面板 */
+function toggleSitePanel(e){
+  if(e) e.stopPropagation();
+  const panel = $('site-filter-panel');
+  if(!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen){
+    const s = $('site-filter-search'); if(s){ s.value=''; filterSiteList(''); }
+    setTimeout(()=>{ document.addEventListener('click', _closeSitePanel, {once:true}); }, 0);
+  }
+}
+function _closeSitePanel(e){
+  const wrapper = $('site-filter-wrapper');
+  if(wrapper && wrapper.contains(e.target)) return;
+  const panel = $('site-filter-panel');
+  if(panel) panel.style.display = 'none';
+}
+
+/** 搜尋過濾 checkbox 清單 */
+function filterSiteList(q){
+  const items = document.querySelectorAll('#site-checkbox-list .site-cb-item');
+  const lq = q.trim().toLowerCase();
+  items.forEach(item => {
+    item.style.display = (!lq || item.dataset.label.toLowerCase().includes(lq)) ? '' : 'none';
+  });
+}
+
+/** 全選 */
+function selectAllSites(){
+  document.querySelectorAll('#site-checkbox-list input[type=checkbox]').forEach(cb => {
+    cb.checked = true;
+    _selectedSiteIds.add(cb.value);
+  });
+  updateSiteFilterBtn();
+}
+
+/** 清除全部 */
+function clearSiteSelection(){
+  document.querySelectorAll('#site-checkbox-list input[type=checkbox]').forEach(cb => cb.checked = false);
+  _selectedSiteIds.clear();
+  updateSiteFilterBtn();
+}
+
+/** 依類型快選（A=銀座 / B=物業） */
+function selectSitesByType(type){
+  document.querySelectorAll('#site-checkbox-list input[type=checkbox]').forEach(cb => {
+    const match = cb.value.startsWith(type);
+    cb.checked = match;
+    if(match) _selectedSiteIds.add(cb.value);
+    else _selectedSiteIds.delete(cb.value);
+  });
+  updateSiteFilterBtn();
+}
+
+/** 取得已選 siteId 陣列（空陣列 = 全部） */
+function getSelectedSiteIds(){
+  return [..._selectedSiteIds];
+}
+
+/** 初始化案場勾選清單（切換到月度報表頁時呼叫） */
 function initExportSiteSelect(){
-  const sel = $('exportSiteSelect');
-  if(!sel) return;
+  const list = $('site-checkbox-list');
+  if(!list) return;
   const sites = JSON.parse(localStorage.getItem('sites') || '[]').filter(s => s.active !== false);
-  sel.innerHTML = '<option value="">全部案場</option>'
-    + sites.map(s => `<option value="${s.id}">${s.id} ${s.name}</option>`).join('');
+  list.innerHTML = sites.map(s => {
+    const checked = _selectedSiteIds.has(s.id) ? 'checked' : '';
+    const label   = `${s.id} ${s.name}`;
+    return `<label class="site-cb-item" data-label="${label}" style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 2px;cursor:pointer;user-select:none">
+      <input type="checkbox" value="${s.id}" ${checked} onchange="
+        this.checked ? _selectedSiteIds.add(this.value) : _selectedSiteIds.delete(this.value);
+        updateSiteFilterBtn();
+      " style="width:15px;height:15px;accent-color:var(--accent)"/>
+      <span>${label}</span>
+    </label>`;
+  }).join('');
+  updateSiteFilterBtn();
 }
 
 /** 點擊匯出按鈕的入口 */
 function handleExportClick(){
-  const ym     = ($('monthly-report-month')||{}).value || getDefaultYM();
-  const siteId = ($('exportSiteSelect')||{}).value || '';
+  const ym = ($('monthly-report-month')||{}).value || getDefaultYM();
   if(!ym){ showToast('請選擇月份','error'); return; }
-  exportDYSReportFinal(ym, siteId);
+  const ids = getSelectedSiteIds();
+  exportDYSReportFinal(ym, ids);
 }
 
 /** 取得預設年月（本月） */
@@ -4231,8 +4477,17 @@ function getDYSStepHours(h){
   return parseFloat(h.toFixed(1)); // 低於 8h 按實際計
 }
 
-/** 建立月度矩陣資料（含案場過濾） */
-function buildMonthlyMatrix(targetYM, filterSiteId){
+/** 建立月度矩陣資料（含多案場過濾）
+ *  @param {string}   targetYM      "YYYY-MM"
+ *  @param {string[]} filterSiteIds 空陣列 = 全部案場
+ */
+function buildMonthlyMatrix(targetYM, filterSiteIds){
+  // 向下相容：若傳入字串（舊格式）自動轉陣列
+  if(typeof filterSiteIds === 'string'){
+    filterSiteIds = filterSiteIds ? [filterSiteIds] : [];
+  }
+  filterSiteIds = filterSiteIds || [];
+
   const [year, month] = targetYM.split('-').map(Number);
   const daysInMonth   = new Date(year, month, 0).getDate();
   const emps          = JSON.parse(localStorage.getItem('employees') || '[]');
@@ -4256,10 +4511,10 @@ function buildMonthlyMatrix(targetYM, filterSiteId){
       let dayRecs  = allRecs.filter(r => r.empId===emp.id && r.date===dateStr);
       let nextRecs = allRecs.filter(r => r.empId===emp.id && r.date===nextDate);
 
-      // 案場過濾
-      if(filterSiteId){
-        dayRecs  = dayRecs.filter(r  => r.siteId===filterSiteId);
-        nextRecs = nextRecs.filter(r => r.siteId===filterSiteId);
+      // 多案場過濾（空陣列 = 不過濾）
+      if(filterSiteIds.length){
+        dayRecs  = dayRecs.filter(r  => filterSiteIds.includes(r.siteId));
+        nextRecs = nextRecs.filter(r => filterSiteIds.includes(r.siteId));
       }
 
       let inRec  = dayRecs.find(r  => r.type==='上班');
@@ -4292,8 +4547,8 @@ function buildMonthlyMatrix(targetYM, filterSiteId){
       }
     }
 
-    // 有案場篩選時，沒到該案場的員工不列入
-    if(filterSiteId && !hasRecord) return;
+    // 有案場篩選時，沒到任一指定案場的員工不列入
+    if(filterSiteIds.length && !hasRecord) return;
 
     dayData.forEach(d => { if(d.note) notes.push(d.note); });
     rows.push({emp, dayData, monthlyTotal, notes});
@@ -4304,9 +4559,9 @@ function buildMonthlyMatrix(targetYM, filterSiteId){
 
 /** 預覽月度報表（前 20 人） */
 function previewMonthlyReport(){
-  const ym     = ($('monthly-report-month')||{}).value || getDefaultYM();
-  const siteId = ($('exportSiteSelect')||{}).value || '';
-  const {rows, daysInMonth, totalHours, anomalyCount, crossdayCount} = buildMonthlyMatrix(ym, siteId);
+  const ym  = ($('monthly-report-month')||{}).value || getDefaultYM();
+  const ids = getSelectedSiteIds();
+  const {rows, daysInMonth, totalHours, anomalyCount, crossdayCount} = buildMonthlyMatrix(ym, ids);
 
   $('monthly-empty-state').style.display   = 'none';
   $('monthly-preview-cards').style.display = 'block';
@@ -4343,11 +4598,18 @@ function previewMonthlyReport(){
   }).join('');
 }
 
-/** 完整匯出月度報表 CSV（銀座格式：每日 時/哨 雙欄） */
-function exportDYSReportFinal(targetYM, filterSiteId){
-  filterSiteId = filterSiteId || '';
-  const {rows, daysInMonth} = buildMonthlyMatrix(targetYM, filterSiteId);
+/** 完整匯出月度報表 CSV（銀座格式：每日 時/哨 雙欄）
+ *  @param {string}   targetYM      "YYYY-MM"
+ *  @param {string[]} filterSiteIds 空陣列 = 全部案場
+ */
+function exportDYSReportFinal(targetYM, filterSiteIds){
+  // 向下相容
+  if(typeof filterSiteIds === 'string'){
+    filterSiteIds = filterSiteIds ? [filterSiteIds] : [];
+  }
+  filterSiteIds = filterSiteIds || [];
 
+  const {rows, daysInMonth} = buildMonthlyMatrix(targetYM, filterSiteIds);
   if(!rows.length){ showToast('本月（此案場）無出勤紀錄可匯出', 'error'); return; }
 
   let headers = ['員工編號','姓名'];
@@ -4361,10 +4623,14 @@ function exportDYSReportFinal(targetYM, filterSiteId){
     return row.join(',');
   });
 
-  const siteSuffix = filterSiteId || '全部';
+  // 檔名後綴：0個=全部 / 1個=案場代號 / 多個=多場(n)
+  const siteSuffix = filterSiteIds.length === 0  ? '全部'
+                   : filterSiteIds.length === 1   ? filterSiteIds[0]
+                   : `多場(${filterSiteIds.length})`;
+  const siteLabel  = filterSiteIds.length === 0 ? '全部' : siteSuffix;
   const csvContent = '﻿' + headers.join(',') + '\n' + csvRows.join('\n');
   dlFile(csvContent, `DYS_月考勤表_${targetYM}_${siteSuffix}.csv`);
-  showToast(`已匯出 ${rows.length} 人 × ${targetYM}（${siteSuffix}）✓`, 'success');
+  showToast(`已匯出 ${rows.length} 人 × ${targetYM}（${siteLabel}）✓`, 'success');
 }
 
 function showToast(msg,type){
