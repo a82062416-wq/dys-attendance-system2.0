@@ -4353,21 +4353,77 @@ function printQr(siteId){
   const site = getSiteById(siteId);
   const token = getSiteToken(siteId);
   const url = `${location.origin}${location.pathname}?site=${siteId}&token=${token}&v=${getSiteV(siteId)}`;
-  const win = window.open('', '_blank', 'width=400,height=500');
-  win.document.write(`<!DOCTYPE html><html><head><title>QR Code - ${siteId}</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-  <style>body{font-family:-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px;gap:12px}
-  h2{font-size:20px;margin:0}p{font-size:12px;color:#666;word-break:break-all;text-align:center}</style>
-  </head><body>
-  <h2>${site.id} · ${site.name}</h2>
-  <div id="qr"></div>
-  <p>${url}</p>
-  <script>
-    window.onload=function(){
-      new QRCode(document.getElementById('qr'),{text:'${url}',width:220,height:220,colorDark:'#1c1c1e',colorLight:'#ffffff'});
-      setTimeout(()=>window.print(),800);
-    };
-  <\/script></body></html>`);
+  const dateStr = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
+  const win = window.open('','_blank','width=794,height=1123');
+  win.document.write(`<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8">
+<title>打卡掃描碼 - ${site.name}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+@page{size:A4 portrait;margin:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;width:210mm;min-height:297mm;background:#fff;display:flex;flex-direction:column;color:#111;}
+.page{width:100%;min-height:297mm;display:flex;flex-direction:column;}
+.hd{padding:20px 40px 18px;border-bottom:2.5px solid #111;display:flex;align-items:center;gap:16px;flex-shrink:0;}
+.hd-logo{width:42px;height:42px;background:#111;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.hd-logo span{color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;}
+.hd-title{font-size:24px;font-weight:700;letter-spacing:4px;color:#111;}
+.hd-sub{font-size:9px;color:#888;letter-spacing:3px;text-transform:uppercase;margin-top:3px;}
+.bd{flex:1;padding:32px 40px;display:flex;flex-direction:column;align-items:center;gap:22px;}
+.site-row{width:100%;display:flex;justify-content:space-between;align-items:center;padding-bottom:20px;border-bottom:1px solid #ddd;}
+.site-name{font-size:20px;font-weight:600;color:#111;letter-spacing:1px;}
+.site-id{font-size:11px;color:#888;margin-top:4px;letter-spacing:2px;}
+.site-badge{font-size:10px;border:1.5px solid #111;padding:5px 14px;letter-spacing:2px;font-weight:600;}
+.qr-wrap{border:2px solid #111;padding:16px;display:inline-flex;}
+#qrcode canvas,#qrcode img{display:block;}
+.steps{width:100%;display:flex;align-items:flex-start;justify-content:center;gap:4px;padding-top:4px;}
+.step{display:flex;flex-direction:column;align-items:center;gap:7px;flex:1;}
+.step-arrow{font-size:16px;color:#111;font-weight:700;padding-top:3px;flex-shrink:0;}
+.sn{width:22px;height:22px;border:2px solid #111;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.st{font-size:11px;color:#444;line-height:1.4;text-align:center;}
+.ft{border-top:1.5px solid #111;padding:10px 40px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.ft span{font-size:9px;color:#888;letter-spacing:1px;}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+<\/style>
+</head><body>
+<div class="page">
+  <div class="hd">
+    <div class="hd-logo"><span>DYS</span></div>
+    <div>
+      <div class="hd-title">打卡掃描碼</div>
+      <div class="hd-sub">Employee Check-In Code &nbsp;·&nbsp; 大洋保全</div>
+    </div>
+  </div>
+  <div class="bd">
+    <div class="site-row">
+      <div>
+        <div class="site-name">${site.name}</div>
+        <div class="site-id">案場代號 &nbsp; ${site.id}</div>
+      </div>
+      <span class="site-badge">VALID</span>
+    </div>
+    <div class="qr-wrap"><div id="qrcode"></div></div>
+    <div class="steps">
+      <div class="step"><div class="sn">1</div><div class="st">開啟相機<br>或掃描 App</div></div>
+      <div class="step-arrow">&#8594;</div>
+      <div class="step"><div class="sn">2</div><div class="st">對準<br>QR Code</div></div>
+      <div class="step-arrow">&#8594;</div>
+      <div class="step"><div class="sn">3</div><div class="st">點選<br>跳出連結</div></div>
+      <div class="step-arrow">&#8594;</div>
+      <div class="step"><div class="sn">4</div><div class="st">輸入<br>員工編號</div></div>
+    </div>
+  </div>
+  <div class="ft">
+    <span>請勿拆除 &nbsp;·&nbsp; 僅供員工使用</span>
+    <span>列印日期：${dateStr}</span>
+  </div>
+</div>
+<script>
+window.onload=function(){
+  new QRCode(document.getElementById('qrcode'),{text:'${url}',width:360,height:360,colorDark:'#111111',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+  setTimeout(function(){window.print();},900);
+};
+<\/script>
+</body></html>`);
   win.document.close();
 }
 
