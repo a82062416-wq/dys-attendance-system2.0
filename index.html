@@ -1245,17 +1245,27 @@ tr:hover td{background:var(--surface2)}
         </div>
       </div>
 
-      <!-- 系統 -->
-      <div class="admin-menu-section">
+      <!-- 系統（管理員專用） -->
+      <div class="admin-menu-section admin-only">
         <div class="admin-menu-hd">系統</div>
         <div class="admin-menu-item" onclick="showSub('qrcode',this)">
           <div class="ami-icon" style="background:rgba(142,142,147,.12)">📷</div>
           <span class="ami-label">QR Code</span>
           <span class="ami-chevron">›</span>
         </div>
-        <div class="admin-menu-item admin-only" onclick="showSub('settings',this)">
+        <div class="admin-menu-item" onclick="showSub('settings',this)">
           <div class="ami-icon" style="background:rgba(142,142,147,.12)">⚙️</div>
           <span class="ami-label">設定</span>
+          <span class="ami-chevron">›</span>
+        </div>
+      </div>
+
+      <!-- QR Code（幹部有授權才顯示） -->
+      <div class="admin-menu-section" id="sup-section-qrprint" style="display:none">
+        <div class="admin-menu-hd">列印</div>
+        <div class="admin-menu-item" onclick="showSub('qrcode',this)">
+          <div class="ami-icon" style="background:rgba(142,142,147,.12)">📷</div>
+          <span class="ami-label">QR Code 列印</span>
           <span class="ami-chevron">›</span>
         </div>
       </div>
@@ -1662,23 +1672,28 @@ tr:hover td{background:var(--surface2)}
 
           <!-- 功能授權 -->
           <div style="margin-bottom:20px" id="sup-perm-section">
-            <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">功能授權</div>
+            <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">功能授權</div>
+            <div style="font-size:11px;color:var(--t3);margin-bottom:10px">打卡紀錄、今日總覽、異常報表為基本功能，所有幹部皆可查看。</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
-                <input type="checkbox" id="perm-manual-punch" style="width:16px;height:16px;accent-color:var(--accent)"/>
-                <span>➕ 補打卡</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
-                <input type="checkbox" id="perm-csv-export" style="width:16px;height:16px;accent-color:var(--accent)"/>
-                <span>⬇ CSV 匯出</span>
+                <input type="checkbox" id="perm-attendance-stat" style="width:16px;height:16px;accent-color:var(--accent)"/>
+                <span>📅 出勤統計</span>
               </label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
                 <input type="checkbox" id="perm-monthly-report" style="width:16px;height:16px;accent-color:var(--accent)"/>
                 <span>🗓️ 月度報表</span>
               </label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
-                <input type="checkbox" id="perm-attendance-stat" style="width:16px;height:16px;accent-color:var(--accent)"/>
-                <span>📅 出勤統計</span>
+                <input type="checkbox" id="perm-manual-punch" style="width:16px;height:16px;accent-color:var(--accent)"/>
+                <span>➕ 補打卡</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
+                <input type="checkbox" id="perm-csv-export" style="width:16px;height:16px;accent-color:var(--accent)"/>
+                <span>⬇️ CSV 匯出</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px;grid-column:span 2">
+                <input type="checkbox" id="perm-qr-print" style="width:16px;height:16px;accent-color:var(--accent)"/>
+                <span>📷 QR Code 列印</span>
               </label>
             </div>
           </div>
@@ -3141,7 +3156,11 @@ function applyRoleUI(role){
   const attItem = $('menu-item-attendance-stat');
   if(attItem) attItem.style.display = (isAdmin || perms.includes('attendance-stat')) ? '' : 'none';
 
-  // 幹部進入後預設顯示紀錄頁（分類清單選單不含 seg-btn，直接傳 null）
+  // QR Code 列印（幹部有授權才顯示，管理員走系統區塊）
+  const qrSec = $('sup-section-qrprint');
+  if(qrSec) qrSec.style.display = (!isAdmin && perms.includes('qr-print')) ? '' : 'none';
+
+  // 幹部進入後預設顯示紀錄頁
   if(!isAdmin){
     showSub('records', null);
   }
@@ -4091,7 +4110,7 @@ function openSupModal(empId){
 
   // 功能授權 checkboxes
   const perms = sup.permissions || [];
-  ['manual-punch','csv-export','monthly-report','attendance-stat'].forEach(key=>{
+  ['attendance-stat','monthly-report','manual-punch','csv-export','qr-print'].forEach(key=>{
     const cb = $('perm-' + key);
     if(cb) cb.checked = perms.includes(key);
   });
@@ -4160,7 +4179,7 @@ function saveSupEdit(){
   const checkedSites = [...$('sup-site-checkboxes').querySelectorAll('input:checked')].map(cb=>cb.value);
 
   // 讀取功能授權
-  const permissions = ['manual-punch','csv-export','monthly-report','attendance-stat']
+  const permissions = ['attendance-stat','monthly-report','manual-punch','csv-export','qr-print']
     .filter(key=>{ const cb=$('perm-'+key); return cb && cb.checked; });
 
   const sups = getSupervisors();
