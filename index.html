@@ -1751,6 +1751,22 @@ tr:hover td{background:var(--surface2)}
           <span class="mf-hint">打卡成功畫面顯示，空白則不顯示</span>
         </div>
         <div class="mf">
+          <label>🖨️ QR 列印警語</label>
+          <span class="mf-hint" style="margin-bottom:8px;display:block">修改後按「儲存設定」，所有案場列印時自動套用，留空使用預設。</span>
+          <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
+            <span style="font-size:16px;margin-top:8px;flex-shrink:0">☀</span>
+            <textarea id="s-qr-warn-1" class="fi" rows="2" placeholder="上班到了別忘了掃碼打卡，並請注意身體狀況，有異常即刻回報！" style="width:100%;resize:vertical;font-family:var(--font);font-size:13px"></textarea>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
+            <span style="font-size:16px;margin-top:8px;flex-shrink:0">🌙</span>
+            <textarea id="s-qr-warn-2" class="fi" rows="2" placeholder="下班前也記得再掃一次，下班路途請注意安全。" style="width:100%;resize:vertical;font-family:var(--font);font-size:13px"></textarea>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <span style="font-size:16px;margin-top:8px;flex-shrink:0">💬</span>
+            <textarea id="s-qr-warn-3" class="fi" rows="2" placeholder="掃描遇到問題嗎？請告知值班主管，我們來幫你處理。" style="width:100%;resize:vertical;font-family:var(--font);font-size:13px"></textarea>
+          </div>
+        </div>
+        <div class="mf">
           <label>修改管理者密碼</label>
           <input id="s-pwd-old" class="fi" type="password" placeholder="目前管理者密碼" style="width:100%;margin-bottom:6px"/>
           <input id="s-pwd-new" class="fi" type="password" placeholder="新密碼（留空不修改）" style="width:100%"/>
@@ -3752,6 +3768,9 @@ function loadSettingsFields(){
   $('s-announcement').value=localStorage.getItem('site_announcement')||'';
   $('s-announcement-level').value=localStorage.getItem('site_announcement_level')||'normal';
   $('s-announcement-expiry').value=localStorage.getItem('site_announcement_expiry')||'';
+  $('s-qr-warn-1').value=localStorage.getItem('qr_warn_1')||'';
+  $('s-qr-warn-2').value=localStorage.getItem('qr_warn_2')||'';
+  $('s-qr-warn-3').value=localStorage.getItem('qr_warn_3')||'';
   $('s-pwd-old').value='';$('s-pwd-new').value='';
   $('s-sup-pwd-old').value='';$('s-sup-pwd-new').value='';
 
@@ -3810,6 +3829,12 @@ function saveSettings(){
   localStorage.setItem('absent_limit',al);
   localStorage.setItem('msg_in',  MSG_IN);
   localStorage.setItem('msg_out', MSG_OUT);
+  const w1=$('s-qr-warn-1').value.trim();
+  const w2=$('s-qr-warn-2').value.trim();
+  const w3=$('s-qr-warn-3').value.trim();
+  if(w1) localStorage.setItem('qr_warn_1',w1); else localStorage.removeItem('qr_warn_1');
+  if(w2) localStorage.setItem('qr_warn_2',w2); else localStorage.removeItem('qr_warn_2');
+  if(w3) localStorage.setItem('qr_warn_3',w3); else localStorage.removeItem('qr_warn_3');
   if(announcement){ localStorage.setItem('site_announcement', announcement); }
   else { localStorage.removeItem('site_announcement'); }
   localStorage.setItem('site_announcement_level', annLevel);
@@ -4368,7 +4393,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-se
 .hd-logo span{color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;}
 .hd-title{font-size:24px;font-weight:700;letter-spacing:4px;color:#111;}
 .hd-sub{font-size:9px;color:#888;letter-spacing:3px;text-transform:uppercase;margin-top:3px;}
-.bd{flex:1;padding:32px 40px;display:flex;flex-direction:column;align-items:center;gap:22px;}
+.bd{flex:1;padding:24px 40px 8px;display:flex;flex-direction:column;align-items:center;gap:16px;}
 .site-row{width:100%;display:flex;justify-content:space-between;align-items:center;padding-bottom:20px;border-bottom:1px solid #ddd;}
 .site-name{font-size:20px;font-weight:600;color:#111;letter-spacing:1px;}
 .site-id{font-size:11px;color:#888;margin-top:4px;letter-spacing:2px;}
@@ -4379,8 +4404,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-se
 .step{display:flex;flex-direction:column;align-items:center;gap:7px;flex:1;}
 .step-arrow{font-size:16px;color:#111;font-weight:700;padding-top:3px;flex-shrink:0;}
 .sn{width:22px;height:22px;border:2px solid #111;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
-.st{font-size:11px;color:#444;line-height:1.4;text-align:center;}
-.ft{border-top:1.5px solid #111;padding:10px 40px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.st{font-size:14px;color:#333;line-height:1.5;text-align:center;}
+.warn{width:100%;background:#fafafa;border:1px solid #ddd;border-radius:6px;padding:12px 18px;margin-top:4px;}
+.warn-title{font-size:11px;font-weight:600;letter-spacing:1px;color:#555;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px;}
+.warn-item{display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;}
+.warn-bullet{font-size:12px;font-weight:700;color:#111;flex-shrink:0;margin-top:1px;}
+.warn-text{font-size:11.5px;color:#222;line-height:1.5;outline:none;border-radius:2px;cursor:text;}
+.warn-text:hover{background:rgba(0,0,0,0.04);}
+.warn-text:focus{background:rgba(0,100,220,0.06);border-bottom:1.5px dashed #5599ee;}
+.edit-hint{font-size:8px;font-weight:400;color:#bbb;letter-spacing:0;font-style:italic;}
+@media print{.edit-hint{display:none;}.warn-text:hover,.warn-text:focus{background:none;border:none;}}
+.ft{border-top:1px solid #ddd;padding:8px 40px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .ft span{font-size:9px;color:#888;letter-spacing:1px;}
 @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
 <\/style>
@@ -4412,6 +4446,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-se
       <div class="step"><div class="sn">4</div><div class="st">輸入<br>員工編號</div></div>
     </div>
   </div>
+  <div class="warn">
+    <div class="warn-title">小提醒 <span class="edit-hint">（點擊文字可直接編輯）</span></div>
+    <div class="warn-item"><span class="warn-bullet">☀</span><span class="warn-text" contenteditable="true" spellcheck="false">${localStorage.getItem('qr_warn_1')||'上班到了別忘了掃碼打卡，並請注意身體狀況，有異常即刻回報！'}</span></div>
+    <div class="warn-item"><span class="warn-bullet">🌙</span><span class="warn-text" contenteditable="true" spellcheck="false">${localStorage.getItem('qr_warn_2')||'下班前也記得再掃一次，下班路途請注意安全。'}</span></div>
+    <div class="warn-item"><span class="warn-bullet">💬</span><span class="warn-text" contenteditable="true" spellcheck="false">${localStorage.getItem('qr_warn_3')||'掃描遇到問題嗎？請告知值班主管，我們來幫你處理。'}</span></div>
   <div class="ft">
     <span>請勿拆除 &nbsp;·&nbsp; 僅供員工使用</span>
     <span>列印日期：${dateStr}</span>
