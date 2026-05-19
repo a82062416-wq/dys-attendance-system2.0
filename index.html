@@ -140,7 +140,7 @@ nav{
   flex:1;
   display:flex;
   flex-direction:column;
-  max-width:440px;
+  max-width:680px;
   width:100%;
   margin:0 auto;
   padding: calc(56px + var(--safe-top) + 16px) calc(18px + var(--safe-left)) calc(20px + var(--safe-bottom)) calc(18px + var(--safe-right));
@@ -1288,7 +1288,7 @@ tr:hover td{background:var(--surface2)}
           <span style="color:var(--t3);font-size:13px">—</span>
           <input type="date" class="fi" id="f-date-end" onchange="loadRecords()" style="width:130px"/>
         </span>
-        <select class="fi" id="f-site" style="font-size:12px;height:28px;padding:0 6px" onchange="loadRecords()">
+        <select class="fi" id="f-site" style="font-size:12px;height:28px;padding:0 6px;min-width:160px;max-width:220px" onchange="loadRecords()">
           <option value="">📍 全部案場</option>
         </select>
       </div>
@@ -1618,6 +1618,22 @@ tr:hover td{background:var(--surface2)}
 
           <div style="margin-bottom:20px" id="sup-site-section">
             <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">負責案場</div>
+
+            <!-- 沿用其他幹部 -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span style="font-size:12px;color:var(--t2);white-space:nowrap">📋 沿用</span>
+              <select id="sup-copy-from" class="fi"
+                style="font-size:12px;height:30px;padding:0 8px;flex:1"
+                onchange="supCopyFromSup(this.value)">
+                <option value="">— 選擇幹部 —</option>
+              </select>
+            </div>
+
+            <!-- 搜尋 + 快捷按鈕 -->
+            <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
+              <input id="sup-site-search" type="text" placeholder="🔍 搜尋案場…" oninput="supSearchSites(this.value)"
+                style="font-size:12px;height:30px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--t1);font-family:var(--font);flex:1;outline:none"/>
+            </div>
             <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
               <button onclick="supFilterSites('A')"
                 style="background:var(--surface2);border:none;border-radius:50px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:var(--font);color:var(--t1)">
@@ -3419,7 +3435,7 @@ function getSiteMap(){
 function getSiteName(siteId){
   if(!siteId) return '–';
   const m = getSiteMap();
-  return m[siteId] ? `${siteId} ${m[siteId]}` : siteId;
+  return m[siteId] ? `${siteId} · ${m[siteId]}` : siteId;
 }
 function initSiteFilter(){
   const sel = $('f-site');
@@ -3427,7 +3443,7 @@ function initSiteFilter(){
   const sites = JSON.parse(localStorage.getItem('sites')||'[]').filter(s=>s.active!==false);
   const cur = sel.value;
   sel.innerHTML = '<option value="">📍 全部案場</option>'
-    + sites.map(s=>`<option value="${s.id}"${s.id===cur?' selected':''}>${s.id} ${s.name}</option>`).join('');
+    + sites.map(s=>`<option value="${s.id}"${s.id===cur?' selected':''}>${s.id} · ${s.name}</option>`).join('');
 }
 
 function loadRecords(){
@@ -4077,6 +4093,16 @@ function openSupModal(empId){
     if(cb) cb.checked = perms.includes(key);
   });
 
+  // 初始化「沿用其他幹部」下拉（排除自己）
+  const copyFrom = $('sup-copy-from');
+  copyFrom.innerHTML = '<option value="">— 選擇幹部 —</option>'
+    + sups.filter(s=>s.empId!==empId && s.active!==false)
+          .map(s=>`<option value="${s.empId}">${s.name}（${s.title}）</option>`).join('');
+
+  // 清空搜尋欄
+  const searchInput = $('sup-site-search');
+  if(searchInput) searchInput.value='';
+
   modal.style.display='flex';
 }
 
@@ -4085,15 +4111,36 @@ function closeSupModal(){
 }
 
 function supFilterSites(filter){
-  const sites = getSites();
   const checkboxes = $('sup-site-checkboxes').querySelectorAll('input[type="checkbox"]');
   if(filter==='all'){    checkboxes.forEach(cb=>cb.checked=true); return; }
   if(filter==='none'){   checkboxes.forEach(cb=>cb.checked=false); return; }
-  // A 或 B 型別篩選
-  const typePrefix = filter; // 'A' or 'B'
   checkboxes.forEach(cb=>{
     const siteId = cb.getAttribute('data-site-id');
-    cb.checked = siteId.startsWith(typePrefix);
+    cb.checked = siteId.startsWith(filter);
+  });
+}
+
+// 沿用其他幹部的案場勾選
+function supCopyFromSup(fromEmpId){
+  if(!fromEmpId) return;
+  const sups = getSupervisors();
+  const from = sups.find(s=>s.empId===fromEmpId);
+  if(!from) return;
+  const checkboxes = $('sup-site-checkboxes').querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(cb=>{
+    cb.checked = from.viewAll || (from.sites||[]).includes(cb.getAttribute('data-site-id'));
+  });
+  // 重置下拉，避免重複點擊困惑
+  $('sup-copy-from').value='';
+  showToast(`已套用 ${from.name} 的案場設定`,'success');
+}
+
+// 即時搜尋過濾案場 label
+function supSearchSites(kw){
+  const q = kw.trim().toLowerCase();
+  $('sup-site-checkboxes').querySelectorAll('label').forEach(label=>{
+    const text = label.textContent.toLowerCase();
+    label.style.display = (!q || text.includes(q)) ? '' : 'none';
   });
 }
 
