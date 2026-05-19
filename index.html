@@ -140,12 +140,15 @@ nav{
   flex:1;
   display:flex;
   flex-direction:column;
-  max-width:680px;
+  max-width:440px;
   width:100%;
   margin:0 auto;
   padding: calc(56px + var(--safe-top) + 16px) calc(18px + var(--safe-left)) calc(20px + var(--safe-bottom)) calc(18px + var(--safe-right));
   gap:14px;
   overflow:hidden;
+}
+@media(min-width:768px){
+  .checkin-wrap{ max-width:680px; }
 }
 
 /* ── 版本標籤 + 系統公告 ── */
