@@ -3969,6 +3969,22 @@ function showAdminMenu(){
   if(titleEl) titleEl.textContent = '管理後台';
   updateNavBackBtn();
   updateAnomalyBanner(); // 每次回到首頁都更新異常橫幅
+
+  // 幹部授權：每次回到選單都從 localStorage 重新讀取，確保即時反映最新設定
+  if(CURRENT_SUPERVISOR){
+    const fresh = getSupervisors().find(s=>s.empId===CURRENT_SUPERVISOR.empId);
+    if(fresh) CURRENT_SUPERVISOR = fresh; // 刷新快照
+    const perms = CURRENT_SUPERVISOR.permissions || [];
+    // QR Code 列印
+    const qrSec = $('sup-section-qrprint');
+    if(qrSec) qrSec.style.display = perms.includes('qr-print') ? '' : 'none';
+    // 月度報表
+    const reportSec = $('admin-section-report');
+    if(reportSec) reportSec.style.display = perms.includes('monthly-report') ? '' : 'none';
+    // 出勤統計
+    const attItem = $('menu-item-attendance-stat');
+    if(attItem) attItem.style.display = perms.includes('attendance-stat') ? '' : 'none';
+  }
 }
 
 /** 返回上一頁（如已在首頁則無動作） */
