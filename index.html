@@ -929,7 +929,7 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.1.2 &nbsp;·&nbsp; 2026.05 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.1.3 &nbsp;·&nbsp; 2026.05 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1067,7 +1067,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.1.2 &nbsp;|&nbsp; 2026.05</div>
+  <div class="version-tag">v1.1.3 &nbsp;|&nbsp; 2026.05</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -2005,7 +2005,28 @@ function getSites(activeOnly=false){
 }
 function saveSites(d){localStorage.setItem('sites',JSON.stringify(d))}
 function getSupervisors(){return JSON.parse(localStorage.getItem('supervisors')||JSON.stringify(_DEFAULT_SUPERVISORS))}
-function saveSupervisors(d){localStorage.setItem('supervisors',JSON.stringify(d))}
+function saveSupervisors(d){
+  localStorage.setItem('supervisors', JSON.stringify(d));
+  // 同步至 Firebase，讓所有裝置都能讀到最新幹部設定
+  if(FB_DB){
+    FB_DB.ref('config/supervisors').set(d)
+      .catch(e=>console.warn('幹部同步 Firebase 失敗:', e));
+  }
+}
+
+// 從 Firebase 拉取最新幹部資料並更新 localStorage
+async function syncSupervisorsFromFirebase(){
+  if(!FB_DB) return;
+  try{
+    const snap = await FB_DB.ref('config/supervisors').once('value');
+    const data = snap.val();
+    if(data && Array.isArray(data)){
+      localStorage.setItem('supervisors', JSON.stringify(data));
+    }
+  }catch(e){
+    console.warn('幹部資料從 Firebase 讀取失敗:', e);
+  }
+}
 function getSiteV(siteId){
   return localStorage.getItem('site_token_v_'+siteId)||'0';
 }
@@ -3046,6 +3067,8 @@ function goAdmin(el){
   if(!getPwdHash()){openSetup();return}
   if(ADMIN_UNLOCKED){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();return}
   navigateTo('admin');showAdminMenu();
+  // 從 Firebase 拉最新幹部資料，確保授權設定是最新的
+  syncSupervisorsFromFirebase();
   $('lock-screen').style.display='flex';
   $('lock-input').value='';
   $('sup-emp-input').value='';
