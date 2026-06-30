@@ -929,7 +929,7 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.1.4 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.1.5 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1067,7 +1067,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.1.4 &nbsp;|&nbsp; 2026.06</div>
+  <div class="version-tag">v1.1.5 &nbsp;|&nbsp; 2026.06</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -2082,9 +2082,28 @@ function initials(name){return name?name.slice(-2):'?'}
 
 function hashPwd(s){let h=0x811c9dc5;for(const c of s){h^=c.charCodeAt(0);h=(h*0x01000193)>>>0}return h.toString(16)}
 function getPwdHash(){return localStorage.getItem('admin_pwd_hash')||''}
-function setPwdHash(p){localStorage.setItem('admin_pwd_hash',hashPwd(p))}
+function setPwdHash(p){
+  const h=hashPwd(p);
+  localStorage.setItem('admin_pwd_hash',h);
+  if(FB_DB) FB_DB.ref('config/auth/admin_pwd_hash').set(h).catch(e=>console.warn('管理密碼同步失敗:',e));
+}
 function getSupPwdHash(){return localStorage.getItem('supervisor_pwd_hash')||''}
-function setSupPwdHash(p){localStorage.setItem('supervisor_pwd_hash',hashPwd(p))}
+function setSupPwdHash(p){
+  const h=hashPwd(p);
+  localStorage.setItem('supervisor_pwd_hash',h);
+  if(FB_DB) FB_DB.ref('config/auth/supervisor_pwd_hash').set(h).catch(e=>console.warn('幹部密碼同步失敗:',e));
+}
+async function syncAuthFromFirebase(){
+  if(!FB_DB) return;
+  try{
+    const snap = await FB_DB.ref('config/auth').once('value');
+    const data = snap.val();
+    if(data){
+      if(data.admin_pwd_hash) localStorage.setItem('admin_pwd_hash', data.admin_pwd_hash);
+      if(data.supervisor_pwd_hash) localStorage.setItem('supervisor_pwd_hash', data.supervisor_pwd_hash);
+    }
+  }catch(e){ console.warn('密碼從 Firebase 讀取失敗:',e); }
+}
 function getResetKeyHash(){return localStorage.getItem('reset_key_hash')||''}
 function setResetKeyHash(k){localStorage.setItem('reset_key_hash',hashPwd(k))}
 function findEmp(id){return employees.find(e=>e.id===id)||null}
@@ -3074,8 +3093,9 @@ function goAdmin(el){
   if(!getPwdHash()){openSetup();return}
   if(ADMIN_UNLOCKED){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();return}
   navigateTo('admin');showAdminMenu();
-  // 從 Firebase 拉最新幹部資料，確保授權設定是最新的
+  // 從 Firebase 拉最新幹部資料與密碼，確保跨裝置一致
   syncSupervisorsFromFirebase();
+  syncAuthFromFirebase();
   $('lock-screen').style.display='flex';
   $('lock-input').value='';
   $('sup-emp-input').value='';
