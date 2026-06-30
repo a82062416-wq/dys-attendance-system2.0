@@ -929,7 +929,7 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.1.9 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.2.0 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1117,7 +1117,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.1.9 &nbsp;|&nbsp; 2026.06</div>
+  <div class="version-tag">v1.2.0 &nbsp;|&nbsp; 2026.06</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1730,7 +1730,7 @@ tr:hover td{background:var(--surface2)}
           <!-- 功能授權 -->
           <div style="margin-bottom:20px" id="sup-perm-section">
             <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">功能授權</div>
-            <div style="font-size:11px;color:var(--t3);margin-bottom:10px">打卡紀錄、今日總覽、異常報表為基本功能，所有幹部皆可查看。</div>
+            <div style="font-size:11px;color:var(--t3);margin-bottom:10px">打卡紀錄、今日總覽、異常報表、QR Code 列印為基本功能，所有幹部皆可使用。</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
                 <input type="checkbox" id="perm-attendance-stat" style="width:16px;height:16px;accent-color:var(--accent)"/>
@@ -1747,10 +1747,6 @@ tr:hover td{background:var(--surface2)}
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px">
                 <input type="checkbox" id="perm-csv-export" style="width:16px;height:16px;accent-color:var(--accent)"/>
                 <span>⬇️ CSV 匯出</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:8px;background:var(--surface2);border-radius:10px;grid-column:span 2">
-                <input type="checkbox" id="perm-qr-print" style="width:16px;height:16px;accent-color:var(--accent)"/>
-                <span>📷 QR Code 列印</span>
               </label>
             </div>
           </div>
@@ -3354,9 +3350,9 @@ function applyRoleUI(role){
   const attItem = $('menu-item-attendance-stat');
   if(attItem) attItem.style.display = (isAdmin || perms.includes('attendance-stat')) ? '' : 'none';
 
-  // QR Code 列印（幹部有授權才顯示，管理員走系統區塊）
+  // QR Code 列印（所有幹部皆可使用，管理員走系統區塊）
   const qrSec = $('sup-section-qrprint');
-  if(qrSec) qrSec.style.display = (!isAdmin && perms.includes('qr-print')) ? '' : 'none';
+  if(qrSec) qrSec.style.display = !isAdmin ? '' : 'none';
 
   // 幹部進入後預設顯示紀錄頁
   if(!isAdmin){
@@ -4202,9 +4198,9 @@ function showAdminMenu(){
     const fresh = getSupervisors().find(s=>s.empId===CURRENT_SUPERVISOR.empId);
     if(fresh) CURRENT_SUPERVISOR = fresh; // 刷新快照
     const perms = CURRENT_SUPERVISOR.permissions || [];
-    // QR Code 列印
+    // QR Code 列印（所有幹部皆可使用）
     const qrSec = $('sup-section-qrprint');
-    if(qrSec) qrSec.style.display = perms.includes('qr-print') ? '' : 'none';
+    if(qrSec) qrSec.style.display = '';
     // 月度報表
     const reportSec = $('admin-section-report');
     if(reportSec) reportSec.style.display = perms.includes('monthly-report') ? '' : 'none';
