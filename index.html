@@ -929,7 +929,7 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.1.5 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.1.8 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1050,6 +1050,62 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 
+<!-- ══ 代班打卡 Modal ══ -->
+<div id="sub-punch-modal" style="display:none;position:fixed;inset:0;z-index:450;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
+  <div class="modal-box" style="max-width:400px;width:100%">
+
+    <!-- Step 1：輸入 ID -->
+    <div id="sub-step-1">
+      <h2>👤 代班打卡</h2>
+      <p style="font-size:13px;color:var(--t2);margin-bottom:16px">輸入代班人的員工編號或身分證號碼</p>
+      <div class="mf" style="margin-bottom:14px">
+        <label>員工編號 / 身分證號碼</label>
+        <input id="sub-id-input" class="fi" type="text" placeholder="輸入後按查詢" style="width:100%;text-transform:uppercase"
+               onkeydown="if(event.key==='Enter') subLookupId()"/>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-s bs-accent" onclick="subLookupId()" style="flex:2;padding:11px">🔍 查詢</button>
+        <button class="btn-s bs-ghost" onclick="closeSubModal()" style="flex:1;padding:11px">取消</button>
+      </div>
+    </div>
+
+    <!-- Step 2A：找到員工（正職或舊臨時） -->
+    <div id="sub-step-2a" style="display:none">
+      <h2>👤 代班打卡</h2>
+      <div id="sub-found-info" style="background:var(--surface2);border-radius:12px;padding:12px 16px;margin-bottom:14px;border:.5px solid var(--border)">
+        <div id="sub-found-name" style="font-size:18px;font-weight:700;color:var(--t1)"></div>
+        <div id="sub-found-id"   style="font-size:12px;color:var(--t3);margin-top:3px"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <button onclick="doSubPunch('上班')" style="padding:14px;background:var(--success);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--font)">☀️ 上班</button>
+        <button onclick="doSubPunch('下班')" style="padding:14px;background:var(--accent);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--font)">🌙 下班</button>
+      </div>
+      <button class="btn-s bs-ghost" onclick="subBack()" style="width:100%;padding:10px">← 重新輸入</button>
+    </div>
+
+    <!-- Step 2B：找不到 → 新臨時員工 -->
+    <div id="sub-step-2b" style="display:none">
+      <h2>👤 代班打卡 <span style="font-size:12px;color:var(--t3);font-weight:400">非在冊人員</span></h2>
+      <div style="font-size:13px;color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--surface));border-radius:8px;padding:9px 12px;margin-bottom:14px">
+        查無此編號，請填寫基本資料後代班打卡
+      </div>
+      <div class="mf" style="margin-bottom:10px">
+        <label>姓名</label>
+        <input id="sub-new-name" class="fi" type="text" placeholder="代班人員姓名" style="width:100%"/>
+      </div>
+      <div class="mf" style="margin-bottom:10px">
+        <label>身分證號碼</label>
+        <input id="sub-new-idno" class="fi" type="text" placeholder="用於下班打卡識別" style="width:100%;text-transform:uppercase"/>
+      </div>
+      <div class="modal-actions">
+        <button onclick="doSubPunchNew()" style="flex:2;padding:12px;background:var(--success);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font)">☀️ 代班上班打卡</button>
+        <button class="btn-s bs-ghost" onclick="subBack()" style="flex:1;padding:11px">返回</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <!-- Nav -->
 <nav>
   <button id="globalBackBtn" onclick="goBack()"
@@ -1067,7 +1123,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.1.5 &nbsp;|&nbsp; 2026.06</div>
+  <div class="version-tag">v1.1.8 &nbsp;|&nbsp; 2026.06</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1152,6 +1208,9 @@ tr:hover td{background:var(--surface2)}
       <button class="change-btn" onclick="toggleDrawer()" id="change-btn">
         🔢 輸入員工編號
       </button>
+
+      <!-- 代班打卡 -->
+      <button onclick="openSubModal()" style="background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;font-family:var(--font);padding:4px 0;text-align:center;width:100%;font-weight:600">👤 代班打卡</button>
 
       <!-- 重新看說明 -->
       <button onclick="replayGuide()" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:var(--font);padding:4px 0;text-align:center;width:100%">❓ 不知道怎麼打卡？點這裡看說明</button>
@@ -1378,6 +1437,9 @@ tr:hover td{background:var(--surface2)}
       <div class="toolbar">
         <div class="toolbar-title">異常報表</div>
         <div class="toolbar-right">
+          <button class="btn-s bs-ghost" onclick="setAnomalyQuick('today')">今日</button>
+          <button class="btn-s bs-ghost" onclick="setAnomalyQuick('week')">本週</button>
+          <button class="btn-s bs-ghost" onclick="setAnomalyQuick('month')">本月</button>
           <input type="date" class="fi" id="an-date-from" placeholder="起始日期"/>
           <input type="date" class="fi" id="an-date-to"   placeholder="結束日期"/>
           <button class="btn-s bs-ghost"  onclick="loadAnomaly()">查詢</button>
@@ -1408,7 +1470,8 @@ tr:hover td{background:var(--surface2)}
             <option value="">📍 全部案場</option>
           </select>
           <button class="btn-s bs-ghost" onclick="loadAttendanceStat()">🔄 查詢</button>
-          <button class="btn-s bs-accent" onclick="exportStatCSV()">⬇ CSV</button>
+          <button class="btn-s bs-ghost" onclick="exportStatCSV()">⬇ CSV</button>
+          <button class="btn-s bs-accent" onclick="exportStatXLSX()">⬇ Excel</button>
           <button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button>
         </div>
       </div>
@@ -2776,6 +2839,117 @@ async function doPunch(type){
   }
 }
 
+// ══════════════════════════════════════
+//  代班打卡
+// ══════════════════════════════════════
+function getTempEmps(){ return JSON.parse(localStorage.getItem('temp_employees')||'[]'); }
+function saveTempEmps(d){ localStorage.setItem('temp_employees', JSON.stringify(d)); }
+
+let _subEmp = null; // 代班流程暫存員工資料
+
+function openSubModal(){
+  _subEmp = null;
+  $('sub-id-input').value='';
+  $('sub-step-1').style.display='';
+  $('sub-step-2a').style.display='none';
+  $('sub-step-2b').style.display='none';
+  $('sub-punch-modal').style.display='flex';
+  setTimeout(()=>$('sub-id-input').focus(),150);
+}
+function closeSubModal(){ $('sub-punch-modal').style.display='none'; }
+function subBack(){
+  $('sub-step-1').style.display='';
+  $('sub-step-2a').style.display='none';
+  $('sub-step-2b').style.display='none';
+  setTimeout(()=>$('sub-id-input').focus(),150);
+}
+
+function subLookupId(){
+  const input = ($('sub-id-input').value||'').trim().toUpperCase();
+  if(!input){ showToast('請輸入員工編號或身分證號碼','error'); return; }
+
+  // 1. 查正職員工（by empId）
+  const emp = employees.find(e=>e.id===input && !e.disabled);
+  if(emp){
+    _subEmp = {id:emp.id, name:emp.name, isTemp:false};
+    $('sub-found-name').textContent = emp.name;
+    $('sub-found-id').textContent   = `員工編號：${emp.id}`;
+    $('sub-for-input').value = '';
+    $('sub-step-1').style.display='none';
+    $('sub-step-2a').style.display='';
+    return;
+  }
+
+  // 2. 查臨時員工（by 身分證 hash）
+  const h = hashPwd(input);
+  const tempEmp = getTempEmps().find(e=>e.idHash===h);
+  if(tempEmp){
+    _subEmp = {id:tempEmp.id, name:tempEmp.name, isTemp:true, idHash:h};
+    $('sub-found-name').textContent = tempEmp.name;
+    $('sub-found-id').textContent   = `身分證後4碼：${tempEmp.idDisplay}　（臨時代班人員）`;
+    $('sub-for-input').value = '';
+    $('sub-step-1').style.display='none';
+    $('sub-step-2a').style.display='';
+    return;
+  }
+
+  // 3. 找不到 → 新臨時員工
+  $('sub-new-name').value='';
+  $('sub-new-idno').value='';
+  $('sub-step-1').style.display='none';
+  $('sub-step-2b').style.display='';
+  setTimeout(()=>$('sub-new-name').focus(),150);
+}
+
+function doSubPunch(type){
+  if(!_subEmp){ return; }
+  _saveSubPunchRec(_subEmp.id, _subEmp.name, type, null);
+  closeSubModal();
+  showToast(`✅ ${_subEmp.name} ${type}代班打卡成功`, 'success');
+  vibratePunch();
+}
+
+function doSubPunchNew(){
+  const name  = ($('sub-new-name').value||'').trim();
+  const idno  = ($('sub-new-idno').value||'').trim().toUpperCase();
+  if(!name){ showToast('請輸入姓名','error'); return; }
+  if(idno.length < 4){ showToast('請輸入完整身分證號碼','error'); return; }
+
+  const idHash    = hashPwd(idno);
+  const idDisplay = idno.slice(-4);
+  const tempId    = 'TMP_' + idHash.slice(0,8).toUpperCase();
+
+  // 存入臨時員工清單（下次直接查到）
+  const temps = getTempEmps();
+  if(!temps.find(e=>e.idHash===idHash)){
+    temps.push({id:tempId, name, idHash, idDisplay, createdAt:new Date().toISOString()});
+    saveTempEmps(temps);
+  }
+
+  _saveSubPunchRec(tempId, name, '上班', null);
+  closeSubModal();
+  const forTxt = subFor ? `（代替 ${subFor}）` : '';
+  showToast(`✅ ${name} 上班代班打卡成功 ${forTxt}`, 'success');
+  vibratePunch();
+}
+
+function _saveSubPunchRec(empId, name, type, substituteFor){
+  const n = new Date();
+  const dateStr = `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
+  const timeStr = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+  const rec = {
+    empId, name, type, date:dateStr, time:timeStr,
+    timestamp:n.toISOString(), synced:false, fbSynced:false,
+    siteId: CURRENT_SITE_ID||null,
+    isSubstitute: true,
+    substituteFor: substituteFor||null
+  };
+  localRecs.unshift(rec);
+  saveRecs();
+  uploadToFirebase(rec);
+  if(!IS_DEMO && SCRIPT_URL) uploadRec(rec);
+}
+
 // 上傳單筆紀錄到 Sheets
 async function uploadRec(rec){
   try{
@@ -3439,6 +3613,34 @@ function exportStatCSV(){
   a.click();
 }
 
+async function exportStatXLSX(){
+  const monthEl = $('stat-month');
+  const yearMonth = monthEl ? monthEl.value : today().slice(0,7);
+  const rows = [...($('stat-body')?.querySelectorAll('tr')||[])];
+  if(!rows.length || rows[0].querySelector('.empty-state')){
+    showToast('請先查詢後再匯出','error'); return;
+  }
+  if(typeof XLSX==='undefined'){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=res; s.onerror=rej; document.head.appendChild(s);
+    });
+  }
+  const headers=['員工編號','姓名','出勤天數','總工時(h)','平均每日工時','最早上班','最晚下班','未下班天數'];
+  const data=[headers];
+  rows.forEach(tr=>{
+    const cells=[...tr.querySelectorAll('td')].map(td=>td.innerText.trim());
+    if(cells.length===headers.length) data.push(cells);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:12},{wch:10},{wch:10},{wch:10},{wch:14},{wch:10},{wch:10},{wch:10}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'出勤統計');
+  XLSX.writeFile(wb,`出勤統計_${yearMonth}.xlsx`);
+  showToast('Excel 已下載 ✓','success');
+}
+
 // ══════════════════════════════════════
 //  Records
 // ══════════════════════════════════════
@@ -3574,10 +3776,11 @@ function loadRecords(){
     if(anomalySet.has(kdup)) anomaly='<span class="badge-anomaly">⚠ 重複</span>';
     else if(r.type==='上班'&&anomalySet.has(kmiss)) anomaly='<span class="badge-anomaly">⚠ 缺下班</span>';
     const manualTag = r.manual ? '<span style="font-size:11px;color:var(--t3);margin-left:4px">補登</span>' : '';
+    const subTag = r.isSubstitute ? `<span style="font-size:10px;background:color-mix(in srgb,var(--accent) 15%,var(--surface2));color:var(--accent);border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600">代班${r.substituteFor?'▸'+r.substituteFor:''}</span>` : '';
     const siteDisplay = r.siteId ? `<span style="font-size:11px;color:var(--t2);white-space:nowrap">${getSiteName(r.siteId)}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
     return`<tr${anomaly?' style="background:rgba(255,59,48,.04)"':''}>
       <td><span style="font-family:'SF Mono',monospace;font-size:14px">${r.empId}</span></td>
-      <td>${r.name||'–'}${manualTag}</td>
+      <td>${r.name||'–'}${manualTag}${subTag}</td>
       <td><span class="badge badge-${r.type==='上班'?'in':'out'}"><span class="badge-dot"></span>${r.type}</span>${anomaly}</td>
       <td>${r.date}</td>
       <td style="font-variant-numeric:tabular-nums">${r.time}</td>
@@ -4750,11 +4953,22 @@ function loadChart(){
 //  異常報表
 // ══════════════════════════════════════
 function initAnomaly(){
-  // 預設日期：本週
-  const now = new Date();
-  const mon = new Date(now); mon.setDate(now.getDate()-now.getDay()+1);
-  $('an-date-from').value = mon.toISOString().slice(0,10);
-  $('an-date-to').value   = now.toISOString().slice(0,10);
+  // 預設日期：今日
+  const td = today();
+  $('an-date-from').value = td;
+  $('an-date-to').value   = td;
+  loadAnomaly();
+}
+function setAnomalyQuick(mode){
+  const now = new Date(); const td = today();
+  if(mode==='today'){
+    $('an-date-from').value = td; $('an-date-to').value = td;
+  } else if(mode==='week'){
+    const mon = new Date(now); mon.setDate(now.getDate()-(now.getDay()||7)+1);
+    $('an-date-from').value = mon.toISOString().slice(0,10); $('an-date-to').value = td;
+  } else if(mode==='month'){
+    $('an-date-from').value = td.slice(0,7)+'-01'; $('an-date-to').value = td;
+  }
   loadAnomaly();
 }
 
@@ -4803,12 +5017,21 @@ function loadAnomaly(){
       });
     }
 
-    // 缺勤（在名單但當天完全沒打卡）
+    // 缺勤（近30天有打卡的員工，當天完全沒有紀錄）
     if(ds<=today()){
-      employees.filter(e=>!e.disabled).forEach(e=>{
-        const hasPunch = dayRecs.some(r=>r.empId===e.id);
+      // 計算近30天有打卡的員工 ID 集合（排除查詢日本身）
+      const cutoff = new Date(ds); cutoff.setDate(cutoff.getDate()-30);
+      const cutoffStr = cutoff.toISOString().slice(0,10);
+      const activeEmpIds = new Set(
+        localRecs.filter(r=>r.date>=cutoffStr && r.date<ds).map(r=>r.empId)
+      );
+      activeEmpIds.forEach(empId=>{
+        const hasPunch = dayRecs.some(r=>r.empId===empId);
         if(!hasPunch){
-          anomalies.push({name:e.name, empId:e.id, date:ds, type:'❌ 缺勤', desc:'當日無任何打卡紀錄', siteId:null});
+          const emp = findEmp(empId);
+          if(emp && !emp.disabled){
+            anomalies.push({name:emp.name, empId, date:ds, type:'❌ 缺勤', desc:'近30天有出勤，當日無打卡', siteId:null});
+          }
         }
       });
     }
