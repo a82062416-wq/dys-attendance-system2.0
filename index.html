@@ -929,7 +929,7 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.1.8 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.1.9 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1050,16 +1050,16 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 
-<!-- ══ 代班打卡 Modal ══ -->
+<!-- ══ 臨時人員打卡 Modal ══ -->
 <div id="sub-punch-modal" style="display:none;position:fixed;inset:0;z-index:450;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
   <div class="modal-box" style="max-width:400px;width:100%">
 
-    <!-- Step 1：輸入 ID -->
+    <!-- Step 1：輸入身分證（查是否曾打過卡） -->
     <div id="sub-step-1">
-      <h2>👤 代班打卡</h2>
-      <p style="font-size:13px;color:var(--t2);margin-bottom:16px">輸入代班人的員工編號或身分證號碼</p>
+      <h2>👤 臨時人員打卡</h2>
+      <p style="font-size:13px;color:var(--t2);margin-bottom:16px">請輸入身分證號碼</p>
       <div class="mf" style="margin-bottom:14px">
-        <label>員工編號 / 身分證號碼</label>
+        <label>身分證號碼</label>
         <input id="sub-id-input" class="fi" type="text" placeholder="輸入後按查詢" style="width:100%;text-transform:uppercase"
                onkeydown="if(event.key==='Enter') subLookupId()"/>
       </div>
@@ -1069,9 +1069,9 @@ tr:hover td{background:var(--surface2)}
       </div>
     </div>
 
-    <!-- Step 2A：找到員工（正職或舊臨時） -->
+    <!-- Step 2A：曾打卡過（臨時員工清單有紀錄）→ 直接上下班 -->
     <div id="sub-step-2a" style="display:none">
-      <h2>👤 代班打卡</h2>
+      <h2>👤 臨時人員打卡</h2>
       <div id="sub-found-info" style="background:var(--surface2);border-radius:12px;padding:12px 16px;margin-bottom:14px;border:.5px solid var(--border)">
         <div id="sub-found-name" style="font-size:18px;font-weight:700;color:var(--t1)"></div>
         <div id="sub-found-id"   style="font-size:12px;color:var(--t3);margin-top:3px"></div>
@@ -1083,22 +1083,16 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-s bs-ghost" onclick="subBack()" style="width:100%;padding:10px">← 重新輸入</button>
     </div>
 
-    <!-- Step 2B：找不到 → 新臨時員工 -->
+    <!-- Step 2B：第一次打卡 → 補填姓名 -->
     <div id="sub-step-2b" style="display:none">
-      <h2>👤 代班打卡 <span style="font-size:12px;color:var(--t3);font-weight:400">非在冊人員</span></h2>
-      <div style="font-size:13px;color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--surface));border-radius:8px;padding:9px 12px;margin-bottom:14px">
-        查無此編號，請填寫基本資料後代班打卡
-      </div>
+      <h2>👤 臨時人員打卡</h2>
+      <p style="font-size:13px;color:var(--t2);margin-bottom:14px">第一次打卡，請補填姓名</p>
       <div class="mf" style="margin-bottom:10px">
         <label>姓名</label>
-        <input id="sub-new-name" class="fi" type="text" placeholder="代班人員姓名" style="width:100%"/>
-      </div>
-      <div class="mf" style="margin-bottom:10px">
-        <label>身分證號碼</label>
-        <input id="sub-new-idno" class="fi" type="text" placeholder="用於下班打卡識別" style="width:100%;text-transform:uppercase"/>
+        <input id="sub-new-name" class="fi" type="text" placeholder="臨時人員姓名" style="width:100%"/>
       </div>
       <div class="modal-actions">
-        <button onclick="doSubPunchNew()" style="flex:2;padding:12px;background:var(--success);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font)">☀️ 代班上班打卡</button>
+        <button onclick="doSubPunchNew()" style="flex:2;padding:12px;background:var(--success);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font)">☀️ 上班打卡</button>
         <button class="btn-s bs-ghost" onclick="subBack()" style="flex:1;padding:11px">返回</button>
       </div>
     </div>
@@ -1123,7 +1117,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.1.8 &nbsp;|&nbsp; 2026.06</div>
+  <div class="version-tag">v1.1.9 &nbsp;|&nbsp; 2026.06</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1209,8 +1203,8 @@ tr:hover td{background:var(--surface2)}
         🔢 輸入員工編號
       </button>
 
-      <!-- 代班打卡 -->
-      <button onclick="openSubModal()" style="background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;font-family:var(--font);padding:4px 0;text-align:center;width:100%;font-weight:600">👤 代班打卡</button>
+      <!-- 臨時人員打卡 -->
+      <button onclick="openSubModal()" style="background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;font-family:var(--font);padding:4px 0;text-align:center;width:100%;font-weight:600">👤 臨時人員打卡</button>
 
       <!-- 重新看說明 -->
       <button onclick="replayGuide()" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:var(--font);padding:4px 0;text-align:center;width:100%">❓ 不知道怎麼打卡？點這裡看說明</button>
@@ -2866,36 +2860,24 @@ function subBack(){
 
 function subLookupId(){
   const input = ($('sub-id-input').value||'').trim().toUpperCase();
-  if(!input){ showToast('請輸入員工編號或身分證號碼','error'); return; }
+  if(!input){ showToast('請輸入身分證號碼','error'); return; }
 
-  // 1. 查正職員工（by empId）
-  const emp = employees.find(e=>e.id===input && !e.disabled);
-  if(emp){
-    _subEmp = {id:emp.id, name:emp.name, isTemp:false};
-    $('sub-found-name').textContent = emp.name;
-    $('sub-found-id').textContent   = `員工編號：${emp.id}`;
-    $('sub-for-input').value = '';
-    $('sub-step-1').style.display='none';
-    $('sub-step-2a').style.display='';
-    return;
-  }
-
-  // 2. 查臨時員工（by 身分證 hash）
+  // 查臨時員工清單（by 身分證 hash）
   const h = hashPwd(input);
   const tempEmp = getTempEmps().find(e=>e.idHash===h);
   if(tempEmp){
-    _subEmp = {id:tempEmp.id, name:tempEmp.name, isTemp:true, idHash:h};
+    // 曾打過卡 → 直接顯示姓名，可上班或下班
+    _subEmp = {id:tempEmp.id, name:tempEmp.name, idHash:h};
     $('sub-found-name').textContent = tempEmp.name;
-    $('sub-found-id').textContent   = `身分證後4碼：${tempEmp.idDisplay}　（臨時代班人員）`;
-    $('sub-for-input').value = '';
+    $('sub-found-id').textContent   = `身分證後4碼：${tempEmp.idDisplay}`;
     $('sub-step-1').style.display='none';
     $('sub-step-2a').style.display='';
     return;
   }
 
-  // 3. 找不到 → 新臨時員工
+  // 第一次 → 請補填姓名
+  _subEmp = {idHash: h, idDisplay: input.slice(-4), tempId: 'TMP_' + h.slice(0,8).toUpperCase()};
   $('sub-new-name').value='';
-  $('sub-new-idno').value='';
   $('sub-step-1').style.display='none';
   $('sub-step-2b').style.display='';
   setTimeout(()=>$('sub-new-name').focus(),150);
@@ -2903,37 +2885,30 @@ function subLookupId(){
 
 function doSubPunch(type){
   if(!_subEmp){ return; }
-  _saveSubPunchRec(_subEmp.id, _subEmp.name, type, null);
+  _saveSubPunchRec(_subEmp.id, _subEmp.name, type);
   closeSubModal();
-  showToast(`✅ ${_subEmp.name} ${type}代班打卡成功`, 'success');
+  showToast(`✅ ${_subEmp.name} ${type}打卡成功`, 'success');
   vibratePunch();
 }
 
 function doSubPunchNew(){
-  const name  = ($('sub-new-name').value||'').trim();
-  const idno  = ($('sub-new-idno').value||'').trim().toUpperCase();
+  const name = ($('sub-new-name').value||'').trim();
   if(!name){ showToast('請輸入姓名','error'); return; }
-  if(idno.length < 4){ showToast('請輸入完整身分證號碼','error'); return; }
 
-  const idHash    = hashPwd(idno);
-  const idDisplay = idno.slice(-4);
-  const tempId    = 'TMP_' + idHash.slice(0,8).toUpperCase();
-
-  // 存入臨時員工清單（下次直接查到）
+  // 存入臨時員工清單
   const temps = getTempEmps();
-  if(!temps.find(e=>e.idHash===idHash)){
-    temps.push({id:tempId, name, idHash, idDisplay, createdAt:new Date().toISOString()});
+  if(!temps.find(e=>e.idHash===_subEmp.idHash)){
+    temps.push({id:_subEmp.tempId, name, idHash:_subEmp.idHash, idDisplay:_subEmp.idDisplay, createdAt:new Date().toISOString()});
     saveTempEmps(temps);
   }
 
-  _saveSubPunchRec(tempId, name, '上班', null);
+  _saveSubPunchRec(_subEmp.tempId, name, '上班');
   closeSubModal();
-  const forTxt = subFor ? `（代替 ${subFor}）` : '';
-  showToast(`✅ ${name} 上班代班打卡成功 ${forTxt}`, 'success');
+  showToast(`✅ ${name} 上班打卡成功`, 'success');
   vibratePunch();
 }
 
-function _saveSubPunchRec(empId, name, type, substituteFor){
+function _saveSubPunchRec(empId, name, type){
   const n = new Date();
   const dateStr = `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
   const timeStr = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
@@ -2941,8 +2916,7 @@ function _saveSubPunchRec(empId, name, type, substituteFor){
     empId, name, type, date:dateStr, time:timeStr,
     timestamp:n.toISOString(), synced:false, fbSynced:false,
     siteId: CURRENT_SITE_ID||null,
-    isSubstitute: true,
-    substituteFor: substituteFor||null
+    isSubstitute: true
   };
   localRecs.unshift(rec);
   saveRecs();
@@ -3776,7 +3750,7 @@ function loadRecords(){
     if(anomalySet.has(kdup)) anomaly='<span class="badge-anomaly">⚠ 重複</span>';
     else if(r.type==='上班'&&anomalySet.has(kmiss)) anomaly='<span class="badge-anomaly">⚠ 缺下班</span>';
     const manualTag = r.manual ? '<span style="font-size:11px;color:var(--t3);margin-left:4px">補登</span>' : '';
-    const subTag = r.isSubstitute ? `<span style="font-size:10px;background:color-mix(in srgb,var(--accent) 15%,var(--surface2));color:var(--accent);border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600">代班${r.substituteFor?'▸'+r.substituteFor:''}</span>` : '';
+    const subTag = r.isSubstitute ? `<span style="font-size:10px;background:color-mix(in srgb,var(--accent) 15%,var(--surface2));color:var(--accent);border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600">臨時</span>` : '';
     const siteDisplay = r.siteId ? `<span style="font-size:11px;color:var(--t2);white-space:nowrap">${getSiteName(r.siteId)}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
     return`<tr${anomaly?' style="background:rgba(255,59,48,.04)"':''}>
       <td><span style="font-family:'SF Mono',monospace;font-size:14px">${r.empId}</span></td>
