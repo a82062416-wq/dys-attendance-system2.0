@@ -929,7 +929,7 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.2.3 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.2.4 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1117,7 +1117,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.2.3 &nbsp;|&nbsp; 2026.06</div>
+  <div class="version-tag">v1.2.4 &nbsp;|&nbsp; 2026.06</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1637,10 +1637,16 @@ tr:hover td{background:var(--surface2)}
       <div style="background:var(--surface);border-radius:var(--r);border:.5px solid var(--border);padding:16px;box-shadow:var(--sh1);max-width:560px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div style="font-size:15px;font-weight:600;color:var(--t1)">幹部名單</div>
-          <button onclick="openSupModal(null)"
-            style="background:var(--accent);color:#fff;border:none;border-radius:50px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">
-            ＋ 新增幹部
-          </button>
+          <div style="display:flex;gap:8px">
+            <button onclick="resetDefaultSupervisors()"
+              style="background:var(--surface2);color:var(--t2);border:none;border-radius:50px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">
+              🔄 還原預設
+            </button>
+            <button onclick="openSupModal(null)"
+              style="background:var(--accent);color:#fff;border:none;border-radius:50px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">
+              ＋ 新增幹部
+            </button>
+          </div>
         </div>
         <div id="sup-card-list"></div>
       </div>
@@ -2059,10 +2065,15 @@ function getSites(activeOnly=false){
 function saveSites(d){localStorage.setItem('sites',JSON.stringify(d))}
 function getSupervisors(){
   const raw = localStorage.getItem('supervisors');
-  if(!raw) return JSON.parse(JSON.stringify(_DEFAULT_SUPERVISORS));
-  const parsed = JSON.parse(raw);
-  // 若本地是空陣列（例如 Firebase 覆蓋錯誤），回退預設名單
-  return (Array.isArray(parsed) && parsed.length > 0) ? parsed : JSON.parse(JSON.stringify(_DEFAULT_SUPERVISORS));
+  const parsed = raw ? JSON.parse(raw) : null;
+  if(!parsed || !Array.isArray(parsed) || parsed.length === 0){
+    // 本地無資料或空陣列 → 還原預設，並同步寫回 localStorage 與 Firebase
+    const defaults = JSON.parse(JSON.stringify(_DEFAULT_SUPERVISORS));
+    localStorage.setItem('supervisors', JSON.stringify(defaults));
+    if(FB_DB) FB_DB.ref('config/supervisors').set(defaults).catch(()=>{});
+    return defaults;
+  }
+  return parsed;
 }
 function saveSupervisors(d){
   localStorage.setItem('supervisors', JSON.stringify(d));
@@ -4290,6 +4301,14 @@ function showSub(name,el){
 }
 // ══════════════════════════════════════
 //  幹部管理（管理員後台）
+function resetDefaultSupervisors(){
+  if(!confirm('確定還原為預設幹部名單？現有資料將被覆蓋。')) return;
+  const defaults = JSON.parse(JSON.stringify(_DEFAULT_SUPERVISORS));
+  saveSupervisors(defaults);
+  loadSupPage();
+  showToast('✅ 已還原預設幹部名單','success');
+}
+
 // ══════════════════════════════════════
 function loadSupPage(){
   const sups = getSupervisors();
