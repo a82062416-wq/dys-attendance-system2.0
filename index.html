@@ -929,7 +929,7 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.2.0 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.2.2 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1117,7 +1117,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.2.0 &nbsp;|&nbsp; 2026.06</div>
+  <div class="version-tag">v1.2.2 &nbsp;|&nbsp; 2026.06</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -2057,7 +2057,13 @@ function getSites(activeOnly=false){
   return activeOnly ? s.filter(x=>x.active!==false) : s;
 }
 function saveSites(d){localStorage.setItem('sites',JSON.stringify(d))}
-function getSupervisors(){return JSON.parse(localStorage.getItem('supervisors')||JSON.stringify(_DEFAULT_SUPERVISORS))}
+function getSupervisors(){
+  const raw = localStorage.getItem('supervisors');
+  if(!raw) return JSON.parse(JSON.stringify(_DEFAULT_SUPERVISORS));
+  const parsed = JSON.parse(raw);
+  // 若本地是空陣列（例如 Firebase 覆蓋錯誤），回退預設名單
+  return (Array.isArray(parsed) && parsed.length > 0) ? parsed : JSON.parse(JSON.stringify(_DEFAULT_SUPERVISORS));
+}
 function saveSupervisors(d){
   localStorage.setItem('supervisors', JSON.stringify(d));
   // 同步至 Firebase，讓所有裝置都能讀到最新幹部設定
@@ -2073,7 +2079,8 @@ async function syncSupervisorsFromFirebase(){
   try{
     const snap = await FB_DB.ref('config/supervisors').once('value');
     const data = snap.val();
-    if(data && Array.isArray(data)){
+    // 只在 Firebase 有實際資料時才覆蓋（防止空陣列清空本地幹部名單）
+    if(data && Array.isArray(data) && data.length > 0){
       localStorage.setItem('supervisors', JSON.stringify(data));
     }
   }catch(e){
@@ -2096,7 +2103,7 @@ function regenerateSiteToken(siteId){
 function getSiteById(id){return getSites().find(s=>s.id===id)||null}
 // ── 員工資料防重合併機制 ───────────────────────
 // DB_VERSION：員工名單有大幅異動時提高版號，強制所有裝置同步預設資料
-const DB_VERSION = '2.2';
+const DB_VERSION = '2.3';
 
 function mergeEmployees(newData) {
   // 以員工編號為唯一鍵，補入不存在的員工，不覆蓋已有資料
@@ -2114,11 +2121,11 @@ function initEmployees() {
   if(savedVer !== DB_VERSION) {
     // 首次載入或版本更新：把預設員工補入（不蓋掉已有資料）
     mergeEmployees(_DEFAULT_EMPLOYEES);
-    // 重置所有自動停用員工（manualDisabled=手動停用的不動）
+    // 版本升級時全部員工強制啟用（清除所有停用狀態）
     const emps = JSON.parse(localStorage.getItem('employees') || '[]');
     let changed = false;
     emps.forEach(e => {
-      if(e.autoDisabled){ e.disabled = false; e.autoDisabled = false; changed = true; }
+      if(e.disabled){ e.disabled = false; e.autoDisabled = false; changed = true; }
     });
     if(changed) localStorage.setItem('employees', JSON.stringify(emps));
     localStorage.setItem('db_version', DB_VERSION);
