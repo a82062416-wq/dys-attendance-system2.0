@@ -929,7 +929,7 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.2.2 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.2.3 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1117,7 +1117,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.2.2 &nbsp;|&nbsp; 2026.06</div>
+  <div class="version-tag">v1.2.3 &nbsp;|&nbsp; 2026.06</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1374,8 +1374,8 @@ tr:hover td{background:var(--surface2)}
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>員工編號</th><th>姓名</th><th>類型</th><th>日期</th><th>時間</th><th>案場</th><th>同步</th></tr></thead>
-          <tbody id="records-body"><tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div><p>尚無打卡紀錄</p></div></td></tr></tbody>
+          <thead><tr><th>員工編號</th><th>姓名</th><th>類型</th><th>日期</th><th>時間</th><th>案場</th><th>IP</th><th>同步</th></tr></thead>
+          <tbody id="records-body"><tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div><p>尚無打卡紀錄</p></div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -2800,6 +2800,18 @@ function updateLastPunch(){
   $('tc-last').className='tc-last show';
   $('tc-last-val').textContent = `${rec.type} ${rec.date} ${rec.time}`;
 }
+// 取得裝置公開 IP（背景執行，失敗不影響打卡）
+async function fetchClientIP(){
+  try{
+    const res = await Promise.race([
+      fetch('https://api.ipify.org?format=json'),
+      new Promise((_,rej)=>setTimeout(()=>rej('timeout'),3000))
+    ]);
+    const data = await res.json();
+    return data.ip || null;
+  }catch(e){ return null; }
+}
+
 async function doPunch(type){
   const id = localStorage.getItem('last_emp_id')||currentId.trim();
   if(!id){showToast('請先輸入員工編號','error');openDrawer();return}
@@ -2819,8 +2831,11 @@ async function doPunch(type){
   const dup=localRecs.some(r=>r.empId===id&&r.type===type&&r.date===dateStr);
   if(dup) showToast(`⚠️ ${name} 今天已有${type}紀錄，仍繼續打卡`,'warn');
 
+  // 背景取得 IP（不等待，打卡完成後補寫）
+  const clientIp = await fetchClientIP();
+
   // 先存本地，標記待同步
-  const rec={empId:id,name,type,date:dateStr,time:timeStr,timestamp:n.toISOString(),synced:false,fbSynced:false,siteId:CURRENT_SITE_ID||null};
+  const rec={empId:id,name,type,date:dateStr,time:timeStr,timestamp:n.toISOString(),synced:false,fbSynced:false,siteId:CURRENT_SITE_ID||null,ip:clientIp||null};
   localRecs.unshift(rec); saveRecs();
   uploadToFirebase(rec); // 同步至雲端
   pruneOldRecs(); // 滾動式清理（員工60天 / 管理後台30天）
@@ -2911,15 +2926,17 @@ function doSubPunchNew(){
   vibratePunch();
 }
 
-function _saveSubPunchRec(empId, name, type){
+async function _saveSubPunchRec(empId, name, type){
   const n = new Date();
   const dateStr = `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
   const timeStr = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+  const clientIp = await fetchClientIP();
   const rec = {
     empId, name, type, date:dateStr, time:timeStr,
     timestamp:n.toISOString(), synced:false, fbSynced:false,
     siteId: CURRENT_SITE_ID||null,
-    isSubstitute: true
+    isSubstitute: true,
+    ip: clientIp||null
   };
   localRecs.unshift(rec);
   saveRecs();
@@ -3755,6 +3772,7 @@ function loadRecords(){
     const manualTag = r.manual ? '<span style="font-size:11px;color:var(--t3);margin-left:4px">補登</span>' : '';
     const subTag = r.isSubstitute ? `<span style="font-size:10px;background:color-mix(in srgb,var(--accent) 15%,var(--surface2));color:var(--accent);border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600">臨時</span>` : '';
     const siteDisplay = r.siteId ? `<span style="font-size:11px;color:var(--t2);white-space:nowrap">${getSiteName(r.siteId)}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
+    const ipDisplay = r.ip ? `<span style="font-family:'SF Mono',monospace;font-size:11px;color:var(--t3)" title="${r.ip}">${r.ip}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
     return`<tr${anomaly?' style="background:rgba(255,59,48,.04)"':''}>
       <td><span style="font-family:'SF Mono',monospace;font-size:14px">${r.empId}</span></td>
       <td>${r.name||'–'}${manualTag}${subTag}</td>
@@ -3762,6 +3780,7 @@ function loadRecords(){
       <td>${r.date}</td>
       <td style="font-variant-numeric:tabular-nums">${r.time}</td>
       <td>${siteDisplay}</td>
+      <td>${ipDisplay}</td>
       <td>${syncBadge}</td>
     </tr>`}).join('');
 }
