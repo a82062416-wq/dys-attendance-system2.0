@@ -942,7 +942,7 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.2.4 &nbsp;·&nbsp; 2026.06 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.2.6 &nbsp;·&nbsp; 2026.07 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1130,7 +1130,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.2.4 &nbsp;|&nbsp; 2026.06</div>
+  <div class="version-tag">v1.2.6 &nbsp;|&nbsp; 2026.07</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1591,6 +1591,10 @@ tr:hover td{background:var(--surface2)}
             <input type="file" accept=".csv,.xlsx,.xls" id="csv-import" style="display:none" onchange="importEmpFile(this)"/>
           </label>
           <button class="btn-s bs-ghost" onclick="togglePasteImport()">📋 貼上匯入</button>
+          <label class="btn-s bs-ghost" style="cursor:pointer;display:inline-flex;align-items:center">
+            📇 匯入HR名冊
+            <input type="file" accept=".xlsx,.xls" id="hr-roster-import" style="display:none" onchange="importHRRoster(this)"/>
+          </label>
           <button class="btn-s bs-ghost"  id="btn-sync" onclick="syncFromSheets()">☁️ Sheets 同步</button>
           <button class="btn-s bs-accent" onclick="exportEmpCSV()">⬇ 匯出</button>
         </div>
@@ -2156,6 +2160,25 @@ function initEmployees() {
   }
 }
 initEmployees();
+
+// ── 從 Firebase 同步員工名單（每次開啟自動補入新員工）──────────────
+async function syncEmployeesFromFirebase(){
+  if(!FB_DB) return;
+  try{
+    const snap = await FB_DB.ref('employees').once('value');
+    const data = snap.val();
+    if(!data || typeof data !== 'object') return;
+    const fbEmps = Object.values(data).filter(e=>e&&e.id&&e.name);
+    if(fbEmps.length === 0) return;
+    const result = mergeEmployees(fbEmps);
+    if(result.added > 0){
+      employees = JSON.parse(localStorage.getItem('employees') || '[]');
+      console.log(`✅ 從 Firebase 同步 ${result.added} 位新員工`);
+    }
+  }catch(e){ console.warn('員工 Firebase 同步失敗:', e); }
+}
+// 頁面載入後背景執行（不阻擋畫面）
+setTimeout(syncEmployeesFromFirebase, 2000);
 
 let employees = JSON.parse(localStorage.getItem('employees') || JSON.stringify(_DEFAULT_EMPLOYEES));
 let localRecs = JSON.parse(localStorage.getItem('local_records')||'[]');
@@ -2840,6 +2863,14 @@ async function doPunch(type){
   const id = localStorage.getItem('last_emp_id')||currentId.trim();
   if(!id){showToast('請先輸入員工編號','error');openDrawer();return}
 
+  // ── QR Code 強制掃碼機制 ──
+  // 有案場設定時，必須從案場 QR Code 掃碼進入才能打卡，防止直接輸入 ID 代打
+  const _activeSites = getSites(true);
+  if(!CURRENT_SITE_ID && !IS_DEMO && _activeSites.length > 0){
+    showToast('請先掃描案場 QR Code 才能打卡','error');
+    return;
+  }
+
   if(employees.length>0){
     const emp=findEmp(id);
     if(!emp){showToast('查無此員工編號','error');return}
@@ -2866,6 +2897,7 @@ async function doPunch(type){
   $('btn-in').disabled=$('btn-out').disabled=true;
   vibratePunch();
   showSuccess(name,type,timeStr,type==='上班');
+  CURRENT_SITE_ID = null; // 打卡完成後清除，下次打卡需重新掃描 QR Code
   if(emp) setTimeout(()=>setEmpDisplay(emp),3100);
   setTimeout(()=>{ $('btn-in').disabled=$('btn-out').disabled=false; },2000);
 
@@ -4042,6 +4074,116 @@ function _applyEmpImport(emps){
   employees=JSON.parse(localStorage.getItem('employees')||'[]');
   renderEmpList();
   showToast(`✓ 成功匯入 ${emps.length} 筆員工資料`,'success');
+}
+
+// ── HR 員工資料一覽表匯入（「員工編號/員工/據點編號/服務據點/離職日」格式）──
+function importHRRoster(input){
+  const file=input.files[0];
+  if(!file){return}
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext!=='xlsx'&&ext!=='xls'){showToast('請上傳 .xlsx 或 .xls 格式','error');input.value='';return}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const buf=e.target.result;
+    if(typeof XLSX==='undefined'){
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=()=>_parseHRRoster(buf);
+      s.onerror=()=>showToast('載入 Excel 解析器失敗','error');
+      document.head.appendChild(s);
+    } else {
+      _parseHRRoster(buf);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value='';
+}
+function _parseHRRoster(buf){
+  try{
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    // 名冊上方有標題列，實際表頭是含「員工編號」的那一列
+    const headerRowIdx=rows.findIndex(r=>r.some(c=>String(c).trim()==='員工編號'));
+    if(headerRowIdx<0){showToast('找不到「員工編號」欄位，格式不符','error');return}
+    const header=rows[headerRowIdx].map(h=>String(h).trim());
+    const idIdx=header.indexOf('員工編號');
+    const nameIdx=header.indexOf('員工');
+    const siteNameIdx=header.indexOf('服務據點');
+    const resignIdx=header.indexOf('離職日');
+
+    // 用案場「名稱」比對回系統既有的案場代碼（HR 名冊代碼格式跟系統不同，例如 A004 vs A04）
+    const sites=getSites();
+    const nameToSiteId=new Map(sites.map(s=>[String(s.name).trim(), s.id]));
+
+    // 第一輪：只掃描收集名冊裡出現、但系統還沒有的案場名稱
+    const missingSiteNames=new Set();
+    let resignedSkipped=0;
+    rows.slice(headerRowIdx+1).forEach(r=>{
+      const id=String(r[idIdx]||'').trim();
+      const name=String(r[nameIdx]||'').trim();
+      if(!id||!name) return;
+      if(resignIdx>=0 && String(r[resignIdx]||'').trim()){ resignedSkipped++; return }
+      const siteName=siteNameIdx>=0 ? String(r[siteNameIdx]||'').trim() : '';
+      if(siteName && !nameToSiteId.has(siteName)) missingSiteNames.add(siteName);
+    });
+
+    // 自動補建缺失案場：用全新的 C 類編號，不影響現有 A/B 類編碼
+    let createdSites=0;
+    if(missingSiteNames.size){
+      const existingC=sites.filter(s=>/^C\d+$/.test(s.id)).map(s=>parseInt(s.id.slice(1)));
+      let nextNum=existingC.length ? Math.max(...existingC)+1 : 1;
+      missingSiteNames.forEach(name=>{
+        const newId='C'+String(nextNum).padStart(3,'0');
+        nextNum++;
+        sites.push({id:newId, name, type:'C', active:true});
+        nameToSiteId.set(name, newId);
+        createdSites++;
+      });
+      saveSites(sites);
+    }
+
+    // 第二輪：正式解析員工，這時案場已經補齊，全部應該都對得起來
+    const emps=[];
+    rows.slice(headerRowIdx+1).forEach(r=>{
+      const id=String(r[idIdx]||'').trim();
+      const name=String(r[nameIdx]||'').trim();
+      if(!id||!name) return;
+      if(resignIdx>=0 && String(r[resignIdx]||'').trim()) return;
+
+      const emp={id,name};
+      const siteName=siteNameIdx>=0 ? String(r[siteNameIdx]||'').trim() : '';
+      if(siteName){
+        const siteId=nameToSiteId.get(siteName);
+        if(siteId) emp.siteId=siteId;
+      }
+      emps.push(emp);
+    });
+
+    if(!emps.length){showToast('沒有解析到有效員工資料，請確認格式','error');return}
+
+    const result=mergeEmployees(emps);
+
+    // 安全補值：既有員工「目前完全沒有案場標記」的才補上，已有標記的絕不覆蓋
+    const empSiteMap=new Map(emps.filter(e=>e.siteId).map(e=>[e.id,e.siteId]));
+    const currentEmps=JSON.parse(localStorage.getItem('employees')||'[]');
+    let backfilled=0;
+    currentEmps.forEach(e=>{
+      if(!e.siteId && empSiteMap.has(e.id)){ e.siteId=empSiteMap.get(e.id); backfilled++; }
+    });
+    if(backfilled) localStorage.setItem('employees', JSON.stringify(currentEmps));
+
+    employees=JSON.parse(localStorage.getItem('employees')||'[]');
+    renderEmpList();
+    if(typeof renderQrList==='function') renderQrList();
+
+    showToast(`✓ HR名冊匯入完成：新增 ${result.added} 位員工、補上 ${backfilled} 位既有員工的案場標記（略過 ${resignedSkipped} 位離職）`,'success');
+    if(createdSites){
+      showToast(`📍 自動補建 ${createdSites} 個新案場（C類），QR Code 已產生，記得列印張貼到現場`,'success');
+    }
+  }catch(err){
+    showToast('HR名冊解析失敗：'+err.message,'error');
+  }
 }
 
 // ── 貼上匯入 ──
@@ -5583,6 +5725,8 @@ restoreLastEmp();
     return;
   }
   CURRENT_SITE_ID = siteId;
+  // 立即移除 URL 參數，防止使用者收藏或重新整理後繞過掃碼機制
+  history.replaceState({}, '', location.pathname);
   const site = getSiteById(siteId);
   const siteName = site ? site.name : siteId;
   window.addEventListener('load',()=>{
