@@ -2180,6 +2180,27 @@ async function syncEmployeesFromFirebase(){
 // 頁面載入後背景執行（不阻擋畫面）
 setTimeout(syncEmployeesFromFirebase, 2000);
 
+// ── 從 Firebase 同步案場清單（每次開啟自動補入新案場，僅新增不覆蓋）──────
+async function syncSitesFromFirebase(){
+  if(!FB_DB) return;
+  try{
+    const snap = await FB_DB.ref('sites').once('value');
+    const data = snap.val();
+    if(!data || typeof data !== 'object') return;
+    const fbSites = Object.values(data).filter(s=>s&&s.id&&s.name);
+    if(fbSites.length === 0) return;
+    const existing = getSites();
+    const map = new Map(existing.map(s=>[s.id, s]));
+    let added = 0;
+    fbSites.forEach(s=>{ if(!map.has(s.id)){ map.set(s.id, s); added++; } });
+    if(added > 0){
+      saveSites(Array.from(map.values()));
+      console.log(`✅ 從 Firebase 同步 ${added} 個新案場`);
+    }
+  }catch(e){ console.warn('案場 Firebase 同步失敗:', e); }
+}
+setTimeout(syncSitesFromFirebase, 2000);
+
 let employees = JSON.parse(localStorage.getItem('employees') || JSON.stringify(_DEFAULT_EMPLOYEES));
 let localRecs = JSON.parse(localStorage.getItem('local_records')||'[]');
 
