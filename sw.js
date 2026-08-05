@@ -4,7 +4,7 @@
 //  日後更新 index.html 推上 GitHub 即自動生效
 // ══════════════════════════════════════════════
 
-const CACHE_NAME = 'attendance-v1.2.4';
+const CACHE_NAME = 'attendance-v1.2.6';
 
 self.addEventListener('install', event => {
   event.waitUntil(
