@@ -27,6 +27,7 @@
 <!-- Firebase Realtime Database (compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script>
   // 註冊 Service Worker
   if ('serviceWorker' in navigator) {
@@ -1926,6 +1927,13 @@ function initFirebase(){
     FB_DB  = firebase.database();
     startTodayListener();
     console.log('Firebase 初始化成功 ✓');
+    // 匿名登入：為之後鎖資料庫規則（僅限已登入使用者）預備。
+    // 尚未在 Firebase 後台開啟「匿名登入」前，這段會靜默失敗，不影響現有任何功能。
+    if(firebase.auth){
+      firebase.auth().signInAnonymously()
+        .then(()=>console.log('Firebase 匿名登入成功 ✓'))
+        .catch(e=>console.warn('Firebase 匿名登入尚未啟用（不影響現有功能）:', e.code));
+    }
   }catch(e){ console.warn('Firebase 初始化失敗:', e); }
 }
 let CURRENT_ROLE = 'admin'; // 'admin' | 'supervisor'
