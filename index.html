@@ -986,6 +986,7 @@ tr:hover td{background:var(--surface2)}
     <div class="so-type"  id="so-type"></div>
     <div class="so-time"  id="so-time"></div>
     <div class="so-reminder" id="so-reminder"></div>
+    <div id="so-offline-badge" style="display:none;background:rgba(255,159,10,.25);border:1.5px solid rgba(255,255,255,.5);border-radius:12px;padding:8px 16px;font-size:14px;font-weight:600;color:#fff;text-align:center;margin-top:4px">📡 離線中，稍後會自動同步</div>
     <div class="so-hint">點擊任意處關閉</div>
   </div>
 </div>
@@ -1164,9 +1165,10 @@ tr:hover td{background:var(--surface2)}
         var saved  = localStorage.getItem('site_announcement') || '打卡系統正式上線，有問題請聯絡主管';
         var level  = localStorage.getItem('site_announcement_level') || 'normal';
         var icon   = level==='urgent' ? '🚨' : level==='important' ? '⚠️' : '📢';
+        var escSaved = String(saved).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
         if(level==='important') bar.classList.add('level-important');
         if(level==='urgent')    bar.classList.add('level-urgent');
-        bar.innerHTML = '<span class="announce-text">'+icon+' 系統公告：'+saved+'</span>'
+        bar.innerHTML = '<span class="announce-text">'+icon+' 系統公告：'+escSaved+'</span>'
           + '<span class="announce-dismiss" onclick="dismissAnnouncement()" title="今日不再顯示">✕</span>';
       })();
     </script>
@@ -1562,6 +1564,11 @@ tr:hover td{background:var(--surface2)}
           <div class="stat-card"><div class="stat-val" id="mr-anomaly-count">–</div><div class="stat-lbl">異常筆數</div></div>
           <div class="stat-card"><div class="stat-val" id="mr-crossday-count">–</div><div class="stat-lbl">跨日班次</div></div>
         </div>
+        <!-- 員工搜尋 -->
+        <div style="margin-top:10px">
+          <input type="text" id="mr-emp-search" placeholder="🔍 搜尋員工姓名/編號" oninput="mrFilterEmp()"
+            style="width:100%;padding:9px 12px;border-radius:10px;border:.5px solid var(--border);background:var(--surface2);color:var(--t1);font-size:13px;font-family:var(--font)"/>
+        </div>
         <!-- 預覽表格 -->
         <div class="table-wrap" style="margin-top:10px;overflow-x:auto">
           <table id="monthly-preview-table" style="min-width:900px;font-size:11px">
@@ -1903,6 +1910,10 @@ tr:hover td{background:var(--surface2)}
 // ══════════════════════════════════════
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2,'0');
+function escapeHtml(str){
+  if(str===null || str===undefined) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 let SCRIPT_URL='', IS_DEMO=false, COMPANY='DYS 大洋保全', ADMIN_UNLOCKED=false;
 
@@ -2216,18 +2227,36 @@ const COLORS=['#007aff','#34c759','#ff9f0a','#af52de','#ff6b35','#5ac8fa','#ff3b
 function avatarColor(id){let h=0x811c9dc5;for(const c of id){h^=c.charCodeAt(0);h=(h*0x01000193)>>>0}return COLORS[h%COLORS.length]}
 function initials(name){return name?name.slice(-2):'?'}
 
+/** 管理員操作審計日誌：寫入 Firebase config/auth/admin_pwd_hash等，不做查看介面（僅供事後查資料庫用） */
+function getAuditActor(){
+  return CURRENT_SUPERVISOR ? `${CURRENT_SUPERVISOR.name}（${CURRENT_SUPERVISOR.empId}）` : '管理員';
+}
+function logAudit(action, detail){
+  if(!FB_DB) return;
+  try{
+    FB_DB.ref('auditLog').push({
+      action, detail: detail||'',
+      actor: getAuditActor(),
+      timestamp: Date.now(),
+      dateStr: today()
+    }).catch(e=>console.warn('審計日誌寫入失敗:', e));
+  }catch(e){ console.warn('審計日誌寫入失敗:', e); }
+}
+
 function hashPwd(s){let h=0x811c9dc5;for(const c of s){h^=c.charCodeAt(0);h=(h*0x01000193)>>>0}return h.toString(16)}
 function getPwdHash(){return localStorage.getItem('admin_pwd_hash')||''}
 function setPwdHash(p){
   const h=hashPwd(p);
   localStorage.setItem('admin_pwd_hash',h);
   if(FB_DB) FB_DB.ref('config/auth/admin_pwd_hash').set(h).catch(e=>console.warn('管理密碼同步失敗:',e));
+  logAudit('change_admin_password', '管理員密碼已變更');
 }
 function getSupPwdHash(){return localStorage.getItem('supervisor_pwd_hash')||''}
 function setSupPwdHash(p){
   const h=hashPwd(p);
   localStorage.setItem('supervisor_pwd_hash',h);
   if(FB_DB) FB_DB.ref('config/auth/supervisor_pwd_hash').set(h).catch(e=>console.warn('幹部密碼同步失敗:',e));
+  logAudit('change_supervisor_password', '幹部登入密碼已變更');
 }
 async function syncAuthFromFirebase(){
   if(!FB_DB) return;
@@ -2915,24 +2944,30 @@ async function doPunch(type){
   const dup=localRecs.some(r=>r.empId===id&&r.type===type&&r.date===dateStr);
   if(dup) showToast(`⚠️ ${name} 今天已有${type}紀錄，仍繼續打卡`,'warn');
 
-  // 背景取得 IP（不等待，打卡完成後補寫）
-  const clientIp = await fetchClientIP();
+  try{
+    // 背景取得 IP（不等待，打卡完成後補寫）
+    const clientIp = await fetchClientIP();
 
-  // 先存本地，標記待同步
-  const rec={empId:id,name,type,date:dateStr,time:timeStr,timestamp:n.toISOString(),synced:false,fbSynced:false,siteId:CURRENT_SITE_ID||null,ip:clientIp||null};
-  localRecs.unshift(rec); saveRecs();
-  uploadToFirebase(rec); // 同步至雲端
-  pruneOldRecs(); // 滾動式清理（員工60天 / 管理後台30天）
-  $('btn-in').disabled=$('btn-out').disabled=true;
-  vibratePunch();
-  showSuccess(name,type,timeStr,type==='上班');
-  CURRENT_SITE_ID = null; // 打卡完成後清除，下次打卡需重新掃描 QR Code
-  if(emp) setTimeout(()=>setEmpDisplay(emp),3100);
-  setTimeout(()=>{ $('btn-in').disabled=$('btn-out').disabled=false; },2000);
+    // 先存本地，標記待同步
+    const rec={empId:id,name,type,date:dateStr,time:timeStr,timestamp:n.toISOString(),synced:false,fbSynced:false,siteId:CURRENT_SITE_ID||null,ip:clientIp||null};
+    localRecs.unshift(rec); saveRecs();
+    uploadToFirebase(rec); // 同步至雲端
+    pruneOldRecs(); // 滾動式清理（員工60天 / 管理後台30天）
+    $('btn-in').disabled=$('btn-out').disabled=true;
+    vibratePunch();
+    showSuccess(name,type,timeStr,type==='上班',!navigator.onLine);
+    CURRENT_SITE_ID = null; // 打卡完成後清除，下次打卡需重新掃描 QR Code
+    if(emp) setTimeout(()=>setEmpDisplay(emp),3100);
+    setTimeout(()=>{ $('btn-in').disabled=$('btn-out').disabled=false; },2000);
 
-  // 嘗試上傳（背景執行，不阻擋打卡流程）
-  if(!IS_DEMO && SCRIPT_URL){
-    uploadRec(rec);
+    // 嘗試上傳（背景執行，不阻擋打卡流程）
+    if(!IS_DEMO && SCRIPT_URL){
+      uploadRec(rec);
+    }
+  }catch(e){
+    console.warn('doPunch error:', e);
+    showToast('打卡時發生錯誤，請重試一次','error');
+    $('btn-in').disabled=$('btn-out').disabled=false;
   }
 }
 
@@ -3042,8 +3077,10 @@ async function uploadRec(rec){
   }
 }
 
-function showSuccess(name,type,time,isIn){
+function showSuccess(name,type,time,isIn,isOffline){
   const ov=$('success-overlay');
+  const offlineBadge = $('so-offline-badge');
+  if(offlineBadge) offlineBadge.style.display = isOffline ? 'block' : 'none';
   ov.className=isIn?'show so-in':'show so-out';
   // 動態 SVG 勾選動畫（每次重新注入以觸發動畫）
   $('so-circle').innerHTML=`<svg class="check-svg" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
@@ -3170,7 +3207,7 @@ function renderHistoryRecords(records, monthStr){
   const tbody = $('records-body');
   const header = '<tr><td colspan="6" style="background:color-mix(in srgb,var(--warn) 12%,var(--surface2));color:var(--t2);font-size:12px;font-weight:600;padding:8px 14px;letter-spacing:.4px">📅 ' + monthStr + ' 歷史紀錄（從 Google Sheets 載入，共 ' + records.length + ' 筆）— <span style=\"cursor:pointer;color:var(--accent)\" onclick=\"loadRecords()\">返回本地紀錄</span></td></tr>';
   const rows = records.map(r => {
-    return `<tr><td>${r.empId||''}</td><td>${r.name||''}</td><td>${r.type||''}</td><td>${r.date||''}</td><td>${r.time||''}</td><td><span class="badge badge-synced">已同步</span></td></tr>`;
+    return `<tr><td>${escapeHtml(r.empId)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.type)}</td><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.time)}</td><td><span class="badge badge-synced">已同步</span></td></tr>`;
   }).join('');
   tbody.innerHTML = header + rows;
 }
@@ -3656,8 +3693,8 @@ function loadAttendanceStat(){
   // 渲染表格
   $('stat-body').innerHTML = rows.map(r => `
     <tr>
-      <td>${r.empId}</td>
-      <td>${r.name}</td>
+      <td>${escapeHtml(r.empId)}</td>
+      <td>${escapeHtml(r.name)}</td>
       <td><strong style="color:${r.attendDays>=20?'var(--ok)':r.attendDays>=10?'var(--t1)':'var(--warn)'}">${r.attendDays} 天</strong></td>
       <td>${r.totalHours}</td>
       <td>${r.avgHours}</td>
@@ -3699,25 +3736,30 @@ async function exportStatXLSX(){
   if(!rows.length || rows[0].querySelector('.empty-state')){
     showToast('請先查詢後再匯出','error'); return;
   }
-  if(typeof XLSX==='undefined'){
-    await new Promise((res,rej)=>{
-      const s=document.createElement('script');
-      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload=res; s.onerror=rej; document.head.appendChild(s);
+  try{
+    if(typeof XLSX==='undefined'){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res; s.onerror=rej; document.head.appendChild(s);
+      });
+    }
+    const headers=['員工編號','姓名','出勤天數','總工時(h)','平均每日工時','最早上班','最晚下班','未下班天數'];
+    const data=[headers];
+    rows.forEach(tr=>{
+      const cells=[...tr.querySelectorAll('td')].map(td=>td.innerText.trim());
+      if(cells.length===headers.length) data.push(cells);
     });
+    const ws=XLSX.utils.aoa_to_sheet(data);
+    ws['!cols']=[{wch:12},{wch:10},{wch:10},{wch:10},{wch:14},{wch:10},{wch:10},{wch:10}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'出勤統計');
+    XLSX.writeFile(wb,`出勤統計_${yearMonth}.xlsx`);
+    showToast('Excel 已下載 ✓','success');
+  }catch(e){
+    showToast('Excel 匯出失敗，請確認網路後重試','error');
+    console.warn('exportStatXLSX error:', e);
   }
-  const headers=['員工編號','姓名','出勤天數','總工時(h)','平均每日工時','最早上班','最晚下班','未下班天數'];
-  const data=[headers];
-  rows.forEach(tr=>{
-    const cells=[...tr.querySelectorAll('td')].map(td=>td.innerText.trim());
-    if(cells.length===headers.length) data.push(cells);
-  });
-  const ws=XLSX.utils.aoa_to_sheet(data);
-  ws['!cols']=[{wch:12},{wch:10},{wch:10},{wch:10},{wch:14},{wch:10},{wch:10},{wch:10}];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'出勤統計');
-  XLSX.writeFile(wb,`出勤統計_${yearMonth}.xlsx`);
-  showToast('Excel 已下載 ✓','success');
 }
 
 // ══════════════════════════════════════
@@ -3856,14 +3898,14 @@ function loadRecords(){
     else if(r.type==='上班'&&anomalySet.has(kmiss)) anomaly='<span class="badge-anomaly">⚠ 缺下班</span>';
     const manualTag = r.manual ? '<span style="font-size:11px;color:var(--t3);margin-left:4px">補登</span>' : '';
     const subTag = r.isSubstitute ? `<span style="font-size:10px;background:color-mix(in srgb,var(--accent) 15%,var(--surface2));color:var(--accent);border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600">臨時</span>` : '';
-    const siteDisplay = r.siteId ? `<span style="font-size:11px;color:var(--t2);white-space:nowrap">${getSiteName(r.siteId)}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
-    const ipDisplay = r.ip ? `<span style="font-family:'SF Mono',monospace;font-size:11px;color:var(--t3)" title="${r.ip}">${r.ip}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
+    const siteDisplay = r.siteId ? `<span style="font-size:11px;color:var(--t2);white-space:nowrap">${escapeHtml(getSiteName(r.siteId))}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
+    const ipDisplay = r.ip ? `<span style="font-family:'SF Mono',monospace;font-size:11px;color:var(--t3)" title="${escapeHtml(r.ip)}">${escapeHtml(r.ip)}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
     return`<tr${anomaly?' style="background:rgba(255,59,48,.04)"':''}>
-      <td><span style="font-family:'SF Mono',monospace;font-size:14px">${r.empId}</span></td>
-      <td>${r.name||'–'}${manualTag}${subTag}</td>
-      <td><span class="badge badge-${r.type==='上班'?'in':'out'}"><span class="badge-dot"></span>${r.type}</span>${anomaly}</td>
-      <td>${r.date}</td>
-      <td style="font-variant-numeric:tabular-nums">${r.time}</td>
+      <td><span style="font-family:'SF Mono',monospace;font-size:14px">${escapeHtml(r.empId)}</span></td>
+      <td>${escapeHtml(r.name)||'–'}${manualTag}${subTag}</td>
+      <td><span class="badge badge-${r.type==='上班'?'in':'out'}"><span class="badge-dot"></span>${escapeHtml(r.type)}</span>${anomaly}</td>
+      <td>${escapeHtml(r.date)}</td>
+      <td style="font-variant-numeric:tabular-nums">${escapeHtml(r.time)}</td>
       <td>${siteDisplay}</td>
       <td>${ipDisplay}</td>
       <td>${syncBadge}</td>
@@ -3912,13 +3954,15 @@ function mpSearchEmp(){
   const q=$('mp-emp').value.trim().toUpperCase();
   const list=$('mp-emp-list');
   if(!q){list.style.display='none';return}
-  const emps=JSON.parse(localStorage.getItem('employees')||'[]');
-  const found=emps.filter(e=>e.id.includes(q)||e.name.toUpperCase().includes(q)).slice(0,8);
+  const emps=JSON.parse(localStorage.getItem('employees')||'[]').map(e=>({id:e.id,name:e.name,isSub:false}));
+  const temps=getTempEmps().map(e=>({id:e.id,name:e.name,isSub:true}));
+  const all=[...emps,...temps];
+  const found=all.filter(e=>e.id.includes(q)||e.name.toUpperCase().includes(q)).slice(0,8);
   if(!found.length){list.style.display='none';return}
-  list.innerHTML=found.map(e=>`<div onclick="mpSelectEmp('${e.id}','${e.name}')"
+  list.innerHTML=found.map(e=>`<div data-id="${escapeHtml(e.id)}" data-name="${escapeHtml(e.name)}" onclick="mpSelectEmp(this.dataset.id,this.dataset.name)"
     style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:.5px solid var(--border)"
     onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''">
-    <span style="font-family:monospace;color:var(--t3);font-size:12px">${e.id}</span>　${e.name}
+    <span style="font-family:monospace;color:var(--t3);font-size:12px">${escapeHtml(e.id)}</span>　${escapeHtml(e.name)}${e.isSub?' <span style="font-size:10px;background:color-mix(in srgb,var(--accent) 15%,var(--surface2));color:var(--accent);border-radius:4px;padding:1px 5px;font-weight:600">代班</span>':''}
   </div>`).join('');
   list.style.display='block';
 }
@@ -3951,6 +3995,7 @@ function saveManualPunch(){
   loadRecords();
   closeManualPunch();
   showToast(`已為 ${name} 補登 ${type} 打卡 ✓`,'success');
+  logAudit('manual_punch', `為 ${name}（${empId}）補登 ${date} ${time} ${type}${note?'，備註：'+note:''}`);
 }
 
 // ══════════════════════════════════════
@@ -3970,7 +4015,7 @@ function renderEmpList(){
     list.innerHTML=`<div class="empty-state" style="padding:28px"><div class="empty-icon">👥</div><p>尚未新增員工</p></div>`;return
   }
   if(!filtered.length){
-    list.innerHTML=`<div class="empty-state" style="padding:28px"><div class="empty-icon">🔍</div><p>找不到「${keyword}」</p></div>`;return
+    list.innerHTML=`<div class="empty-state" style="padding:28px"><div class="empty-icon">🔍</div><p>找不到「${escapeHtml(keyword)}」</p></div>`;return
   }
   list.innerHTML=filtered.map((e)=>{
     const i=employees.indexOf(e);
@@ -3979,10 +4024,10 @@ function renderEmpList(){
     const statusText=e.disabled?(e.manualDisabled?'手動停用':'自動停用（缺勤）'):`正常（已缺勤 ${absent}/${limit} 天）`;
     const statusCls=e.disabled?'disabled':'active';
     return`<div class="emp-item">
-      <div class="emp-av" style="background:${avatarColor(e.id)}">${initials(e.name)}</div>
+      <div class="emp-av" style="background:${avatarColor(e.id)}">${escapeHtml(initials(e.name))}</div>
       <div class="emp-info">
-        <div class="emp-name">${e.name}</div>
-        <div class="emp-meta">${e.id}${e.absentLimit?` · 缺勤上限 ${e.absentLimit} 天`:''}</div>
+        <div class="emp-name">${escapeHtml(e.name)}</div>
+        <div class="emp-meta">${escapeHtml(e.id)}${e.absentLimit?` · 缺勤上限 ${e.absentLimit} 天`:''}</div>
         <div class="emp-status ${statusCls}">${statusText}</div>
       </div>
       <div class="emp-actions">
@@ -4017,6 +4062,7 @@ function toggleEmp(i){
   e.autoDisabled=false;
   saveEmps();renderEmpList();
   showToast(`${e.name} 已${e.disabled?'停用':'啟用'}`,'');
+  logAudit(e.disabled?'disable_employee':'enable_employee', `${e.name}（${e.id}）`);
 }
 async function syncFromSheets(){
   if(!SCRIPT_URL){showToast('請先設定 Apps Script 網址','error');return}
@@ -4328,7 +4374,7 @@ function saveSettings(){
     bar.style.display='';
     bar.className='announce-bar'+(annLevel==='important'?' level-important':annLevel==='urgent'?' level-urgent':'');
     const icon = annLevel==='urgent'?'🚨':annLevel==='important'?'⚠️':'📢';
-    const txt = announcement||'打卡系統正式上線，有問題請聯絡主管';
+    const txt = escapeHtml(announcement||'打卡系統正式上線，有問題請聯絡主管');
     bar.innerHTML='<span class="announce-text">'+icon+' 系統公告：'+txt+'</span>'
       +'<span class="announce-dismiss" onclick="dismissAnnouncement()" title="今日不再顯示">✕</span>';
   }
@@ -4517,8 +4563,8 @@ function loadSupPage(){
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:.5px solid var(--border)">
         <div>
-          <div style="font-size:15px;font-weight:600;color:var(--t1);margin-bottom:4px">${sup.name} <span style="font-size:12px;color:var(--t2);font-weight:400">${sup.title}</span></div>
-          <div style="font-size:12px;color:var(--t3);margin-bottom:6px"># ${sup.empId}</div>
+          <div style="font-size:15px;font-weight:600;color:var(--t1);margin-bottom:4px">${escapeHtml(sup.name)} <span style="font-size:12px;color:var(--t2);font-weight:400">${escapeHtml(sup.title)}</span></div>
+          <div style="font-size:12px;color:var(--t3);margin-bottom:6px"># ${escapeHtml(sup.empId)}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">${viewTag}${activeTag}${permTags}</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -4563,8 +4609,8 @@ function openSupModal(empId){
       <input type="checkbox" data-site-id="${site.id}" value="${site.id}"
         ${sup.viewAll || sup.sites.includes(site.id) ? 'checked' : ''}
         style="accent-color:var(--accent);width:15px;height:15px"/>
-      <span style="color:var(--t1)">${site.id}</span>
-      <span style="color:var(--t2);font-size:11px">${site.name}</span>
+      <span style="color:var(--t1)">${escapeHtml(site.id)}</span>
+      <span style="color:var(--t2);font-size:11px">${escapeHtml(site.name)}</span>
     </label>`).join('');
 
   // viewAll 切換時 disable checkboxes
@@ -4587,7 +4633,7 @@ function openSupModal(empId){
   const copyFrom = $('sup-copy-from');
   copyFrom.innerHTML = '<option value="">— 選擇幹部 —</option>'
     + sups.filter(s=>s.empId!==empId && s.active!==false)
-          .map(s=>`<option value="${s.empId}">${s.name}（${s.title}）</option>`).join('');
+          .map(s=>`<option value="${escapeHtml(s.empId)}">${escapeHtml(s.name)}（${escapeHtml(s.title)}）</option>`).join('');
 
   // 清空搜尋欄
   const searchInput = $('sup-site-search');
@@ -4749,8 +4795,8 @@ function scanIdleSites(){
         ${idle.map(s=>`
           <label style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:.5px solid var(--border);cursor:pointer;font-size:14px">
             <input type="checkbox" class="idle-cb" value="${s.id}" style="accent-color:var(--accent);width:15px;height:15px"/>
-            <span style="font-weight:600;color:var(--t1)">${s.id}</span>
-            <span style="color:var(--t2)">${s.name}</span>
+            <span style="font-weight:600;color:var(--t1)">${escapeHtml(s.id)}</span>
+            <span style="color:var(--t2)">${escapeHtml(s.name)}</span>
           </label>`).join('')}
       </div>
       <button onclick="batchDisableSites([...document.querySelectorAll('.idle-cb:checked')].map(c=>c.value))"
@@ -4821,7 +4867,7 @@ function renderQrList(){
       <div style="padding:12px 0;border-bottom:.5px solid var(--border);opacity:${disabled?'.45':'1'}">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div style="flex:1;min-width:0">
-            <div style="font-size:15px;font-weight:600;color:var(--t1)">${site.id} · ${site.name}${disabled?' <span style="font-size:11px;color:var(--t3)">[停用]</span>':''}</div>
+            <div style="font-size:15px;font-weight:600;color:var(--t1)">${escapeHtml(site.id)} · ${escapeHtml(site.name)}${disabled?' <span style="font-size:11px;color:var(--t3)">[停用]</span>':''}</div>
             ${!disabled?`<div style="font-size:11px;color:var(--t3);margin-top:2px;word-break:break-all">${url}</div>`:''}
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
@@ -4854,7 +4900,7 @@ function showQrDetail(siteId){
   modal.innerHTML=`
     <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-width:420px;padding:24px 20px 36px;text-align:center">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div style="font-size:17px;font-weight:700">${site.id} · ${site.name}</div>
+        <div style="font-size:17px;font-weight:700">${escapeHtml(site.id)} · ${escapeHtml(site.name)}</div>
         <button onclick="$('qr-detail-modal').remove()"
           style="background:none;border:none;font-size:22px;color:var(--t3);cursor:pointer">✕</button>
       </div>
@@ -5038,10 +5084,10 @@ function loadOverview(){
   Object.entries(empMap).forEach(([id,data])=>{
     const status = data.out ? '✅ 已下班' : data.in ? '☀️ 上班中' : '–';
     const cls    = data.out ? 'badge-in' : 'badge-warn';
-    const siteCell = data.siteId ? `<span style="font-size:11px;color:var(--t2)">${getSiteName(data.siteId)}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
+    const siteCell = data.siteId ? `<span style="font-size:11px;color:var(--t2)">${escapeHtml(getSiteName(data.siteId))}</span>` : '<span style="color:var(--t4);font-size:11px">–</span>';
     rows.push(`<tr>
-      <td><strong>${data.name}</strong></td>
-      <td style="font-family:'SF Mono',monospace;font-size:13px">${id}</td>
+      <td><strong>${escapeHtml(data.name)}</strong></td>
+      <td style="font-family:'SF Mono',monospace;font-size:13px">${escapeHtml(id)}</td>
       <td><span class="badge ${cls}"><span class="badge-dot"></span>${status}</span></td>
       <td style="font-variant-numeric:tabular-nums">${data.in||'–'}</td>
       <td style="font-variant-numeric:tabular-nums">${data.out||'–'}</td>
@@ -5052,8 +5098,8 @@ function loadOverview(){
   // 缺勤員工
   absentEmps.forEach(e=>{
     rows.push(`<tr>
-      <td><strong>${e.name}</strong></td>
-      <td style="font-family:'SF Mono',monospace;font-size:13px">${e.id}</td>
+      <td><strong>${escapeHtml(e.name)}</strong></td>
+      <td style="font-family:'SF Mono',monospace;font-size:13px">${escapeHtml(e.id)}</td>
       <td><span class="badge badge-out"><span class="badge-dot"></span>❌ 未打卡</span></td>
       <td>–</td><td>–</td><td>–</td>
     </tr>`);
@@ -5249,11 +5295,11 @@ function loadAnomaly(){
   }
   tbody.innerHTML = anomalies.map(a=>`
     <tr>
-      <td><strong>${a.name}</strong><div style="font-size:12px;color:var(--t2);font-family:'SF Mono',monospace">${a.empId}</div></td>
-      <td>${a.date}</td>
-      <td>${a.type}</td>
-      <td style="font-size:13px;color:var(--t2)">${a.desc}</td>
-      <td style="font-size:11px;color:var(--t2)">${a.siteId ? getSiteName(a.siteId) : '<span style="color:var(--t4)">–</span>'}</td>
+      <td><strong>${escapeHtml(a.name)}</strong><div style="font-size:12px;color:var(--t2);font-family:'SF Mono',monospace">${escapeHtml(a.empId)}</div></td>
+      <td>${escapeHtml(a.date)}</td>
+      <td>${escapeHtml(a.type)}</td>
+      <td style="font-size:13px;color:var(--t2)">${escapeHtml(a.desc)}</td>
+      <td style="font-size:11px;color:var(--t2)">${a.siteId ? escapeHtml(getSiteName(a.siteId)) : '<span style="color:var(--t4)">–</span>'}</td>
     </tr>`).join('');
 }
 
@@ -5412,7 +5458,7 @@ function initExportSiteSelect(){
     const label   = `${s.id} ${s.name}`;
     const typeClass = s.type ? `sc-type-${s.type.toLowerCase()}` : '';
     const selClass  = _selectedSiteIds.has(s.id) ? 'sc-selected' : '';
-    return `<button class="site-chip ${typeClass} ${selClass}" data-id="${s.id}" data-label="${label.toLowerCase()}" onclick="toggleSiteChip('${s.id}', this)">${label}</button>`;
+    return `<button class="site-chip ${typeClass} ${selClass}" data-id="${escapeHtml(s.id)}" data-label="${escapeHtml(label.toLowerCase())}" onclick="toggleSiteChip('${s.id}', this)">${escapeHtml(label)}</button>`;
   }).join('');
   updateSiteFilterBtn();
 }
@@ -5546,10 +5592,13 @@ function printMonthlyReport(){
   setTimeout(()=>{ window.print(); }, 400);
 }
 
+let _mrLastRows = [];
+
 function previewMonthlyReport(){
   const ym  = ($('monthly-report-month')||{}).value || getDefaultYM();
   const ids = getSelectedSiteIds();
   const {rows, daysInMonth, totalHours, anomalyCount, crossdayCount} = buildMonthlyMatrix(ym, ids);
+  _mrLastRows = rows;
 
   $('monthly-empty-state').style.display   = 'none';
   $('monthly-preview-cards').style.display = 'block';
@@ -5564,10 +5613,25 @@ function previewMonthlyReport(){
   $('monthly-preview-thead').innerHTML =
     `<tr><th>編號</th><th>姓名</th>${dayHeaders}<th>小計</th><th>備註</th></tr>`;
 
+  const searchEl = $('mr-emp-search');
+  if(searchEl) searchEl.value='';
+  renderMonthlyPreviewBody(rows);
+}
+
+/** 依 mr-emp-search 關鍵字重新篩選並渲染月度報表預覽表格（不重算矩陣） */
+function mrFilterEmp(){
+  const q = ($('mr-emp-search')||{value:''}).value.trim().toUpperCase();
+  const filtered = q
+    ? _mrLastRows.filter(({emp}) => emp.id.toUpperCase().includes(q) || emp.name.toUpperCase().includes(q))
+    : _mrLastRows;
+  renderMonthlyPreviewBody(filtered);
+}
+
+function renderMonthlyPreviewBody(rows){
   const preview = rows.slice(0, 20);
   if(!preview.length){
     $('monthly-preview-body').innerHTML =
-      '<tr><td colspan="35"><div class="empty-state"><div class="empty-icon">📭</div><p>本月（此案場）無出勤紀錄</p></div></td></tr>';
+      '<tr><td colspan="35"><div class="empty-state"><div class="empty-icon">📭</div><p>找不到符合條件的員工</p></div></td></tr>';
     return;
   }
 
@@ -5577,11 +5641,11 @@ function previewMonthlyReport(){
       return `<td ${warn} style="font-size:10px;text-align:center;padding:2px 1px">${d.h}</td>`;
     }).join('');
     return `<tr>
-      <td style="font-size:10px;white-space:nowrap;padding:4px 6px">${emp.id}</td>
-      <td style="white-space:nowrap;font-weight:600;padding:4px 6px">${emp.name}</td>
+      <td style="font-size:10px;white-space:nowrap;padding:4px 6px">${escapeHtml(emp.id)}</td>
+      <td style="white-space:nowrap;font-weight:600;padding:4px 6px">${escapeHtml(emp.name)}</td>
       ${cells}
       <td style="font-weight:700;color:var(--accent);text-align:center">${monthlyTotal.toFixed(1)}</td>
-      <td style="font-size:10px;color:var(--t3);max-width:130px;word-break:break-all;padding:4px 6px">${notes.join('；')}</td>
+      <td style="font-size:10px;color:var(--t3);max-width:130px;word-break:break-all;padding:4px 6px">${escapeHtml(notes.join('；'))}</td>
     </tr>`;
   }).join('');
 }
@@ -5699,25 +5763,27 @@ function startTodayListener(){
   if(!FB_DB || _fbTodayUnsub) return;
   const todayRef = FB_DB.ref('punches/'+today());
   todayRef.on('value', snap=>{
-    const data = snap.val();
-    if(!data) return;
-    let added = 0;
-    Object.values(data).forEach(rec=>{
-      if(!rec||!rec.timestamp) return;
-      const exists = localRecs.some(r=>r.timestamp===rec.timestamp);
-      if(!exists){
-        localRecs.push({...rec, fbSynced:true, fromCloud:true, synced:true});
-        added++;
+    try{
+      const data = snap.val();
+      if(!data) return;
+      let added = 0;
+      Object.values(data).forEach(rec=>{
+        if(!rec||!rec.timestamp) return;
+        const exists = localRecs.some(r=>r.timestamp===rec.timestamp);
+        if(!exists){
+          localRecs.push({...rec, fbSynced:true, fromCloud:true, synced:true});
+          added++;
+        }
+      });
+      if(added>0){
+        localRecs.sort((a,b)=>b.timestamp.localeCompare(a.timestamp));
+        saveRecs();
+        // 若管理員正在看今日總覽，自動刷新
+        const ovEl = $('sub-overview');
+        if(ADMIN_UNLOCKED && ovEl && ovEl.style.display!=='none'){ loadOverview(); }
       }
-    });
-    if(added>0){
-      localRecs.sort((a,b)=>b.timestamp.localeCompare(a.timestamp));
-      saveRecs();
-      // 若管理員正在看今日總覽，自動刷新
-      const ovEl = $('sub-overview');
-      if(ADMIN_UNLOCKED && ovEl && ovEl.style.display!=='none'){ loadOverview(); }
-    }
-  });
+    }catch(e){ console.warn('今日即時監聽處理失敗:', e); }
+  }, e=>{ console.warn('今日即時監聽連線失敗:', e); });
   _fbTodayUnsub = ()=>{ todayRef.off('value'); _fbTodayUnsub=null; };
 }
 
