@@ -710,6 +710,10 @@ tr:hover td{background:var(--surface2)}
 .modal-actions{display:flex;gap:9px;margin-top:18px}
 .btn-primary{flex:1;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:var(--rxs);font-size:16px;font-weight:600;cursor:pointer;font-family:var(--font)}
 .btn-primary:hover{filter:brightness(1.08)}
+.lookup-modal{position:fixed;inset:0;z-index:320;display:none;align-items:center;justify-content:center;padding:20px}
+.lookup-modal.show{display:flex}
+.lookup-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(10px)}
+.lookup-modal-box{position:relative;z-index:1;max-width:420px;padding:28px 24px}
 .btn-secondary{padding:13px 18px;background:var(--fill2);color:var(--t2);border:none;border-radius:var(--rxs);font-size:15px;font-weight:500;cursor:pointer;font-family:var(--font)}
 .cfg-bar{background:color-mix(in srgb,var(--warn) 8%,var(--surface));border:.5px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:var(--rsm);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;font-size:13px;gap:10px}
 .cfg-url{font-family:'SF Mono',monospace;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t1)}
@@ -889,6 +893,38 @@ button,input,select{font-family:var(--font)}
       <button class="nk nk-action" onclick="nkDel()">⌫</button>
     </div>
     <button class="confirm-btn" onclick="confirmId()">確認編號 →</button>
+    <button onclick="openEmployeeLookup()" style="width:100%;margin-top:12px;border:0;background:none;color:var(--accent);font-size:15px;font-weight:700;font-family:var(--font);padding:12px;cursor:pointer">忘記員工編號？點這裡查詢</button>
+  </div>
+</div>
+
+<!-- ══ 員工編號自助查詢 ══ -->
+<div id="employee-lookup-modal" class="lookup-modal" aria-hidden="true">
+  <div class="lookup-modal-backdrop" onclick="closeEmployeeLookup()"></div>
+  <div class="modal-box lookup-modal-box" role="dialog" aria-modal="true" aria-labelledby="lookup-title">
+    <button class="ko-close" style="position:absolute;right:18px;top:14px" onclick="closeEmployeeLookup()">×</button>
+    <h2 id="lookup-title">查詢員工編號</h2>
+    <p>輸入姓名與驗證資料，系統只會顯示您的員工編號。</p>
+    <div class="mf">
+      <label for="lookup-name">姓名</label>
+      <input id="lookup-name" class="fi" type="text" autocomplete="name" placeholder="請輸入完整姓名" maxlength="20"/>
+    </div>
+    <div class="mf">
+      <label for="lookup-type">驗證方式</label>
+      <select id="lookup-type" class="fi" onchange="updateLookupHint()">
+        <option value="mobile">手機末四碼</option>
+        <option value="birthday">生日月日（例：0520）</option>
+      </select>
+    </div>
+    <div class="mf">
+      <label id="lookup-value-label" for="lookup-value">手機末四碼</label>
+      <input id="lookup-value" class="fi" type="text" inputmode="numeric" autocomplete="off" placeholder="例：5678" maxlength="4"/>
+      <span class="mf-hint" id="lookup-hint">請輸入您自己的手機號碼末四碼</span>
+    </div>
+    <div id="lookup-result" class="mf-hint" aria-live="polite"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeEmployeeLookup()">取消</button>
+      <button class="btn-primary" id="lookup-submit" onclick="lookupEmployeeIdFromServer()">查詢編號</button>
+    </div>
   </div>
 </div>
 
@@ -964,7 +1000,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.3.0 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.0 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1153,7 +1189,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.3.0 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.0 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -2851,6 +2887,79 @@ function closeDrawer(){
 }
 function toggleDrawer(){
   drawerOpen ? closeDrawer() : openDrawer();
+}
+
+let _employeeLookupSeq = 0;
+function openEmployeeLookup(){
+  const modal = $('employee-lookup-modal');
+  if(!modal) return;
+  $('lookup-name').value = '';
+  $('lookup-value').value = '';
+  $('lookup-result').textContent = '';
+  updateLookupHint();
+  modal.classList.add('show');
+  modal.setAttribute('aria-hidden','false');
+  setTimeout(()=>$('lookup-name').focus(),50);
+}
+function closeEmployeeLookup(){
+  const modal = $('employee-lookup-modal');
+  if(!modal) return;
+  modal.classList.remove('show');
+  modal.setAttribute('aria-hidden','true');
+}
+function updateLookupHint(){
+  const birthday = $('lookup-type').value === 'birthday';
+  $('lookup-value-label').textContent = birthday ? '生日月日' : '手機末四碼';
+  $('lookup-value').placeholder = birthday ? '例：0520' : '例：5678';
+  $('lookup-hint').textContent = birthday ? '請輸入出生月日，共四碼' : '請輸入您自己的手機號碼末四碼';
+}
+function requestEmployeeIdLookup(params){
+  return new Promise((resolve,reject)=>{
+    const callbackName = '__dysEmployeeLookup_' + Date.now() + '_' + (++_employeeLookupSeq);
+    const script = document.createElement('script');
+    let settled = false;
+    const cleanup = ()=>{ clearTimeout(timeout); delete window[callbackName]; script.remove(); };
+    const finish = (fn,value)=>{ if(settled) return; settled=true; cleanup(); fn(value); };
+    const timeout = setTimeout(()=>finish(reject,new Error('查詢逾時，請稍後再試')),10000);
+    window[callbackName] = data=>finish(resolve,data);
+    script.onerror = ()=>finish(reject,new Error('查詢連線失敗，請稍後再試'));
+    script.src = `${SCRIPT_URL}?${new URLSearchParams({...params,action:'lookupEmployeeId',callback:callbackName})}`;
+    document.head.appendChild(script);
+  });
+}
+async function lookupEmployeeIdFromServer(){
+  const name = $('lookup-name').value.trim();
+  const verifyType = $('lookup-type').value;
+  const verifyValue = $('lookup-value').value.replace(/\D/g,'');
+  const result = $('lookup-result');
+  if(!name || !/^\d{4}$/.test(verifyValue)){
+    result.textContent = '請輸入完整姓名與四碼驗證資料';
+    result.style.color = 'var(--danger)';
+    return;
+  }
+  if(!SCRIPT_URL || IS_DEMO){
+    result.textContent = '目前無法查詢，請聯絡主管協助';
+    result.style.color = 'var(--danger)';
+    return;
+  }
+  const button = $('lookup-submit');
+  button.disabled = true; button.textContent = '查詢中…';
+  result.textContent = '';
+  try{
+    const data = await requestEmployeeIdLookup({name,verifyType,verifyValue});
+    if(!data || data.status !== 'ok' || !data.empId) throw new Error((data&&data.message)||'查無符合資料，請確認後再試一次');
+    const emp = findEmp(data.empId) || {id:data.empId,name};
+    localStorage.setItem('last_emp_id', data.empId);
+    setEmpDisplay(emp);
+    closeEmployeeLookup();
+    closeDrawer();
+    showToast(`已找到您的員工編號：${data.empId}`,'success');
+  }catch(error){
+    result.textContent = error.message || '查詢失敗，請稍後再試';
+    result.style.color = 'var(--danger)';
+  }finally{
+    button.disabled = false; button.textContent = '查詢編號';
+  }
 }
 
 function nkDel()   { currentId=currentId.slice(0,-1); $('id-display-text').textContent=currentId; }

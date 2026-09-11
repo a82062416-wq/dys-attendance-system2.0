@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════
 //  DYS 大洋保全 打卡系統 — Google Apps Script
-//  版本：1.0.0  |  2026.04
+//  版本：1.4.0  |  2026.09
 //
 //  支援功能：
 //  1. 寫入打卡紀錄（員工手機自動上傳）
@@ -25,6 +25,10 @@ function doGet(e) {
     // 讀取員工名單（從 Sheets 同步員工）
     if (action === 'getEmployees') {
       return jsonResponse(getEmployees(), callback);
+    }
+    // 員工忘記編號時，以姓名加第二驗證資料查詢（不回傳電話或生日）
+    if (action === 'lookupEmployeeId') {
+      return jsonResponse(lookupEmployeeId(params), callback);
     }
     // 寫入打卡紀錄（員工打卡時自動呼叫）
     if (params.empId) {
@@ -127,6 +131,55 @@ function getEmployees() {
   }
 
   return { status: 'ok', employees: employees };
+}
+
+// ── 員工編號自助查詢 ─────────────────────────────────────────
+function lookupEmployeeId(params) {
+  const name = String(params.name || '').trim();
+  const verifyType = String(params.verifyType || '').trim();
+  const verifyValue = String(params.verifyValue || '').replace(/\D/g, '');
+  if (!name || !/^(mobile|birthday)$/.test(verifyType) || !/^\d{4}$/.test(verifyValue)) {
+    return { status: 'error', message: '查詢資料不完整' };
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_EMPLOYEES);
+  if (!sheet) return { status: 'error', message: '目前無法查詢，請聯絡主管' };
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { status: 'error', message: '目前無法查詢，請聯絡主管' };
+  const headers = data[0].map(value => String(value || '').trim());
+  const idIndex = findEmployeeColumn(headers, ['員工編號', '工號']);
+  const nameIndex = findEmployeeColumn(headers, ['姓名', '員工姓名', '中文姓名', '員工']);
+  const verifyIndex = verifyType === 'mobile'
+    ? findEmployeeColumn(headers, ['行動電話', '手機', '連絡電話', '聯絡電話'])
+    : findEmployeeColumn(headers, ['生日', '出生年月日']);
+  if (idIndex < 0 || nameIndex < 0 || verifyIndex < 0) {
+    return { status: 'error', message: '目前無法查詢，請聯絡主管' };
+  }
+
+  const matches = data.slice(1).filter(row => {
+    const rowId = String(row[idIndex] || '').trim();
+    const rowName = String(row[nameIndex] || '').trim();
+    return rowId && rowName === name && getVerificationLastFour(row[verifyIndex], verifyType) === verifyValue;
+  });
+  if (matches.length !== 1) return { status: 'error', message: '查無符合資料，請確認後再試一次' };
+  return { status: 'ok', empId: String(matches[0][idIndex]).trim() };
+}
+
+function findEmployeeColumn(headers, candidates) {
+  const exactIndex = headers.findIndex(header => candidates.includes(header));
+  return exactIndex >= 0
+    ? exactIndex
+    : headers.findIndex(header => candidates.some(candidate => header.indexOf(candidate) >= 0));
+}
+
+function getVerificationLastFour(value, verifyType) {
+  if (value instanceof Date && !isNaN(value.getTime()) && verifyType === 'birthday') {
+    return (`0${value.getMonth() + 1}`).slice(-2) + (`0${value.getDate()}`).slice(-2);
+  }
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length >= 4 ? digits.slice(-4) : '';
 }
 
 // ── 工具：回傳 JSON 並設定 CORS ─────────────────────────────
