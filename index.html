@@ -812,6 +812,27 @@ tr:hover td{background:var(--surface2)}
 #site-chip-search{font-size:12px;padding:4px 10px;height:28px;width:110px}
 .site-sel-summary{font-size:12px;color:var(--t3);margin-top:8px;padding-top:6px;border-top:.5px solid var(--border2)}
 
+/* ══ 易讀易按模式：現場主管以手機操作為主 ══ */
+button,input,select{font-family:var(--font)}
+@media(max-width:767px){
+  .nav-admin-btn{width:44px;height:44px;font-size:18px}
+  .admin-menu-item{min-height:58px;padding-top:10px;padding-bottom:10px}
+  .admin-menu-hd{font-size:14px;margin-top:20px}
+  .toolbar{gap:10px;align-items:flex-start}
+  .toolbar-title{font-size:20px}
+  .toolbar-right{gap:8px}
+  .btn-s{min-height:42px;font-size:14px;padding-left:12px;padding-right:12px}
+  .fi{min-height:42px;font-size:16px}
+  .stats-row{gap:10px}
+  .stat-card{min-height:82px}
+}
+.senior-action{min-height:44px;padding:10px 16px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font)}
+.senior-action.primary{background:var(--accent);color:#fff}
+.senior-action.danger{background:#fff1f0;color:#c5221f;border:1px solid rgba(197,34,31,.28)}
+@media(prefers-color-scheme:dark){.senior-action.danger{background:rgba(255,59,48,.16);color:#ff8a83}}
+.admin-status-summary{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 16px;font-size:14px;color:var(--t2)}
+.admin-status-summary span{background:var(--surface2);border-radius:50px;padding:6px 10px}
+
 </style>
 </head>
 <body>
@@ -1659,20 +1680,21 @@ tr:hover td{background:var(--surface2)}
     <div class="sub-page" id="sub-supervisors">
       <div class="toolbar"><div class="toolbar-title">幹部管理</div></div>
 
-      <div style="background:var(--surface);border-radius:var(--r);border:.5px solid var(--border);padding:16px;box-shadow:var(--sh1);max-width:560px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <div style="font-size:15px;font-weight:600;color:var(--t1)">幹部名單</div>
+      <div style="background:var(--surface);border-radius:var(--r);border:.5px solid var(--border);padding:20px;box-shadow:var(--sh1);max-width:620px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
+          <div style="font-size:19px;font-weight:700;color:var(--t1)">幹部名單</div>
           <div style="display:flex;gap:8px">
             <button onclick="resetDefaultSupervisors()"
-              style="background:var(--surface2);color:var(--t2);border:none;border-radius:50px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">
-              🔄 還原預設
+              class="senior-action danger" title="會覆蓋目前幹部資料，請謹慎使用">
+              ⚠ 還原預設
             </button>
             <button onclick="openSupModal(null)"
-              style="background:var(--accent);color:#fff;border:none;border-radius:50px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">
+              class="senior-action primary">
               ＋ 新增幹部
             </button>
           </div>
         </div>
+        <div id="sup-summary" class="admin-status-summary" aria-live="polite"></div>
         <div id="sup-card-list"></div>
       </div>
 
@@ -2145,6 +2167,10 @@ function normalizeSupervisors(data){
     active:sup.active!==false,
     viewAll:sup.viewAll===true
   }));
+}
+function getSupervisorSummary(sups){
+  const list=Array.isArray(sups)?sups:[];
+  return {total:list.length,active:list.filter(sup=>sup.active!==false).length};
 }
 function getSupervisors(){
   try{
@@ -4629,6 +4655,9 @@ function resetDefaultSupervisors(){
 // ══════════════════════════════════════
 function loadSupPage(){
   const sups = getSupervisors();
+  const summary=getSupervisorSummary(sups);
+  const summaryEl=$('sup-summary');
+  if(summaryEl) summaryEl.innerHTML=`<span>目前 ${summary.total} 位幹部</span><span>${summary.active} 位啟用中</span>`;
   const list = $('sup-card-list');
   if(!list) return;
   if(sups.length===0){
