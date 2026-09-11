@@ -4,7 +4,8 @@
 //  日後更新 index.html 推上 GitHub 即自動生效
 // ══════════════════════════════════════════════
 
-const CACHE_NAME = 'attendance-v1.2.7';
+// 每次正式發布都更新版本，讓已安裝的 iPhone PWA 立即淘汰舊首頁快取。
+const CACHE_NAME = 'attendance-v1.2.8';
 
 self.addEventListener('install', event => {
   event.waitUntil(
