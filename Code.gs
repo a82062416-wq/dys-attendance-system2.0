@@ -15,26 +15,26 @@ const SHEET_EMPLOYEES = '員工資料';
 function doGet(e) {
   const params = e.parameter || {};
   const action = params.action || '';
+  const callback = isValidJsonpCallback(params.callback) ? params.callback : '';
 
   try {
     // 查詢打卡紀錄（管理後台查歷史）
     if (action === 'getRecords') {
-      return jsonResponse(getRecords(params.yearMonth));
+      return jsonResponse(getRecords(params.yearMonth), callback);
     }
     // 讀取員工名單（從 Sheets 同步員工）
     if (action === 'getEmployees') {
-      return jsonResponse(getEmployees());
+      return jsonResponse(getEmployees(), callback);
     }
     // 寫入打卡紀錄（員工打卡時自動呼叫）
     if (params.empId) {
-      writePunch(params);
-      return jsonResponse({ status: 'ok' });
+      return jsonResponse(writePunch(params), callback);
     }
     // 其他：回傳系統狀態（測試用）
-    return jsonResponse({ status: 'ok', message: 'DYS 打卡系統 API 運作正常' });
+    return jsonResponse({ status: 'ok', message: 'DYS 打卡系統 API 運作正常' }, callback);
 
   } catch (err) {
-    return jsonResponse({ status: 'error', message: err.toString() });
+    return jsonResponse({ status: 'error', message: err.toString() }, callback);
   }
 }
 
@@ -56,14 +56,25 @@ function writePunch(params) {
     sheet.setColumnWidths(1, 6, 130);
   }
 
+  const timestamp = String(params.timestamp || new Date().toISOString());
+  const dataRows = sheet.getLastRow() - 1;
+  if (timestamp && dataRows > 0) {
+    const duplicate = sheet.getRange(2, 6, dataRows, 1)
+      .createTextFinder(timestamp)
+      .matchEntireCell(true)
+      .findNext();
+    if (duplicate) return { status: 'ok', duplicate: true };
+  }
+
   sheet.appendRow([
     params.empId    || '',
     params.name     || '',
     params.type     || '',
     params.date     || '',
     params.time     || '',
-    params.timestamp || new Date().toISOString()
+    timestamp
   ]);
+  return { status: 'ok', duplicate: false };
 }
 
 // ── 查詢打卡紀錄（依年月篩選） ────────────────────────────────
@@ -119,8 +130,15 @@ function getEmployees() {
 }
 
 // ── 工具：回傳 JSON 並設定 CORS ─────────────────────────────
-function jsonResponse(obj) {
+function isValidJsonpCallback(callback) {
+  return /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(String(callback || ''));
+}
+
+function jsonResponse(obj, callback) {
+  const content = callback
+    ? `${callback}(${JSON.stringify(obj)});`
+    : JSON.stringify(obj);
   return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+    .createTextOutput(content)
+    .setMimeType(callback ? ContentService.MimeType.JAVASCRIPT : ContentService.MimeType.JSON);
 }
