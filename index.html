@@ -2136,7 +2136,14 @@ function getSupervisors(){
   try{
     const raw = localStorage.getItem('supervisors');
     const parsed = raw ? JSON.parse(raw) : null;
-    if(Array.isArray(parsed) && parsed.length > 0) return parsed;
+    if(Array.isArray(parsed) && parsed.length > 0){
+      // 舊版／手動建立的幹部資料可能沒有 sites、permissions；補齊後再交給畫面使用。
+      return parsed.map(sup=>({
+        ...sup,
+        sites:Array.isArray(sup.sites)?sup.sites:[],
+        permissions:Array.isArray(sup.permissions)?sup.permissions:[]
+      }));
+    }
   }catch(e){
     console.warn('本機幹部資料格式錯誤，暫時使用預設名單:', e);
   }
