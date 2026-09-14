@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════
 //  DYS 大洋保全 打卡系統 — Google Apps Script
-//  版本：1.4.0  |  2026.09
+//  版本：1.4.1  |  2026.09
 //
 //  支援功能：
 //  1. 寫入打卡紀錄（員工手機自動上傳）
@@ -44,6 +44,9 @@ function doGet(e) {
 
 // ── 寫入打卡紀錄 ─────────────────────────────────────────────
 function writePunch(params) {
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(30000);
+  try {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   let   sheet = ss.getSheetByName(SHEET_RECORDS);
 
@@ -79,6 +82,9 @@ function writePunch(params) {
     timestamp
   ]);
   return { status: 'ok', duplicate: false };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ── 查詢打卡紀錄（依年月篩選） ────────────────────────────────
@@ -176,7 +182,7 @@ function findEmployeeColumn(headers, candidates) {
 
 function getVerificationLastFour(value, verifyType) {
   if (value instanceof Date && !isNaN(value.getTime()) && verifyType === 'birthday') {
-    return (`0${value.getMonth() + 1}`).slice(-2) + (`0${value.getDate()}`).slice(-2);
+    return ('0' + (value.getMonth() + 1)).slice(-2) + ('0' + value.getDate()).slice(-2);
   }
   const digits = String(value || '').replace(/\D/g, '');
   return digits.length >= 4 ? digits.slice(-4) : '';
@@ -189,7 +195,7 @@ function isValidJsonpCallback(callback) {
 
 function jsonResponse(obj, callback) {
   const content = callback
-    ? `${callback}(${JSON.stringify(obj)});`
+    ? callback + '(' + JSON.stringify(obj) + ');'
     : JSON.stringify(obj);
   return ContentService
     .createTextOutput(content)

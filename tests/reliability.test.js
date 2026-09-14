@@ -135,6 +135,7 @@ test('Apps Script 對同一 timestamp 僅新增一次打卡資料', () => {
   };
   const context = {
     SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: () => sheet, insertSheet: () => sheet }) },
+    LockService: { getDocumentLock: () => ({ waitLock() {}, releaseLock() {} }) },
   };
   vm.runInNewContext(`${codeGs}; this.run = writePunch;`, context);
   const punch = { empId: '10000001', name: '測試員工', type: '上班', date: '2026-09-10', time: '08:00', timestamp: 'unique-1' };
@@ -163,6 +164,19 @@ test('員工編號查詢僅在姓名與手機末四碼都相符時回傳編號',
   assert.deepEqual(JSON.parse(JSON.stringify(match)), { status: 'ok', empId: '11500001' });
   assert.equal(mismatch.status, 'error');
   assert.equal(mismatch.empId, undefined);
+});
+
+test('上次打卡應顯示白話日期，過久紀錄要提醒確認', () => {
+  const context = { pad: value => String(value).padStart(2, '0') };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'summarizeLastPunch')}; this.run = summarizeLastPunch;`, context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run(
+    { type: '上班', date: '2026-09-11', time: '08:03' },
+    new Date('2026-09-11T14:00:00'),
+  ))), { text: '今天 08:03 上班', stale: false });
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run(
+    { type: '下班', date: '2026-05-20', time: '18:00' },
+    new Date('2026-09-11T14:00:00'),
+  ))), { text: '5/20 18:00 下班（請確認）', stale: true });
 });
 
 test('伺服器回覆失敗時，打卡紀錄不可標記為已同步', async () => {
@@ -203,4 +217,53 @@ test('舊版 A58 QR token 與新版 A058 token 都必須有效', () => {
   assert.equal(context.run('A58', 'OLD-TOKE', '0'), true);
   assert.equal(context.run('A58', 'NEW-TOKE', '0'), true);
   assert.equal(context.run('A58', 'WRONG-TOKEN', '0'), false);
+});
+
+test('已更換 QR 的案場必須拒絕舊版本，但未更換案場保留 v0 QR', () => {
+  const context = {
+    resolveSiteId: siteId => ({ A58: 'A058', A07: 'A007', A12: 'A012' })[siteId] || siteId,
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'isQrVersionCurrent')}; this.run = isQrVersionCurrent;`, context);
+  assert.equal(context.run('A58', '0', {}), true);
+  assert.equal(context.run('A58', '0', { A058: '1' }), false);
+  assert.equal(context.run('A58', '1', { A058: '1' }), true);
+  assert.equal(context.run('A07', '0', { A058: '1' }), true);
+});
+
+test('台灣凌晨的日期鍵必須是當地日期，不可退回前一天', () => {
+  const context = { pad: value => String(value).padStart(2, '0') };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'localDateKey')}; this.run = localDateKey;`, context);
+  assert.equal(context.run(new Date('2026-09-14T00:30:00+08:00')), '2026-09-14');
+});
+
+test('從 Sheets 同步員工時必須保留既有手動停用與案場設定', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'mergeSheetEmployees')}; this.run = mergeSheetEmployees;`, context);
+  const merged = context.run(
+    [{ id: '10000001', name: '舊姓名', disabled: true, manualDisabled: true, siteId: 'A058', absentLimit: 10 }],
+    [{ id: '10000001', name: '新姓名' }, { id: '10000002', name: '新員工' }],
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(merged)), [
+    { id: '10000001', name: '新姓名', disabled: true, manualDisabled: true, siteId: 'A058', absentLimit: 10 },
+    { id: '10000002', name: '新員工', disabled: false, absentLimit: null },
+  ]);
+});
+
+test('Apps Script 寫入完成後必須釋放文件鎖', () => {
+  const rows = [];
+  let released = false;
+  const sheet = {
+    getLastRow: () => rows.length + 1,
+    getRange: () => ({ createTextFinder: () => ({ matchEntireCell: () => ({ findNext: () => null }) }) }),
+    appendRow: row => rows.push(row),
+  };
+  const context = {
+    SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: () => sheet, insertSheet: () => sheet }) },
+    LockService: { getDocumentLock: () => ({ waitLock: () => {}, releaseLock: () => { released = true; } }) },
+  };
+  vm.runInNewContext(`${codeGs}; this.run = writePunch;`, context);
+  const result = context.run({ empId: '10000001', name: '測試員工', type: '上班', date: '2026-09-10', time: '08:00', timestamp: 'locked-1' });
+  assert.equal(result.status, 'ok');
+  assert.equal(released, true);
+  assert.equal(rows.length, 1);
 });

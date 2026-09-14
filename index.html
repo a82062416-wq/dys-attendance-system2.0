@@ -249,12 +249,13 @@ nav{
   display:none;align-items:center;justify-content:center;gap:6px;
   margin-top:6px;padding-top:6px;
   border-top:.5px solid rgba(255,255,255,.12);
-  font-size:12px;color:rgba(255,255,255,.5);
+  font-size:14px;color:rgba(255,255,255,.72);
   position:relative;z-index:1;
 }
 .tc-last.show{display:flex}
-.tc-last-label{color:rgba(255,255,255,.35);font-weight:500}
-.tc-last-val{font-variant-numeric:tabular-nums;color:rgba(255,255,255,.6)}
+.tc-last-label{color:rgba(255,255,255,.55);font-weight:600}
+.tc-last-val{font-variant-numeric:tabular-nums;color:rgba(255,255,255,.82)}
+.tc-last.stale{color:#ffe09a}.tc-last.stale .tc-last-label,.tc-last.stale .tc-last-val{color:#ffe09a}
 
 /* 深色模式時鐘稍微調亮 */
 @media(prefers-color-scheme:dark){
@@ -307,12 +308,12 @@ nav{
   box-shadow:0 4px 16px rgba(255,59,48,.15);
 }
 
-.emp-badge-label{font-size:10px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--t3);margin-bottom:7px}
+.emp-badge-label{font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--t3);margin-bottom:7px}
 .emp-display-top{display:flex;align-items:center;gap:13px}
 .emp-av{width:56px;height:56px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;background:var(--fill1)}
 .emp-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .emp-disp-name{font-size:clamp(26px,7vw,32px);font-weight:700;color:var(--t1);letter-spacing:-.4px;line-height:1.1}
-.emp-disp-id{font-size:13px;color:var(--t2);font-variant-numeric:tabular-nums}
+.emp-disp-id{font-size:15px;color:var(--t2);font-variant-numeric:tabular-nums}
 
 /* 大打卡按鈕（永遠顯示，flex 填滿） */
 .big-punch-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0}
@@ -359,6 +360,10 @@ nav{
   letter-spacing:-.2px;
 }
 .change-btn:active{filter:brightness(.9);transform:scale(.98)}
+.secondary-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0}
+.secondary-action{min-height:46px;padding:10px 8px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);color:var(--t1);font:700 14px var(--font);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.secondary-action:active{background:var(--fill2);transform:scale(.98)}
+.secondary-action.help{color:var(--accent)}
 
 /* ══ 鍵盤全螢幕覆蓋（像 iPhone 輸入法） ══ */
 #keyboard-overlay{
@@ -605,6 +610,10 @@ nav{
 }
 .admin-menu-item:active{background:var(--fill2)}
 @media(hover:hover){.admin-menu-item:hover{background:var(--fill2)}}
+.admin-quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 14px}
+.admin-quick-btn{min-height:72px;padding:9px 6px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--t1);font:700 13px var(--font);cursor:pointer;box-shadow:var(--sh1)}
+.admin-quick-btn:active{background:var(--fill2);transform:scale(.98)}
+.admin-quick-icon{display:block;font-size:21px;margin-bottom:4px}
 .ami-icon{
   width:34px;height:34px;border-radius:9px;
   display:flex;align-items:center;justify-content:center;
@@ -813,6 +822,8 @@ tr:hover td{background:var(--surface2)}
 .site-chip.sc-type-b.sc-selected{background:var(--success);border-color:var(--success)}
 #site-selector-section{padding:10px 16px 12px;background:var(--surface);border-bottom:.5px solid var(--border)}
 #site-chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#site-chip-list.is-collapsed{display:none}
+.site-selector-toggle{min-height:40px;font-size:14px;font-weight:700}
 #site-chip-search{font-size:12px;padding:4px 10px;height:28px;width:110px}
 .site-sel-summary{font-size:12px;color:var(--t3);margin-top:8px;padding-top:6px;border-top:.5px solid var(--border2)}
 
@@ -907,6 +918,7 @@ button,input,select{font-family:var(--font)}
     <div class="mf">
       <label for="lookup-name">姓名</label>
       <input id="lookup-name" class="fi" type="text" autocomplete="name" placeholder="請輸入完整姓名" maxlength="20"/>
+      <span class="mf-hint" id="lookup-name-error" aria-live="polite"></span>
     </div>
     <div class="mf">
       <label for="lookup-type">驗證方式</label>
@@ -919,6 +931,7 @@ button,input,select{font-family:var(--font)}
       <label id="lookup-value-label" for="lookup-value">手機末四碼</label>
       <input id="lookup-value" class="fi" type="text" inputmode="numeric" autocomplete="off" placeholder="例：5678" maxlength="4"/>
       <span class="mf-hint" id="lookup-hint">請輸入您自己的手機號碼末四碼</span>
+      <span class="mf-hint" id="lookup-value-error" aria-live="polite"></span>
     </div>
     <div id="lookup-result" class="mf-hint" aria-live="polite"></div>
     <div class="modal-actions">
@@ -1000,7 +1013,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.0 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.1 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1189,7 +1202,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.0 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.1 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1256,7 +1269,7 @@ button,input,select{font-family:var(--font)}
           </svg>
           <div class="bpb-icon">☀️</div>
           <div class="bpb-text">上班打卡</div>
-          <div class="bpb-sub" id="sub-in">長按確認</div>
+          <div class="bpb-sub" id="sub-in">按住 1.5 秒確認</div>
         </button>
         <button class="big-punch-btn bpb-out" id="btn-out"
           onmousedown="startHold('下班',this)" onmouseup="cancelHold()" onmouseleave="cancelHold()"
@@ -1267,7 +1280,7 @@ button,input,select{font-family:var(--font)}
           </svg>
           <div class="bpb-icon">🌙</div>
           <div class="bpb-text">下班打卡</div>
-          <div class="bpb-sub" id="sub-out">長按確認</div>
+          <div class="bpb-sub" id="sub-out">按住 1.5 秒確認</div>
         </button>
       </div>
 
@@ -1276,11 +1289,10 @@ button,input,select{font-family:var(--font)}
         🔢 輸入員工編號
       </button>
 
-      <!-- 臨時人員打卡 -->
-      <button onclick="openSubModal()" style="background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;font-family:var(--font);padding:4px 0;text-align:center;width:100%;font-weight:600">👤 臨時人員打卡</button>
-
-      <!-- 重新看說明 -->
-      <button onclick="replayGuide()" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:var(--font);padding:4px 0;text-align:center;width:100%">❓ 不知道怎麼打卡？點這裡看說明</button>
+      <div class="secondary-actions" aria-label="其他操作">
+        <button class="secondary-action" onclick="openSubModal()">臨時人員打卡</button>
+        <button class="secondary-action help" onclick="replayGuide()">查看打卡說明</button>
+      </div>
 
     </div>
   </div>
@@ -1304,6 +1316,13 @@ button,input,select{font-family:var(--font)}
 
     <!-- ══ 分類清單選單 ══ -->
     <div id="admin-menu">
+
+      <div class="admin-menu-hd">常用功能</div>
+      <div class="admin-quick-grid" aria-label="常用管理功能">
+        <button class="admin-quick-btn" onclick="showSub('records',this)"><span class="admin-quick-icon">📋</span>查打卡</button>
+        <button class="admin-quick-btn" onclick="showSub('overview',this)"><span class="admin-quick-icon">📊</span>今日總覽</button>
+        <button class="admin-quick-btn admin-only" onclick="showSub('monthly-report',this)"><span class="admin-quick-icon">📅</span>月度報表</button>
+      </div>
 
       <!-- 今日異常橫幅 -->
       <div id="anomaly-banner" style="display:none;margin:12px 16px 4px;background:color-mix(in srgb,var(--warn) 14%,var(--surface2));border:1.5px solid color-mix(in srgb,var(--warn) 35%,transparent);border-radius:12px;padding:12px 16px;cursor:pointer" onclick="navigateTo('anomaly')">
@@ -1596,13 +1615,14 @@ button,input,select{font-family:var(--font)}
       <div id="site-selector-section">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-size:13px;font-weight:600;color:var(--t2);white-space:nowrap">📍 選擇案場</span>
+          <button class="btn-s bs-accent site-selector-toggle" id="site-selector-toggle" onclick="toggleSiteSelector()" aria-expanded="false">選擇案場</button>
           <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px" onclick="selectAllSites()">全選</button>
           <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px" onclick="clearSiteSelection()">清除</button>
           <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--border))" onclick="selectSitesByType('A')">銀座</button>
           <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px;color:var(--success);border-color:color-mix(in srgb,var(--success) 40%,var(--border))" onclick="selectSitesByType('B')">物業</button>
           <input type="text" class="fi site-chip-search" id="site-chip-search" placeholder="搜尋案場…" oninput="filterSiteChips(this.value)"/>
         </div>
-        <div id="site-chip-list"></div>
+        <div id="site-chip-list" class="is-collapsed"></div>
         <div class="site-sel-summary" id="site-sel-summary">已選：全部案場</div>
       </div>
 
@@ -2250,17 +2270,42 @@ async function syncSupervisorsFromFirebase(){
   }
 }
 function getSiteV(siteId){
-  return localStorage.getItem('site_token_v_'+siteId)||'0';
+  return localStorage.getItem('site_token_v_'+resolveSiteId(siteId))||'0';
+}
+function isQrVersionCurrent(siteId, requestedVersion, versions){
+  const canonicalId=resolveSiteId(siteId);
+  const current=(versions&&versions[canonicalId]!==undefined)?versions[canonicalId]:'0';
+  return String(requestedVersion||'0')===String(current);
+}
+async function getRemoteQrVersion(siteId){
+  const canonicalId=resolveSiteId(siteId);
+  if(!FB_DB) return getSiteV(canonicalId);
+  const snap=await FB_DB.ref('config/qr_versions/'+canonicalId).once('value');
+  const value=snap.val();
+  const version=value===null||value===undefined?'0':String(value);
+  localStorage.setItem('site_token_v_'+canonicalId,version);
+  return version;
+}
+async function syncQrVersionsFromFirebase(){
+  if(!FB_DB) return {};
+  try{
+    const data=(await FB_DB.ref('config/qr_versions').once('value')).val()||{};
+    Object.keys(data).forEach(siteId=>localStorage.setItem('site_token_v_'+siteId,String(data[siteId])));
+    return data;
+  }catch(e){ console.warn('QR 版本同步失敗:',e); return {}; }
 }
 function getSiteToken(siteId){
   // token 由 案場ID + 公司驗證碼 + 版本號 hash 計算，跨裝置一致
   return hashPwd(siteId+'DYS0427'+getSiteV(siteId)).slice(0,8).toUpperCase();
 }
-function regenerateSiteToken(siteId){
-  const key='site_token_v_'+siteId;
-  const v=String(parseInt(localStorage.getItem(key)||'0')+1);
-  localStorage.setItem(key,v);
-  return getSiteToken(siteId);
+async function regenerateSiteToken(siteId){
+  const canonicalId=resolveSiteId(siteId);
+  if(!FB_DB) throw new Error('QR 版本雲端尚未連線，請確認網路後再試');
+  const current=await getRemoteQrVersion(canonicalId);
+  const next=String((parseInt(current,10)||0)+1);
+  await FB_DB.ref('config/qr_versions/'+canonicalId).set(next);
+  localStorage.setItem('site_token_v_'+canonicalId,next);
+  return getSiteToken(canonicalId);
 }
 function getSiteById(id){return getSites().find(s=>s.id===id)||null}
 // ── 員工資料防重合併機制 ───────────────────────
@@ -2283,13 +2328,7 @@ function initEmployees() {
   if(savedVer !== DB_VERSION) {
     // 首次載入或版本更新：把預設員工補入（不蓋掉已有資料）
     mergeEmployees(_DEFAULT_EMPLOYEES);
-    // 版本升級時全部員工強制啟用（清除所有停用狀態）
-    const emps = JSON.parse(localStorage.getItem('employees') || '[]');
-    let changed = false;
-    emps.forEach(e => {
-      if(e.disabled){ e.disabled = false; e.autoDisabled = false; changed = true; }
-    });
-    if(changed) localStorage.setItem('employees', JSON.stringify(emps));
+    // 版本升級不可改變既有停用狀態，避免離職或停權員工被意外重新啟用。
     localStorage.setItem('db_version', DB_VERSION);
   }
 }
@@ -2336,6 +2375,7 @@ async function syncSitesFromFirebase(){
   }catch(e){ console.warn('案場 Firebase 同步失敗:', e); }
 }
 setTimeout(syncSitesFromFirebase, 2000);
+setTimeout(syncQrVersionsFromFirebase, 2000);
 
 let employees = JSON.parse(localStorage.getItem('employees') || JSON.stringify(_DEFAULT_EMPLOYEES));
 let localRecs = JSON.parse(localStorage.getItem('local_records')||'[]');
@@ -2389,7 +2429,10 @@ async function syncAuthFromFirebase(){
 function getResetKeyHash(){return localStorage.getItem('reset_key_hash')||''}
 function setResetKeyHash(k){localStorage.setItem('reset_key_hash',hashPwd(k))}
 function findEmp(id){return employees.find(e=>e.id===id)||null}
-function today(){return new Date().toISOString().slice(0,10)}
+function localDateKey(value=new Date()){
+  return `${value.getFullYear()}-${pad(value.getMonth()+1)}-${pad(value.getDate())}`;
+}
+function today(){return localDateKey()}
 
 // ══════════════════════════════════════
 //  缺勤計算
@@ -2770,13 +2813,16 @@ function guideSkip(){
 // ══════════════════════════════════════
 let deferredPrompt = null;
 
+function showPwaBannerWhenReady(){
+  if(!deferredPrompt || drawerOpen || localStorage.getItem('pwa_dismissed') || !localStorage.getItem('guide_done')) return;
+  setTimeout(()=> $('pwa-banner').classList.add('show'), 1200);
+}
+
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   deferredPrompt = e;
-  // 若之前沒有關閉過，3 秒後顯示 banner
-  if(!localStorage.getItem('pwa_dismissed')){
-    setTimeout(()=> $('pwa-banner').classList.add('show'), 3000);
-  }
+  // 新手引導尚未完成時不打斷；完成後才顯示安裝提示。
+  showPwaBannerWhenReady();
 });
 
 async function installPWA(){
@@ -2884,6 +2930,7 @@ function openDrawer(){
 function closeDrawer(){
   drawerOpen = false;
   $('keyboard-overlay').classList.remove('show');
+  showPwaBannerWhenReady();
 }
 function toggleDrawer(){
   drawerOpen ? closeDrawer() : openDrawer();
@@ -2913,6 +2960,26 @@ function updateLookupHint(){
   $('lookup-value').placeholder = birthday ? '例：0520' : '例：5678';
   $('lookup-hint').textContent = birthday ? '請輸入出生月日，共四碼' : '請輸入您自己的手機號碼末四碼';
 }
+function clearLookupErrors(){
+  ['lookup-name','lookup-value'].forEach(id=>$(id).removeAttribute('aria-invalid'));
+  $('lookup-name-error').textContent = '';
+  $('lookup-value-error').textContent = '';
+}
+function showLookupErrors(name, verifyValue){
+  clearLookupErrors();
+  let valid = true;
+  if(!name){
+    $('lookup-name').setAttribute('aria-invalid','true');
+    $('lookup-name-error').textContent = '請輸入您的完整姓名';
+    valid = false;
+  }
+  if(!/^\d{4}$/.test(verifyValue)){
+    $('lookup-value').setAttribute('aria-invalid','true');
+    $('lookup-value-error').textContent = '請輸入四碼數字';
+    valid = false;
+  }
+  return valid;
+}
 function requestEmployeeIdLookup(params){
   return new Promise((resolve,reject)=>{
     const callbackName = '__dysEmployeeLookup_' + Date.now() + '_' + (++_employeeLookupSeq);
@@ -2932,8 +2999,8 @@ async function lookupEmployeeIdFromServer(){
   const verifyType = $('lookup-type').value;
   const verifyValue = $('lookup-value').value.replace(/\D/g,'');
   const result = $('lookup-result');
-  if(!name || !/^\d{4}$/.test(verifyValue)){
-    result.textContent = '請輸入完整姓名與四碼驗證資料';
+  if(!showLookupErrors(name, verifyValue)){
+    result.textContent = '請完成標示的欄位後再查詢';
     result.style.color = 'var(--danger)';
     return;
   }
@@ -3072,7 +3139,7 @@ function resetHold(){
     const prog = document.getElementById(isIn ? 'ring-in-prog' : 'ring-out-prog');
     if(prog){ prog.style.transition='none'; prog.style.strokeDashoffset='276'; }
     const sub = isIn ? $('sub-in') : $('sub-out');
-    if(sub) sub.textContent = '長按確認';
+    if(sub) sub.textContent = '按住 1.5 秒確認';
   }
   holdTimer=null; holdRaf=null; holdStart=null; holdType=null; holdBtn=null;
 }
@@ -3087,13 +3154,23 @@ function nkPress(d){
 }
 
 // ── 上次打卡顯示 ──
+function summarizeLastPunch(rec, now){
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  if(rec.date === todayStr) return { text: `今天 ${rec.time} ${rec.type}`, stale: false };
+  const parts = String(rec.date || '').split('-');
+  const shortDate = parts.length === 3 ? `${Number(parts[1])}/${Number(parts[2])}` : rec.date;
+  const past = new Date(`${rec.date}T00:00:00`);
+  const days = Number.isNaN(past.getTime()) ? 0 : Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - past) / 86400000);
+  return { text: `${shortDate} ${rec.time} ${rec.type}${days > 7 ? '（請確認）' : ''}`, stale: days > 7 };
+}
 function updateLastPunch(){
   const empId = localStorage.getItem('last_emp_id');
   if(!empId||!localRecs.length){ $('tc-last').className='tc-last'; return; }
   const rec = localRecs.find(r=>r.empId===empId);
   if(!rec){ $('tc-last').className='tc-last'; return; }
-  $('tc-last').className='tc-last show';
-  $('tc-last-val').textContent = `${rec.type} ${rec.date} ${rec.time}`;
+  const summary = summarizeLastPunch(rec, new Date());
+  $('tc-last').className = `tc-last show${summary.stale ? ' stale' : ''}`;
+  $('tc-last-val').textContent = summary.text;
 }
 // 取得裝置公開 IP（背景執行，失敗不影響打卡）
 async function fetchClientIP(){
@@ -3355,7 +3432,7 @@ function pruneOldRecs(){
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - retainDays);
-  const cutoffStr = cutoff.toISOString().slice(0,10);
+  const cutoffStr = localDateKey(cutoff);
   const before = localRecs.length;
   // 只刪除「已同步」且「超過保留期限」的紀錄，未同步的保留
   localRecs = localRecs.filter(r => r.date >= cutoffStr || r.synced === false || r.fbSynced === false);
@@ -4293,7 +4370,7 @@ async function syncFromSheets(){
     const res=await fetch(`${SCRIPT_URL}?action=getEmployees`);
     const d=await res.json();
     if(d.employees&&Array.isArray(d.employees)){
-      employees=d.employees.map(e=>({...e,disabled:false,absentLimit:null}));
+      employees=mergeSheetEmployees(employees,d.employees);
       saveEmps();renderEmpList();showToast(`已同步 ${employees.length} 位員工`,'success');
     }else{showToast('Sheets 尚未建立員工名單','error')}
   }catch(e){showToast('同步失敗，請確認網址及網路','error')}
@@ -5173,13 +5250,17 @@ function _drawQr(text, canvasId){
   } catch(e){ div.textContent='QR Code 產生失敗'; }
 }
 
-function regenQr(siteId){
+async function regenQr(siteId){
   if(!confirm(`確定要更換「${siteId}」的 QR Code？
 舊的 QR Code 貼紙將立即失效，需重新列印。`)) return;
-  regenerateSiteToken(siteId);
-  $('qr-detail-modal').remove();
-  showToast(`${siteId} QR Code 已更換，請重新列印貼紙`, 'ok');
-  renderQrList();
+  try{
+    await regenerateSiteToken(siteId);
+    $('qr-detail-modal').remove();
+    showToast(`${siteId} QR Code 已更換，請重新列印貼紙`, 'ok');
+    renderQrList();
+  }catch(e){
+    showToast(e.message||'QR Code 更換失敗，請稍後再試','error');
+  }
 }
 
 function printQr(siteId){
@@ -5187,9 +5268,14 @@ function printQr(siteId){
   const token = getSiteToken(siteId);
   const url = `${location.origin}${location.pathname}?site=${siteId}&token=${token}&v=${getSiteV(siteId)}`;
   const dateStr = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
+  const safeSiteName=escapeHtml(site.name);
+  const safeSiteId=escapeHtml(site.id);
+  const safeWarn1=escapeHtml(localStorage.getItem('qr_warn_1')||'上班到了別忘了掃碼打卡，並請注意身體狀況，有異常即刻回報！');
+  const safeWarn2=escapeHtml(localStorage.getItem('qr_warn_2')||'下班前也記得再掃一次，下班路途請注意安全。');
+  const safeWarn3=escapeHtml(localStorage.getItem('qr_warn_3')||'掃描遇到問題嗎？請告知值班主管，我們來幫你處理。');
   const win = window.open('','_blank','width=794,height=1123');
   win.document.write(`<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8">
-<title>打卡掃描碼 - ${site.name}</title>
+<title>打卡掃描碼 - ${safeSiteName}</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -5238,8 +5324,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-se
   <div class="bd">
     <div class="site-row">
       <div>
-        <div class="site-name">${site.name}</div>
-        <div class="site-id">案場代號 &nbsp; ${site.id}</div>
+        <div class="site-name">${safeSiteName}</div>
+        <div class="site-id">案場代號 &nbsp; ${safeSiteId}</div>
       </div>
       <span class="site-badge">VALID</span>
     </div>
@@ -5256,9 +5342,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-se
   </div>
   <div class="warn">
     <div class="warn-title">小提醒 <span class="edit-hint">（點擊文字可直接編輯）</span></div>
-    <div class="warn-item"><span class="warn-bullet">☀</span><span class="warn-text" contenteditable="true" spellcheck="false">${localStorage.getItem('qr_warn_1')||'上班到了別忘了掃碼打卡，並請注意身體狀況，有異常即刻回報！'}</span></div>
-    <div class="warn-item"><span class="warn-bullet">🌙</span><span class="warn-text" contenteditable="true" spellcheck="false">${localStorage.getItem('qr_warn_2')||'下班前也記得再掃一次，下班路途請注意安全。'}</span></div>
-    <div class="warn-item"><span class="warn-bullet">💬</span><span class="warn-text" contenteditable="true" spellcheck="false">${localStorage.getItem('qr_warn_3')||'掃描遇到問題嗎？請告知值班主管，我們來幫你處理。'}</span></div>
+    <div class="warn-item"><span class="warn-bullet">☀</span><span class="warn-text" contenteditable="true" spellcheck="false">${safeWarn1}</span></div>
+    <div class="warn-item"><span class="warn-bullet">🌙</span><span class="warn-text" contenteditable="true" spellcheck="false">${safeWarn2}</span></div>
+    <div class="warn-item"><span class="warn-bullet">💬</span><span class="warn-text" contenteditable="true" spellcheck="false">${safeWarn3}</span></div>
   <div class="ft">
     <span>請勿拆除 &nbsp;·&nbsp; 僅供員工使用</span>
     <span>列印日期：${dateStr}</span>
@@ -5612,6 +5698,28 @@ function updateSiteFilterBtn(){
     chip.classList.toggle('sc-selected', _selectedSiteIds.has(chip.dataset.id));
   });
 }
+function mergeSheetEmployees(existing, sheetEmployees){
+  const currentById=new Map((Array.isArray(existing)?existing:[]).map(emp=>[emp.id,emp]));
+  return sheetEmployees.map(emp=>{
+    const previous=currentById.get(emp.id);
+    if(!previous) return {...emp,disabled:false,absentLimit:null};
+    const preserved={};
+    ['disabled','manualDisabled','autoDisabled','siteId','absentLimit'].forEach(key=>{
+      if(previous[key]!==undefined) preserved[key]=previous[key];
+    });
+    return {...emp,...preserved};
+  });
+}
+
+function toggleSiteSelector(forceOpen){
+  const list = $('site-chip-list');
+  const toggle = $('site-selector-toggle');
+  if(!list || !toggle) return;
+  const open = typeof forceOpen === 'boolean' ? forceOpen : list.classList.contains('is-collapsed');
+  list.classList.toggle('is-collapsed', !open);
+  toggle.setAttribute('aria-expanded', String(open));
+  toggle.textContent = open ? '收合案場清單' : '選擇案場';
+}
 
 /** 點擊 chip 切換選取 */
 function toggleSiteChip(id, el){
@@ -5628,6 +5736,7 @@ function toggleSiteChip(id, el){
 /** 搜尋過濾 chips */
 function filterSiteChips(q){
   const lq = q.trim().toLowerCase();
+  if(lq) toggleSiteSelector(true);
   document.querySelectorAll('#site-chip-list .site-chip').forEach(chip => {
     chip.style.display = (!lq || chip.dataset.label.toLowerCase().includes(lq)) ? '' : 'none';
   });
@@ -5685,6 +5794,7 @@ function initExportSiteSelect(){
     const selClass  = _selectedSiteIds.has(s.id) ? 'sc-selected' : '';
     return `<button class="site-chip ${typeClass} ${selClass}" data-id="${escapeHtml(s.id)}" data-label="${escapeHtml(label.toLowerCase())}" onclick="toggleSiteChip('${s.id}', this)">${escapeHtml(label)}</button>`;
   }).join('');
+  toggleSiteSelector(false);
   updateSiteFilterBtn();
 }
 
@@ -6032,18 +6142,29 @@ restoreLastEmp();
 // ══════════════════════════════════════
 //  QR Code URL 偵測（掃碼進入）
 // ══════════════════════════════════════
-(function detectQrSite(){
+(async function detectQrSite(){
   const params = new URLSearchParams(location.search);
   const siteId = params.get('site');
   const token  = params.get('token');
   if(!siteId || !token) return;
-  // 跨裝置驗證：依 URL 帶入的版本號計算預期 token，不依賴 localStorage
+  // 先驗證 token，再向雲端確認此案場目前允許的 QR 版本。
   const v = params.get('v')||'0';
   if(!isSiteTokenValid(siteId,token,v)){
     window.addEventListener('load',()=>showToast('此 QR Code 已失效，請聯絡幹部更換','error'),{once:true});
     return;
   }
-  CURRENT_SITE_ID = resolveSiteId(siteId);
+  const canonicalId=resolveSiteId(siteId);
+  try{
+    const currentVersion=await getRemoteQrVersion(canonicalId);
+    if(!isQrVersionCurrent(canonicalId,v,{[canonicalId]:currentVersion})){
+      window.addEventListener('load',()=>showToast('此 QR Code 已失效，請聯絡幹部更換','error'),{once:true});
+      return;
+    }
+  }catch(e){
+    window.addEventListener('load',()=>showToast('暫時無法確認 QR Code，請確認網路後重試','error'),{once:true});
+    return;
+  }
+  CURRENT_SITE_ID = canonicalId;
   // 立即移除 URL 參數，防止使用者收藏或重新整理後繞過掃碼機制
   history.replaceState({}, '', location.pathname);
   const site = getSiteById(CURRENT_SITE_ID);
