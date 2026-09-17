@@ -405,3 +405,25 @@ test('後台分析合併本機與雲端紀錄時同 timestamp 只保留一筆', 
   const merged = context.run([{ timestamp: 'same', source: 'local' }], [{ timestamp: 'same', source: 'cloud' }, { timestamp: 'new' }]);
   assert.deepEqual(JSON.parse(JSON.stringify(merged)), [{ timestamp: 'same', source: 'local' }, { timestamp: 'new' }]);
 });
+
+test('臨時人員歷程只彙整出勤案場與日期，不回傳身分證欄位', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'buildTempStaffHistory')}; this.run = buildTempStaffHistory;`, context);
+  const result = context.run([{ id: 'TMP_1', name: '代班甲', idHash: 'private' }], [
+    { empId: 'TMP_1', siteId: 'A058', date: '2026-09-10', type: '上班' },
+    { empId: 'TMP_1', siteId: 'B002', date: '2026-09-12', type: '下班' },
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), [{ id: 'TMP_1', name: '代班甲', attendanceDays: 2, sites: ['A058', 'B002'], lastDate: '2026-09-12' }]);
+  assert.equal('idHash' in result[0], false);
+});
+
+test('月結檢查統計漏下班、重複、逾期補卡與未同步紀錄', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'buildMonthCloseSummary')}; this.run = buildMonthCloseSummary;`, context);
+  const result = context.run([
+    { empId: '1001', date: '2026-09-10', type: '上班', timestamp: 'a', manual: true, createdAt: '2026-10-20', fbSynced: true },
+    { empId: '1002', date: '2026-09-11', type: '上班', timestamp: 'b', fbSynced: false },
+    { empId: '1002', date: '2026-09-11', type: '上班', timestamp: 'c', fbSynced: true },
+  ], '2026-09', '2026-10-20');
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), { missingOut: 2, duplicate: 1, overdueManual: 1, unsynced: 1 });
+});

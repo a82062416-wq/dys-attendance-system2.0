@@ -1013,7 +1013,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.3 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.4 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1206,7 +1206,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.3 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.4 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1379,6 +1379,16 @@ button,input,select{font-family:var(--font)}
         <div class="admin-menu-item" onclick="showSub('employee-analysis',this)">
           <div class="ami-icon" style="background:rgba(88,86,214,.10)">👤</div>
           <span class="ami-label">人員出勤分析</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item" onclick="showSub('temp-history',this)">
+          <div class="ami-icon" style="background:rgba(88,86,214,.10)">🧾</div>
+          <span class="ami-label">臨時人員歷程</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item" onclick="showSub('month-close',this)">
+          <div class="ami-icon" style="background:rgba(255,159,10,.10)">📅</div>
+          <span class="ami-label">月結前檢查</span>
           <span class="ami-chevron">›</span>
         </div>
         <div class="admin-menu-item" id="menu-item-attendance-stat" style="display:none" onclick="showSub('attendance-stat',this)">
@@ -1606,6 +1616,19 @@ button,input,select{font-family:var(--font)}
           <tbody id="employee-analysis-body"><tr><td colspan="5"><div class="empty-state"><div class="empty-icon">👤</div><p>載入中…</p></div></td></tr></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="sub-page" id="sub-temp-history">
+      <div class="toolbar"><div class="toolbar-title">臨時人員歷程</div><div class="toolbar-right"><button class="btn-s bs-ghost" onclick="loadTempStaffHistory()">🔄 更新</button><button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button></div></div>
+      <div style="font-size:12px;color:var(--t3);margin:0 0 10px">顯示近 90 天出勤與案場；完整身分證不會在此頁顯示。</div>
+      <div class="table-wrap"><table><thead><tr><th>臨時人員</th><th>出勤天數</th><th>服務案場</th><th>最近出勤</th></tr></thead><tbody id="temp-history-body"></tbody></table></div>
+    </div>
+
+    <div class="sub-page" id="sub-month-close">
+      <div class="toolbar"><div class="toolbar-title">月結前檢查</div><div class="toolbar-right"><input type="month" class="fi" id="month-close-month"/><button class="btn-s bs-ghost" onclick="loadMonthCloseCheck()">查詢</button><button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button></div></div>
+      <div id="month-close-note" style="font-size:12px;color:var(--t3);margin:0 0 10px"></div>
+      <div class="stats-row" style="margin-bottom:14px"><div class="stat-card"><div class="stat-val" id="mc-noout">–</div><div class="stat-lbl">漏下班</div></div><div class="stat-card"><div class="stat-val" id="mc-duplicate">–</div><div class="stat-lbl">重複打卡</div></div><div class="stat-card"><div class="stat-val" id="mc-overdue">–</div><div class="stat-lbl">逾期補卡</div></div><div class="stat-card"><div class="stat-val" id="mc-unsynced">–</div><div class="stat-lbl">未同步</div></div></div>
+      <div id="month-close-result" class="empty-state"><div class="empty-icon">📅</div><p>選擇月份後開始月結檢查</p></div>
     </div>
 
     <!-- ══ 出勤統計 ══ -->
@@ -4199,6 +4222,33 @@ function buildDailyActionItems(anomalies){
     action:item.kind==='missing_out'?'補下班':'查看紀錄'
   })).sort((a,b)=>a.severity===b.severity?0:(a.severity==='red'?-1:1));
 }
+function buildTempStaffHistory(tempEmployees, records){
+  return (Array.isArray(tempEmployees)?tempEmployees:[]).map(temp=>{
+    const tempRecords=(Array.isArray(records)?records:[]).filter(record=>record&&record.empId===temp.id);
+    const sites=[...new Set(tempRecords.map(record=>record.siteId).filter(Boolean))].sort();
+    const lastDate=tempRecords.map(record=>String(record.date||'')).sort().at(-1)||'';
+    return {id:temp.id,name:temp.name||temp.id,attendanceDays:new Set(tempRecords.map(record=>record.date).filter(Boolean)).size,sites,lastDate};
+  }).sort((a,b)=>String(b.lastDate).localeCompare(String(a.lastDate)));
+}
+function buildMonthCloseSummary(records, month, currentDate){
+  const rows=(Array.isArray(records)?records:[]).filter(record=>record&&String(record.date||'').startsWith(month));
+  const grouped={};
+  rows.forEach(record=>{ const key=record.empId+'|'+record.date; (grouped[key]||(grouped[key]=[])).push(record); });
+  let missingOut=0,duplicate=0;
+  Object.values(grouped).forEach(dayRows=>{
+    const types={}; dayRows.forEach(row=>{types[row.type]=(types[row.type]||0)+1;});
+    if(types['上班']&&!types['下班']) missingOut++;
+    if(Object.values(types).some(count=>count>1)) duplicate++;
+  });
+  const now=new Date(String(currentDate||today())+'T00:00:00');
+  const overdueManual=rows.filter(row=>{
+    if(!row.manual||!row.createdAt) return false;
+    const worked=new Date(String(row.date)+'T00:00:00');
+    const created=new Date(row.createdAt);
+    return !Number.isNaN(worked.getTime())&&!Number.isNaN(created.getTime())&&Math.floor((created-worked)/86400000)>30;
+  }).length;
+  return {missingOut,duplicate,overdueManual,unsynced:rows.filter(row=>row.fbSynced!==true).length};
+}
 function buildSiteHealth(sites, anomalies, records){
   const anomalyItems=Array.isArray(anomalies)?anomalies:[];
   const allRecords=Array.isArray(records)?records:[];
@@ -4320,6 +4370,30 @@ async function loadEmployeeAnalysis(days){
   $('emp-analysis-30').className='btn-s '+(days===30?'bs-accent':'bs-ghost');
   if(!rows.length){ body.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📭</div><p>此期間沒有出勤資料</p></div></td></tr>'; return; }
   body.innerHTML=rows.map(row=>`<tr><td><strong>${escapeHtml(row.name)}</strong><div style="font:12px 'SF Mono',monospace;color:var(--t3)">${escapeHtml(row.empId)}</div></td><td>${row.attendanceDays}</td><td style="color:${row.missingOut?'var(--danger)':'var(--t3)'}">${row.missingOut||'–'}</td><td style="color:${row.duplicate?'var(--warn)':'var(--t3)'}">${row.duplicate||'–'}</td><td style="font-size:12px">${escapeHtml(row.lastDate||'–')}<div style="color:var(--t3)">${escapeHtml(row.lastSiteId?getSiteName(row.lastSiteId):'–')}</div>${row.missingOut?`<button class="btn-s bs-ghost" style="margin-top:5px;font-size:11px;padding:4px 8px" onclick="openManualPunchFor('${encodeURIComponent(row.empId)}','${encodeURIComponent(row.lastDate)}','${encodeURIComponent(row.lastSiteId||'')}')">補下班</button>`:''}</td></tr>`).join('');
+}
+async function loadTempStaffHistory(){
+  const result=await loadAnalysisRecords(90);
+  const rows=buildTempStaffHistory(getTempEmps(),result.records);
+  const body=$('temp-history-body');
+  if(!rows.length){ body.innerHTML='<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">🧾</div><p>目前沒有臨時人員出勤資料</p></div></td></tr>'; return; }
+  body.innerHTML=rows.map(row=>`<tr><td><strong>${escapeHtml(row.name)}</strong><div style="font:12px 'SF Mono',monospace;color:var(--t3)">${escapeHtml(row.id)}</div></td><td>${row.attendanceDays}</td><td style="font-size:12px">${row.sites.map(siteId=>escapeHtml(getSiteName(siteId))).join('<br>')||'–'}</td><td>${escapeHtml(row.lastDate||'–')}</td></tr>`).join('');
+}
+async function loadMonthCloseCheck(){
+  const input=$('month-close-month');
+  if(!input.value) input.value=today().slice(0,7);
+  const month=input.value;
+  const start=new Date(month+'-01T00:00:00');
+  const end=new Date(today()+'T00:00:00');
+  const days=Math.max(31,Math.min(370,Math.floor((end-start)/86400000)+1));
+  const result=await loadAnalysisRecords(days);
+  const summary=buildMonthCloseSummary(result.records,month,today());
+  $('mc-noout').textContent=summary.missingOut;
+  $('mc-duplicate').textContent=summary.duplicate;
+  $('mc-overdue').textContent=summary.overdueManual;
+  $('mc-unsynced').textContent=summary.unsynced;
+  const issues=summary.missingOut+summary.duplicate+summary.overdueManual+summary.unsynced;
+  $('month-close-note').textContent='月結前請先處理紅色項目；優先使用雲端資料。'+(result.complete?'':' 目前無法完整同步，請稍後重試。');
+  $('month-close-result').innerHTML=issues?`<div class="empty-icon">⚠️</div><p>${month} 尚有 ${issues} 項需要確認</p><button class="btn-s bs-accent" onclick="showSub('anomaly')">查看異常報表</button>`:'<div class="empty-icon">✅</div><p>本月目前沒有需要確認的月結項目</p>';
 }
 function openManualPunchFor(encodedEmpId, encodedDate, encodedSiteId){
   openManualPunch({empId:decodeURIComponent(encodedEmpId),date:decodeURIComponent(encodedDate),siteId:decodeURIComponent(encodedSiteId),reason:'異常補登：漏打下班'});
@@ -5150,7 +5224,7 @@ function showSub(name,el){
   // 更新標題列
   const _labels = {
     'records':'打卡紀錄','overview':'今日總覽','chart':'統計圖表',
-    'daily-actions':'今日待處理','anomaly':'異常報表','site-health':'案場狀態','employee-analysis':'人員出勤分析','attendance-stat':'出勤統計','monthly-report':'月度報表',
+    'daily-actions':'今日待處理','anomaly':'異常報表','site-health':'案場狀態','employee-analysis':'人員出勤分析','temp-history':'臨時人員歷程','month-close':'月結前檢查','attendance-stat':'出勤統計','monthly-report':'月度報表',
     'employees':'員工名單','supervisors':'幹部管理','qrcode':'QR Code','settings':'設定'
   };
   const backBtn = $('sub-back-btn');
@@ -5159,6 +5233,8 @@ function showSub(name,el){
   if(titleEl) titleEl.textContent = _labels[name] || name;
   // 資料載入
   if(name==='daily-actions') loadDailyActionCenter();
+  if(name==='temp-history') loadTempStaffHistory();
+  if(name==='month-close') loadMonthCloseCheck();
   if(name==='records'){         initSiteFilter(); loadRecords(); }
   if(name==='attendance-stat'){ initStatMonth(); loadAttendanceStat(); }
   if(name==='monthly-report'){ initExportSiteSelect(); const _el=$('monthly-report-month'); if(_el&&!_el.value){const _n=new Date();_el.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');} updateSiteFilterBtn(); }
