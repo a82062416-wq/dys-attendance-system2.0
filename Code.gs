@@ -12,16 +12,42 @@ const SHEET_RECORDS   = '打卡紀錄';
 const SHEET_EMPLOYEES = '員工資料';
 const TEMP_VAULT_PROPERTY = 'TEMP_IDENTITY_VAULT_ID';
 const TEMP_VAULT_SECRET_PROPERTY = 'TEMP_IDENTITY_VAULT_SECRET';
+const MONTHLY_BACKUP_FOLDER_PROPERTY = 'MONTHLY_BACKUP_FOLDER_ID';
 
 // 完整身分證只接受 POST 本文，不得透過 GET／一般打卡紀錄傳送。
 function doPost(e) {
   try {
     const payload = JSON.parse((e.postData && e.postData.contents) || '{}');
     if (payload.action === 'registerTempIdentity') return jsonResponse(registerTempIdentity(payload));
+    if (payload.action === 'backupMonthlySnapshot') return jsonResponse(backupMonthlySnapshot(payload));
     return jsonResponse({ status: 'error', message: '不支援的請求' });
   } catch (err) {
     return jsonResponse({ status: 'error', message: '資料處理失敗' });
   }
+}
+
+function getMonthlyBackupFolder() {
+  const props = PropertiesService.getScriptProperties();
+  const folderId = props.getProperty(MONTHLY_BACKUP_FOLDER_PROPERTY);
+  if (folderId) {
+    try { return DriveApp.getFolderById(folderId); }
+    catch (err) { throw new Error('備份資料夾無法存取，請聯絡系統管理員'); }
+  }
+  const folder = DriveApp.createFolder('DYS 出勤備份（限管理員）');
+  props.setProperty(MONTHLY_BACKUP_FOLDER_PROPERTY, folder.getId());
+  return folder;
+}
+
+function backupMonthlySnapshot(payload) {
+  const month = String(payload.month || '');
+  const snapshot = payload.snapshot || {};
+  if (!/^\d{4}-\d{2}$/.test(month) || !Array.isArray(snapshot.records)) return { status: 'error', message: '備份資料不完整' };
+  const folder = getMonthlyBackupFolder();
+  const filename = 'DYS_出勤備份_' + month + '.json';
+  if (folder.getFilesByName(filename).hasNext()) return { status: 'ok', duplicate: true };
+  const content = JSON.stringify({ month: month, createdAt: new Date().toISOString(), snapshot: snapshot });
+  folder.createFile(filename, content, MimeType.PLAIN_TEXT);
+  return { status: 'ok', duplicate: false };
 }
 
 function getTempIdentityVaultSheet() {

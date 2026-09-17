@@ -1013,7 +1013,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.4 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.5 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1206,7 +1206,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.4 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.5 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1625,7 +1625,7 @@ button,input,select{font-family:var(--font)}
     </div>
 
     <div class="sub-page" id="sub-month-close">
-      <div class="toolbar"><div class="toolbar-title">月結前檢查</div><div class="toolbar-right"><input type="month" class="fi" id="month-close-month"/><button class="btn-s bs-ghost" onclick="loadMonthCloseCheck()">查詢</button><button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button></div></div>
+      <div class="toolbar"><div class="toolbar-title">月結前檢查</div><div class="toolbar-right"><input type="month" class="fi" id="month-close-month"/><button class="btn-s bs-ghost" onclick="loadMonthCloseCheck()">查詢</button><button class="btn-s bs-accent" onclick="backupMonthToDrive()">☁️ 備份</button><button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button></div></div>
       <div id="month-close-note" style="font-size:12px;color:var(--t3);margin:0 0 10px"></div>
       <div class="stats-row" style="margin-bottom:14px"><div class="stat-card"><div class="stat-val" id="mc-noout">–</div><div class="stat-lbl">漏下班</div></div><div class="stat-card"><div class="stat-val" id="mc-duplicate">–</div><div class="stat-lbl">重複打卡</div></div><div class="stat-card"><div class="stat-val" id="mc-overdue">–</div><div class="stat-lbl">逾期補卡</div></div><div class="stat-card"><div class="stat-val" id="mc-unsynced">–</div><div class="stat-lbl">未同步</div></div></div>
       <div id="month-close-result" class="empty-state"><div class="empty-icon">📅</div><p>選擇月份後開始月結檢查</p></div>
@@ -4249,6 +4249,11 @@ function buildMonthCloseSummary(records, month, currentDate){
   }).length;
   return {missingOut,duplicate,overdueManual,unsynced:rows.filter(row=>row.fbSynced!==true).length};
 }
+function buildMonthlyBackupPayload(month, data){
+  data=data||{};
+  const employees=(Array.isArray(data.employees)?data.employees:[]).map(employee=>({id:employee.id,name:employee.name,siteId:employee.siteId||null,disabled:employee.disabled===true}));
+  return {month:month,records:(Array.isArray(data.records)?data.records:[]).filter(record=>String(record.date||'').startsWith(month)),employees,sites:Array.isArray(data.sites)?data.sites:[],supervisors:Array.isArray(data.supervisors)?data.supervisors:[],announcement:String(data.announcement||'')};
+}
 function buildSiteHealth(sites, anomalies, records){
   const anomalyItems=Array.isArray(anomalies)?anomalies:[];
   const allRecords=Array.isArray(records)?records:[];
@@ -4394,6 +4399,17 @@ async function loadMonthCloseCheck(){
   const issues=summary.missingOut+summary.duplicate+summary.overdueManual+summary.unsynced;
   $('month-close-note').textContent='月結前請先處理紅色項目；優先使用雲端資料。'+(result.complete?'':' 目前無法完整同步，請稍後重試。');
   $('month-close-result').innerHTML=issues?`<div class="empty-icon">⚠️</div><p>${month} 尚有 ${issues} 項需要確認</p><button class="btn-s bs-accent" onclick="showSub('anomaly')">查看異常報表</button>`:'<div class="empty-icon">✅</div><p>本月目前沒有需要確認的月結項目</p>';
+}
+async function backupMonthToDrive(){
+  const month=$('month-close-month').value||today().slice(0,7);
+  const start=new Date(month+'-01T00:00:00');
+  const days=Math.max(31,Math.min(370,Math.floor((new Date(today()+'T00:00:00')-start)/86400000)+1));
+  const result=await loadAnalysisRecords(days);
+  if(!result.complete){ showToast('雲端資料尚未完整同步，請稍後再備份','error'); return; }
+  const snapshot=buildMonthlyBackupPayload(month,{records:result.records,employees,sites:getSites(),supervisors:getSupervisors(),announcement:localStorage.getItem('site_announcement')||''});
+  if(!SCRIPT_URL||IS_DEMO){ showToast('備份服務尚未設定','error'); return; }
+  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'backupMonthlySnapshot',month,snapshot}),keepalive:true}).catch(()=>{});
+  showToast(`${month} 備份已送出至私人 Google Drive`,'success');
 }
 function openManualPunchFor(encodedEmpId, encodedDate, encodedSiteId){
   openManualPunch({empId:decodeURIComponent(encodedEmpId),date:decodeURIComponent(encodedDate),siteId:decodeURIComponent(encodedSiteId),reason:'異常補登：漏打下班'});

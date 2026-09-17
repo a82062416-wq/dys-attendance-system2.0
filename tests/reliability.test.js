@@ -427,3 +427,24 @@ test('月結檢查統計漏下班、重複、逾期補卡與未同步紀錄', ()
   ], '2026-09', '2026-10-20');
   assert.deepEqual(JSON.parse(JSON.stringify(result)), { missingOut: 2, duplicate: 1, overdueManual: 1, unsynced: 1 });
 });
+
+test('月度備份只含指定月份出勤，且排除完整身分證與驗證資料', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'buildMonthlyBackupPayload')}; this.run = buildMonthlyBackupPayload;`, context);
+  const result = context.run('2026-09', {
+    records: [{ empId: '1001', date: '2026-09-01' }, { empId: '1002', date: '2026-08-31' }],
+    employees: [{ id: '1001', name: '王小明', phone: '0912345678', birthday: '1980-01-01' }],
+    sites: [{ id: 'A058', name: '藏美海揚' }], supervisors: [], announcement: '測試',
+  });
+  assert.equal(result.records.length, 1);
+  assert.equal(result.employees[0].phone, undefined);
+  assert.equal(result.employees[0].birthday, undefined);
+  assert.equal(JSON.stringify(result).includes('0912345678'), false);
+  assert.equal(JSON.stringify(result).includes('fullId'), false);
+});
+
+test('Apps Script 月度備份只接受 POST 並寫入專屬 Drive 資料夾', () => {
+  assert.match(codeGs, /action === 'backupMonthlySnapshot'/);
+  assert.match(codeGs, /function backupMonthlySnapshot\(payload\)/);
+  assert.match(codeGs, /DriveApp\.createFolder/);
+});
