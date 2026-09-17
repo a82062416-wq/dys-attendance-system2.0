@@ -1013,7 +1013,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.2 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.3 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1129,8 +1129,8 @@ button,input,select{font-family:var(--font)}
       <select id="mp-site" class="fi" style="width:100%"></select>
     </div>
     <div class="mf" style="margin-bottom:16px">
-      <label>補登原因 <span style="color:var(--danger)">*</span></label>
-      <input id="mp-note" class="fi" type="text" maxlength="80" placeholder="必填，例如：忘記打下班卡" style="width:100%"/>
+      <label>補登原因 <span style="font-size:12px;color:var(--t3)">（超過 30 天才必填）</span></label>
+      <input id="mp-note" class="fi" type="text" maxlength="80" placeholder="例如：忘記打下班卡" style="width:100%"/>
     </div>
     <div class="modal-actions">
       <button class="btn-s bs-accent" onclick="saveManualPunch()" style="flex:1;padding:11px">儲存</button>
@@ -1206,7 +1206,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.2 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.3 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1346,6 +1346,11 @@ button,input,select{font-family:var(--font)}
       <!-- 查詢 -->
       <div class="admin-menu-section">
         <div class="admin-menu-hd">查詢</div>
+        <div class="admin-menu-item" onclick="showSub('daily-actions',this)">
+          <div class="ami-icon" style="background:rgba(255,59,48,.10)">✅</div>
+          <span class="ami-label">今日待處理</span>
+          <span class="ami-chevron">›</span>
+        </div>
         <div class="admin-menu-item" onclick="showSub('records',this)">
           <div class="ami-icon" style="background:rgba(0,122,255,.10)">📋</div>
           <span class="ami-label">打卡紀錄</span>
@@ -1534,6 +1539,13 @@ button,input,select{font-family:var(--font)}
         <div class="stat-card"><div class="stat-val" id="ch-max">–</div><div class="stat-lbl">最高單日出勤</div></div>
         <div class="stat-card"><div class="stat-val" id="ch-total">–</div><div class="stat-lbl">期間總打卡</div></div>
       </div>
+    </div>
+
+    <!-- ══ 今日待處理 ══ -->
+    <div class="sub-page" id="sub-daily-actions">
+      <div class="toolbar"><div class="toolbar-title">今日待處理</div><div class="toolbar-right"><button class="btn-s bs-ghost" onclick="loadDailyActionCenter()">🔄 更新</button><button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button></div></div>
+      <div id="daily-actions-scope" style="font-size:12px;color:var(--t3);margin:0 0 10px">載入中…</div>
+      <div id="daily-actions-list" style="display:grid;gap:8px"></div>
     </div>
 
     <!-- ── 異常報表 ── -->
@@ -4182,6 +4194,11 @@ function buildAnomalies(records, options){
   });
   return {items,counts:{duplicate:items.filter(item=>item.kind==='duplicate').length,missingOut:items.filter(item=>item.kind==='missing_out').length}};
 }
+function buildDailyActionItems(anomalies){
+  return (Array.isArray(anomalies)?anomalies:[]).filter(item=>item&&['missing_out','duplicate'].includes(item.kind)).map(item=>Object.assign({},item,{
+    action:item.kind==='missing_out'?'補下班':'查看紀錄'
+  })).sort((a,b)=>a.severity===b.severity?0:(a.severity==='red'?-1:1));
+}
 function buildSiteHealth(sites, anomalies, records){
   const anomalyItems=Array.isArray(anomalies)?anomalies:[];
   const allRecords=Array.isArray(records)?records:[];
@@ -4252,6 +4269,20 @@ function markAnalysisCompleteness(elementId, complete){
   const element=$(elementId);
   if(element) element.textContent+=' · 資料可能未完整同步';
 }
+async function loadDailyActionCenter(){
+  const result=await loadAnalysisRecords(31);
+  const anomalies=buildAnomalies(result.records,{referenceDate:today()}).items;
+  const items=buildDailyActionItems(anomalies);
+  const list=$('daily-actions-list');
+  const scope=$('daily-actions-scope');
+  scope.textContent='目前顯示：需要優先處理的漏下班與重複打卡';
+  markAnalysisCompleteness('daily-actions-scope',result.complete);
+  if(!items.length){ list.innerHTML='<div class="empty-state"><div class="empty-icon">✅</div><p>目前沒有需要處理的出勤異常</p></div>'; return; }
+  const color={red:'var(--danger)',yellow:'var(--warn)'};
+  list.innerHTML=items.map(item=>`<div style="border:.5px solid var(--border);border-left:4px solid ${color[item.severity]||'var(--accent)'};background:var(--surface);border-radius:12px;padding:14px">
+    <div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1"><strong>${escapeHtml(item.name)}</strong><span style="font:12px 'SF Mono',monospace;color:var(--t3);margin-left:6px">${escapeHtml(item.empId)}</span><div style="font-size:13px;margin-top:5px">${escapeHtml(item.date)} · ${escapeHtml(item.desc)}</div><div style="font-size:12px;color:var(--t3);margin-top:3px">${escapeHtml(item.siteId?getSiteName(item.siteId):'未指定案場')}</div></div>${item.kind==='missing_out'?`<button class="btn-s bs-accent" onclick="openManualPunchFor('${encodeURIComponent(item.empId)}','${encodeURIComponent(item.date)}','${encodeURIComponent(item.siteId||'')}')">補下班</button>`:`<button class="btn-s bs-ghost" onclick="showSiteHealthDetail('${encodeURIComponent(item.siteId||'')}')">查看</button>`}</div>
+  </div>`).join('');
+}
 async function loadSiteHealth(){
   const result=await loadAnalysisRecords(30);
   const records=result.records;
@@ -4259,7 +4290,7 @@ async function loadSiteHealth(){
   const sites=getVisibleSitesForCurrentUser();
   const rows=buildSiteHealth(sites,anomalies,records);
   const list=$('site-health-list');
-  updateSiteScopeLabel('site-health-scope','最近 30 天','');
+  updateSiteScopeLabel('site-health-scope','最近 30 天 · 紅色優先處理、黃色需要確認、綠色正常','');
   markAnalysisCompleteness('site-health-scope',result.complete);
   if(!rows.length){ list.innerHTML='<div class="empty-state"><div class="empty-icon">📍</div><p>目前沒有可查看的案場</p></div>'; return; }
   const label={green:'正常',yellow:'需要確認',red:'優先處理'};
@@ -4497,8 +4528,10 @@ function validateManualPunchInput(input, records=[], currentDate=today()){
   const {empId,type,date,time,reason}=input;
   if(!empId) return {valid:false,error:'請選擇員工'};
   if(!date||!time) return {valid:false,error:'請填寫日期與時間'};
-  if(!String(reason||'').trim()) return {valid:false,error:'請填寫補登原因'};
   if(date>currentDate) return {valid:false,error:'不可補登未來日期'};
+  const policy=getManualPunchPolicy(date,currentDate);
+  if(!policy.allowed) return {valid:false,error:'超過 60 天的補卡請由管理員處理'};
+  if(policy.requiresReason&&!String(reason||'').trim()) return {valid:false,error:'超過 30 天的補卡請填寫原因'};
   const sameDay=(Array.isArray(records)?records:[]).filter(r=>r&&r.empId===empId&&r.date===date);
   if(sameDay.some(r=>r.type===type&&r.time===time)) return {valid:false,error:'已有相同時間的打卡紀錄'};
   if(type==='下班'){
@@ -4509,6 +4542,17 @@ function validateManualPunchInput(input, records=[], currentDate=today()){
     }
   }
   return {valid:true};
+}
+function getManualPunchPolicy(date,currentDate){
+  const start=new Date(String(date)+'T00:00:00');
+  const end=new Date(String(currentDate)+'T00:00:00');
+  const days=Math.floor((end-start)/86400000);
+  if(!date||Number.isNaN(start.getTime())||days<0) return {allowed:false,requiresReason:false,overdue:false};
+  const sameMonth=String(date).slice(0,7)===String(currentDate).slice(0,7);
+  const grace=end.getDate()<=7&&start.getMonth()===((end.getMonth()+11)%12)&&start.getFullYear()===(end.getMonth()===0?end.getFullYear()-1:end.getFullYear());
+  if(days<=30||sameMonth||grace) return {allowed:true,requiresReason:false,overdue:false};
+  if(days<=60) return {allowed:true,requiresReason:true,overdue:true};
+  return {allowed:false,requiresReason:true,overdue:true};
 }
 function buildManualPunchRecord(input, meta){
   meta=meta||{};
@@ -5106,7 +5150,7 @@ function showSub(name,el){
   // 更新標題列
   const _labels = {
     'records':'打卡紀錄','overview':'今日總覽','chart':'統計圖表',
-    'anomaly':'異常報表','site-health':'案場狀態','employee-analysis':'人員出勤分析','attendance-stat':'出勤統計','monthly-report':'月度報表',
+    'daily-actions':'今日待處理','anomaly':'異常報表','site-health':'案場狀態','employee-analysis':'人員出勤分析','attendance-stat':'出勤統計','monthly-report':'月度報表',
     'employees':'員工名單','supervisors':'幹部管理','qrcode':'QR Code','settings':'設定'
   };
   const backBtn = $('sub-back-btn');
@@ -5114,6 +5158,7 @@ function showSub(name,el){
   if(backBtn) backBtn.style.display = '';
   if(titleEl) titleEl.textContent = _labels[name] || name;
   // 資料載入
+  if(name==='daily-actions') loadDailyActionCenter();
   if(name==='records'){         initSiteFilter(); loadRecords(); }
   if(name==='attendance-stat'){ initStatMonth(); loadAttendanceStat(); }
   if(name==='monthly-report'){ initExportSiteSelect(); const _el=$('monthly-report-month'); if(_el&&!_el.value){const _n=new Date();_el.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');} updateSiteFilterBtn(); }

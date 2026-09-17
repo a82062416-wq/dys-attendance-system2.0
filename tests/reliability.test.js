@@ -52,6 +52,128 @@ function createStorage(initial = {}) {
   };
 }
 
+test('案場搜尋支援正式代碼、舊代碼與名稱，並遵守幹部案場範圍', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'findSitesForSearch')}; this.run = findSitesForSearch;`, context);
+  const sites = [
+    { id: 'A058', name: '藏美海揚' },
+    { id: 'C127', name: '濾能-南科' },
+  ];
+
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run(sites, 'A58', ['A058']).map(site => site.id))), ['A058']);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run(sites, '藏美', ['A058']).map(site => site.id))), ['A058']);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run(sites, '南科', ['A058']).map(site => site.id))), []);
+});
+
+test('案場健康燈號對漏下班顯示紅色、對單筆重複顯示黃色', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'buildSiteHealth')}; this.run = buildSiteHealth;`, context);
+  const result = context.run(
+    [{ id: 'A058', name: '藏美海揚' }, { id: 'B002', name: '測試案場' }],
+    [{ siteId: 'A058', kind: 'missing_out' }, { siteId: 'B002', kind: 'duplicate' }],
+    [{ siteId: 'A058', timestamp: '2026-09-16T08:00:00' }, { siteId: 'B002', timestamp: '2026-09-16T09:00:00' }],
+  );
+  assert.equal(result.find(row => row.siteId === 'A058').level, 'red');
+  assert.equal(result.find(row => row.siteId === 'B002').level, 'yellow');
+});
+
+test('人員出勤摘要計算出勤日、漏下班、重複與最近案場', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'buildEmployeeAttendance')}; this.run = buildEmployeeAttendance;`, context);
+  const result = context.run([
+    { empId: '1001', name: '王小明', type: '上班', date: '2026-09-14', siteId: 'A058', timestamp: '2026-09-14T08:00:00' },
+    { empId: '1001', name: '王小明', type: '上班', date: '2026-09-15', siteId: 'B002', timestamp: '2026-09-15T08:00:00' },
+  ], [
+    { empId: '1001', kind: 'missing_out' }, { empId: '1001', kind: 'duplicate' },
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), [{
+    empId: '1001', name: '王小明', attendanceDays: 2, missingOut: 1, duplicate: 1,
+    lastDate: '2026-09-15', lastSiteId: 'B002', lastTimestamp: '2026-09-15T08:00:00',
+  }]);
+});
+
+test('分析日期鍵以台灣本地日期連續產生，不跳過起訖日', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'getAnalysisDateKeys')}; this.run = getAnalysisDateKeys;`, context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run(3, '2026-09-16'))), ['2026-09-14', '2026-09-15', '2026-09-16']);
+});
+
+test('完整身分證保管只能走 POST，且不會被寫進一般打卡工作表', () => {
+  assert.match(codeGs, /function doPost\(e\)/);
+  assert.match(codeGs, /action === 'registerTempIdentity'/);
+  assert.match(codeGs, /function registerTempIdentity\(payload\)/);
+  assert.doesNotMatch(codeGs, /writePunch\(params\)[\s\S]*params\.fullId/);
+});
+
+test('補登資料拒絕未填原因、未來日期與完全重複的打卡', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'getManualPunchPolicy')}; ${extractFunction(inlineScript, 'validateManualPunchInput')}; this.run = validateManualPunchInput;`, context);
+  const duplicate = [{ empId: '1001', type: '上班', date: '2026-09-16', time: '08:00' }];
+
+  assert.equal(context.run({ empId: '1001', type: '上班', date: '2026-08-10', time: '08:00', reason: '' }, duplicate, '2026-09-16').error, '超過 30 天的補卡請填寫原因');
+  assert.equal(context.run({ empId: '1001', type: '上班', date: '2026-09-17', time: '08:00', reason: '忘記打卡' }, [], '2026-09-16').error, '不可補登未來日期');
+  assert.equal(context.run({ empId: '1001', type: '上班', date: '2026-09-16', time: '08:00', reason: '忘記打卡' }, duplicate, '2026-09-16').error, '已有相同時間的打卡紀錄');
+});
+
+test('補卡在 30 天內與跨月前 7 天可直接補登，較久才要求填原因', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'getManualPunchPolicy')}; this.run = getManualPunchPolicy;`, context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run('2026-08-30', '2026-09-06'))), { allowed: true, requiresReason: false, overdue: false });
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run('2026-08-01', '2026-09-20'))), { allowed: true, requiresReason: true, overdue: true });
+  assert.equal(context.run('2026-07-01', '2026-09-20').allowed, false);
+});
+
+test('今日待處理中心只列出漏下班與需要確認的案場', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'buildDailyActionItems')}; this.run = buildDailyActionItems;`, context);
+  const result = context.run([
+    { kind: 'missing_out', severity: 'red', empId: '1001', name: '王小明', date: '2026-09-16', siteId: 'A058', desc: '有上班無下班紀錄' },
+    { kind: 'duplicate', severity: 'yellow', empId: '1002', name: '陳小美', date: '2026-09-16', siteId: 'B002', desc: '上班打卡 2 次' },
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.map(item => item.kind))), ['missing_out', 'duplicate']);
+  assert.equal(result[0].action, '補下班');
+});
+
+test('補下班必須有同日較早的上班紀錄', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'getManualPunchPolicy')}; ${extractFunction(inlineScript, 'validateManualPunchInput')}; this.run = validateManualPunchInput;`, context);
+
+  assert.equal(context.run({ empId: '1001', type: '下班', date: '2026-09-16', time: '17:00', reason: '漏打下班' }, [], '2026-09-16').error, '補下班前請先確認同日上班紀錄');
+  assert.equal(context.run({ empId: '1001', type: '下班', date: '2026-09-16', time: '07:00', reason: '漏打下班' }, [{ empId: '1001', type: '上班', date: '2026-09-16', time: '08:00' }], '2026-09-16').error, '下班時間不可早於上班時間');
+  assert.equal(context.run({ empId: '1001', type: '下班', date: '2026-09-16', time: '17:00', reason: '漏打下班' }, [{ empId: '1001', type: '上班', date: '2026-09-16', time: '08:00' }], '2026-09-16').valid, true);
+});
+
+test('補登紀錄保留原因、建立時間與操作者，不覆寫原始欄位', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'buildManualPunchRecord')}; this.run = buildManualPunchRecord;`, context);
+  const record = context.run(
+    { empId: '1001', name: '王小明', type: '下班', date: '2026-09-16', time: '17:00', reason: '漏打下班', siteId: 'A058' },
+    { createdAt: '2026-09-16T18:00:00+08:00', createdBy: 'S001' },
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(record)), {
+    empId: '1001', name: '王小明', type: '下班', date: '2026-09-16', time: '17:00',
+    timestamp: '2026-09-16T17:00:00', siteId: 'A058', synced: false, fbSynced: false,
+    manual: true, note: '漏打下班', correctionReason: '漏打下班', createdAt: '2026-09-16T18:00:00+08:00', createdBy: 'S001',
+  });
+});
+
+test('補登同步到 Firebase 時必須保留稽核欄位', async () => {
+  const writes = [];
+  const context = {
+    FB_DB: { ref: () => ({ set: value => { writes.push(value); return Promise.resolve(); } }) },
+    localRecs: [], saveRecs() {}, updateFbStatusBar() {}, console: { warn() {} },
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'uploadToFirebase')}; this.run = uploadToFirebase;`, context);
+  context.run({
+    empId: '1001', name: '王小明', type: '下班', date: '2026-09-16', time: '17:00', timestamp: '2026-09-16T17:00:00', siteId: 'A058',
+    manual: true, correctionReason: '漏打下班', createdAt: '2026-09-16T18:00:00+08:00', createdBy: 'S001',
+  });
+  await Promise.resolve();
+  assert.equal(writes[0].manual, true);
+  assert.equal(writes[0].correctionReason, '漏打下班');
+  assert.equal(writes[0].createdBy, 'S001');
+});
+
 test('本機沒有幹部名單時，不可把預設名單寫回 Firebase', () => {
   const writes = [];
   const context = {
@@ -266,4 +388,20 @@ test('Apps Script 寫入完成後必須釋放文件鎖', () => {
   assert.equal(result.status, 'ok');
   assert.equal(released, true);
   assert.equal(rows.length, 1);
+});
+
+test('後台分析中幹部只能看見分配案場，管理員可看全部', () => {
+  const records = [{ timestamp: 'a', siteId: 'A058' }, { timestamp: 'b', siteId: 'B002' }, { timestamp: 'legacy', siteId: null }];
+  const context = { CURRENT_ROLE: 'supervisor', CURRENT_SUPERVISOR: { sites: ['A058'] } };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'getAnalysisSiteScope')}; ${extractFunction(inlineScript, 'filterAnalysisRecords')}; this.run = filterAnalysisRecords;`, context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run(records))), [records[0]]);
+  context.CURRENT_ROLE = 'admin';
+  assert.equal(context.run(records).length, 3);
+});
+
+test('後台分析合併本機與雲端紀錄時同 timestamp 只保留一筆', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'mergeRecordsByTimestamp')}; this.run = mergeRecordsByTimestamp;`, context);
+  const merged = context.run([{ timestamp: 'same', source: 'local' }], [{ timestamp: 'same', source: 'cloud' }, { timestamp: 'new' }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(merged)), [{ timestamp: 'same', source: 'local' }, { timestamp: 'new' }]);
 });
