@@ -448,3 +448,13 @@ test('Apps Script 月度備份只接受 POST 並寫入專屬 Drive 資料夾', (
   assert.match(codeGs, /function backupMonthlySnapshot\(payload\)/);
   assert.match(codeGs, /DriveApp\.createFolder/);
 });
+
+test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動摘要', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
+  const notes = context.run();
+  assert.equal(notes[0].version, 'v1.4.6');
+  assert.equal(notes[0].date, '2026.09');
+  assert.ok(notes[0].changes.some(change => change.includes('版本更新紀錄')));
+  assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
+});

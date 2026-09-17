@@ -1013,7 +1013,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.5 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.6 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1206,7 +1206,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.5 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.6 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1434,6 +1434,11 @@ button,input,select{font-family:var(--font)}
         <div class="admin-menu-item" onclick="showSub('settings',this)">
           <div class="ami-icon" style="background:rgba(142,142,147,.12)">⚙️</div>
           <span class="ami-label">設定</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item" onclick="showSub('version-history',this)">
+          <div class="ami-icon" style="background:rgba(88,86,214,.10)">📝</div>
+          <span class="ami-label">版本更新紀錄</span>
           <span class="ami-chevron">›</span>
         </div>
       </div>
@@ -2061,6 +2066,13 @@ button,input,select{font-family:var(--font)}
         </div>
         <button class="btn-s bs-accent" onclick="saveSettings()" style="width:fit-content;padding:11px 24px">儲存設定</button>
       </div>
+    </div>
+
+    <!-- 版本更新紀錄 -->
+    <div class="sub-page" id="sub-version-history">
+      <div class="toolbar"><div class="toolbar-title">版本更新紀錄</div></div>
+      <div style="max-width:620px;margin-bottom:14px;font-size:13px;color:var(--t2);line-height:1.65">這裡會保留每次正式上線的重點。現場打卡、QR Code 是否受影響，也會在每一版清楚標示。</div>
+      <div id="version-history-list"></div>
     </div>
 
   </div>
@@ -5228,6 +5240,20 @@ function showPage(name,el){
   if(el) el.classList.add('active');
   updateNavBackBtn();
 }
+function getReleaseNotes(){
+  return [
+    {version:'v1.4.6',date:'2026.09',changes:['新增管理員後台的版本更新紀錄','每次正式上線會同步更新頁尾版本與此處說明','不影響現場打卡、既有資料或 QR Code']},
+    {version:'v1.4.5',date:'2026.09',changes:['新增 Google Drive 月度出勤備份','月結前檢查可選月份後手動備份','備份不包含完整身分證、手機或生日']},
+    {version:'v1.4.4',date:'2026.09',changes:['新增臨時人員歷程與月結前檢查','協助找出漏下班、重複打卡與未同步紀錄']},
+    {version:'v1.4.3',date:'2026.09',changes:['強化補卡流程與今日待處理中心','30 天內與跨月前 7 天可直接補登']},
+    {version:'v1.4.2',date:'2026.09',changes:['臨時人員完整身分證改由獨立保管','一般打卡紀錄不會寫入完整身分證']}
+  ];
+}
+function renderReleaseNotes(){
+  const list=$('version-history-list');
+  if(!list) return;
+  list.innerHTML=getReleaseNotes().map((note,index)=>`<div style="background:var(--surface);border-radius:var(--r);border:.5px solid ${index===0?'var(--accent)':'var(--border)'};padding:16px 18px;box-shadow:var(--sh1);margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:17px;color:var(--t1)">${escapeHtml(note.version)}${index===0?' <span style=\"font-size:11px;color:var(--accent);background:var(--fill2);padding:3px 7px;border-radius:99px;margin-left:6px\">目前使用中</span>':''}</strong><span style="font-size:12px;color:var(--t3);white-space:nowrap">${escapeHtml(note.date)}</span></div><ul style="margin:0;padding-left:20px;color:var(--t2);font-size:14px;line-height:1.75">${note.changes.map(change=>`<li>${escapeHtml(change)}</li>`).join('')}</ul></div>`).join('');
+}
 function showSub(name,el){
   adminViewState = 'sub';
   // 隱藏分類清單，顯示子頁面
@@ -5241,7 +5267,7 @@ function showSub(name,el){
   const _labels = {
     'records':'打卡紀錄','overview':'今日總覽','chart':'統計圖表',
     'daily-actions':'今日待處理','anomaly':'異常報表','site-health':'案場狀態','employee-analysis':'人員出勤分析','temp-history':'臨時人員歷程','month-close':'月結前檢查','attendance-stat':'出勤統計','monthly-report':'月度報表',
-    'employees':'員工名單','supervisors':'幹部管理','qrcode':'QR Code','settings':'設定'
+    'employees':'員工名單','supervisors':'幹部管理','qrcode':'QR Code','settings':'設定','version-history':'版本更新紀錄'
   };
   const backBtn = $('sub-back-btn');
   const titleEl = $('admin-page-title');
@@ -5256,6 +5282,7 @@ function showSub(name,el){
   if(name==='monthly-report'){ initExportSiteSelect(); const _el=$('monthly-report-month'); if(_el&&!_el.value){const _n=new Date();_el.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');} updateSiteFilterBtn(); }
   if(name==='employees'){ const _s=$('emp-search'); if(_s) _s.value=''; renderEmpList(); }
   if(name==='settings') loadSettingsFields();
+  if(name==='version-history') renderReleaseNotes();
   if(name==='overview') loadOverview();
   if(name==='chart')    loadChart();
   if(name==='anomaly')  initAnomaly();
