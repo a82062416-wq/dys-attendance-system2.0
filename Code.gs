@@ -10,6 +10,53 @@
 
 const SHEET_RECORDS   = '打卡紀錄';
 const SHEET_EMPLOYEES = '員工資料';
+const TEMP_VAULT_PROPERTY = 'TEMP_IDENTITY_VAULT_ID';
+const TEMP_VAULT_SECRET_PROPERTY = 'TEMP_IDENTITY_VAULT_SECRET';
+
+// 完整身分證只接受 POST 本文，不得透過 GET／一般打卡紀錄傳送。
+function doPost(e) {
+  try {
+    const payload = JSON.parse((e.postData && e.postData.contents) || '{}');
+    if (payload.action === 'registerTempIdentity') return jsonResponse(registerTempIdentity(payload));
+    return jsonResponse({ status: 'error', message: '不支援的請求' });
+  } catch (err) {
+    return jsonResponse({ status: 'error', message: '資料處理失敗' });
+  }
+}
+
+function getTempIdentityVaultSheet() {
+  const props = PropertiesService.getScriptProperties();
+  let vaultId = props.getProperty(TEMP_VAULT_PROPERTY);
+  let ss = vaultId ? SpreadsheetApp.openById(vaultId) : null;
+  if (!ss) {
+    ss = SpreadsheetApp.create('DYS 臨時人員身分保管（限管理員）');
+    vaultId = ss.getId();
+    props.setProperty(TEMP_VAULT_PROPERTY, vaultId);
+  }
+  let sheet = ss.getSheetByName('身分保管');
+  if (!sheet) {
+    sheet = ss.insertSheet('身分保管');
+    sheet.appendRow(['臨時人員代碼', '姓名', '完整身分證', '末四碼', '伺服器比對值', '同意時間', '首次案場', '最後更新']);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function registerTempIdentity(payload) {
+  const fullId = String(payload.fullId || '').trim().toUpperCase();
+  const tempId = String(payload.tempId || '').trim();
+  const name = String(payload.name || '').trim();
+  if (!fullId || !tempId || !name || payload.consent !== true) return { status: 'error', message: '資料不完整' };
+  const props = PropertiesService.getScriptProperties();
+  let secret = props.getProperty(TEMP_VAULT_SECRET_PROPERTY);
+  if (!secret) { secret = Utilities.getUuid() + Utilities.getUuid(); props.setProperty(TEMP_VAULT_SECRET_PROPERTY, secret); }
+  const fingerprint = Utilities.base64Encode(Utilities.computeHmacSha256Signature(fullId, secret));
+  const sheet = getTempIdentityVaultSheet();
+  const rows = Math.max(0, sheet.getLastRow() - 1);
+  if (rows > 0 && sheet.getRange(2, 5, rows, 1).createTextFinder(fingerprint).matchEntireCell(true).findNext()) return { status: 'ok', duplicate: true };
+  sheet.appendRow([tempId, name, fullId, fullId.slice(-4), fingerprint, String(payload.consentAt || new Date().toISOString()), String(payload.siteId || ''), new Date()]);
+  return { status: 'ok', duplicate: false };
+}
 
 // ── 主入口 ──────────────────────────────────────────────────
 function doGet(e) {

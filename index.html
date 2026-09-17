@@ -1013,7 +1013,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.1 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.2 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1124,9 +1124,13 @@ button,input,select{font-family:var(--font)}
         <input id="mp-time" class="fi" type="time" style="width:100%"/>
       </div>
     </div>
+    <div class="mf" style="margin-bottom:10px">
+      <label>案場</label>
+      <select id="mp-site" class="fi" style="width:100%"></select>
+    </div>
     <div class="mf" style="margin-bottom:16px">
-      <label>備註</label>
-      <input id="mp-note" class="fi" type="text" placeholder="選填，例如：補登" style="width:100%"/>
+      <label>補登原因 <span style="color:var(--danger)">*</span></label>
+      <input id="mp-note" class="fi" type="text" maxlength="80" placeholder="必填，例如：忘記打下班卡" style="width:100%"/>
     </div>
     <div class="modal-actions">
       <button class="btn-s bs-accent" onclick="saveManualPunch()" style="flex:1;padding:11px">儲存</button>
@@ -1202,7 +1206,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.1 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.2 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1293,6 +1297,10 @@ button,input,select{font-family:var(--font)}
         <button class="secondary-action" onclick="openSubModal()">臨時人員打卡</button>
         <button class="secondary-action help" onclick="replayGuide()">查看打卡說明</button>
       </div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--t2);margin:0 0 14px">
+        <input id="sub-id-consent" type="checkbox" style="margin-top:3px;accent-color:var(--accent)"/>
+        <span>我已了解：本系統為身分確認、派遣與出勤追查而蒐集完整身分證；僅管理員可查閱，保存與利用依公司個資告知辦理。</span>
+      </label>
 
     </div>
   </div>
@@ -1356,6 +1364,16 @@ button,input,select{font-family:var(--font)}
         <div class="admin-menu-item" onclick="showSub('anomaly',this)">
           <div class="ami-icon" style="background:rgba(255,159,10,.10)">⚠️</div>
           <span class="ami-label">異常報表</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item" onclick="showSub('site-health',this)">
+          <div class="ami-icon" style="background:rgba(52,199,89,.10)">🚦</div>
+          <span class="ami-label">案場狀態</span>
+          <span class="ami-chevron">›</span>
+        </div>
+        <div class="admin-menu-item" onclick="showSub('employee-analysis',this)">
+          <div class="ami-icon" style="background:rgba(88,86,214,.10)">👤</div>
+          <span class="ami-label">人員出勤分析</span>
           <span class="ami-chevron">›</span>
         </div>
         <div class="admin-menu-item" id="menu-item-attendance-stat" style="display:none" onclick="showSub('attendance-stat',this)">
@@ -1446,10 +1464,10 @@ button,input,select{font-family:var(--font)}
           <span style="color:var(--t3);font-size:13px">—</span>
           <input type="date" class="fi" id="f-date-end" onchange="loadRecords()" style="width:130px"/>
         </span>
-        <select class="fi" id="f-site" style="font-size:12px;height:28px;padding:0 6px;min-width:160px;max-width:220px" onchange="loadRecords()">
-          <option value="">📍 全部案場</option>
-        </select>
+        <input class="fi" id="f-site" list="record-site-options" placeholder="🔍 搜尋案場" style="font-size:12px;height:28px;padding:0 8px;min-width:160px;max-width:220px" oninput="loadRecords()"/>
+        <datalist id="record-site-options"></datalist>
       </div>
+      <div id="record-site-scope" style="font-size:12px;color:var(--t3);margin:0 0 8px">目前查看：全部案場</div>
       <div id="sync-status-bar" style="display:none" class="cfg-bar" style="background:color-mix(in srgb,var(--warn) 8%,var(--surface))">
         <span id="sync-status-msg" style="font-size:13px;color:var(--t1)"></span>
         <button class="btn-recfg" onclick="manualSync()">立即同步</button>
@@ -1540,8 +1558,40 @@ button,input,select{font-family:var(--font)}
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>員工</th><th>日期</th><th>異常類型</th><th>說明</th><th>案場</th></tr></thead>
-          <tbody id="anomaly-body"><tr><td colspan="5"><div class="empty-state"><div class="empty-icon">✅</div><p>請選擇日期範圍後查詢</p></div></td></tr></tbody>
+          <thead><tr><th>員工</th><th>日期</th><th>異常類型</th><th>說明</th><th>案場</th><th>處理</th></tr></thead>
+          <tbody id="anomaly-body"><tr><td colspan="6"><div class="empty-state"><div class="empty-icon">✅</div><p>請選擇日期範圍後查詢</p></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ 案場健康燈號 ══ -->
+    <div class="sub-page" id="sub-site-health">
+      <div class="toolbar">
+        <div class="toolbar-title">案場狀態</div>
+        <div class="toolbar-right">
+          <button class="btn-s bs-ghost" onclick="loadSiteHealth()">🔄 更新</button>
+          <button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button>
+        </div>
+      </div>
+      <div id="site-health-scope" style="font-size:12px;color:var(--t3);margin:0 0 10px">目前查看：最近 30 天 · 載入中</div>
+      <div id="site-health-list" style="display:grid;gap:8px"></div>
+    </div>
+
+    <!-- ══ 人員出勤分析 ══ -->
+    <div class="sub-page" id="sub-employee-analysis">
+      <div class="toolbar">
+        <div class="toolbar-title">人員出勤分析</div>
+        <div class="toolbar-right">
+          <button class="btn-s bs-ghost" id="emp-analysis-7" onclick="loadEmployeeAnalysis(7)">近 7 天</button>
+          <button class="btn-s bs-accent" id="emp-analysis-30" onclick="loadEmployeeAnalysis(30)">近 30 天</button>
+          <button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button>
+        </div>
+      </div>
+      <div id="employee-analysis-scope" style="font-size:12px;color:var(--t3);margin:0 0 10px">目前查看：載入中</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>員工</th><th>出勤天數</th><th>漏下班</th><th>重複</th><th>最近打卡</th></tr></thead>
+          <tbody id="employee-analysis-body"><tr><td colspan="5"><div class="empty-state"><div class="empty-icon">👤</div><p>載入中…</p></div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1552,15 +1602,15 @@ button,input,select{font-family:var(--font)}
         <div class="toolbar-title">出勤統計</div>
         <div class="toolbar-right">
           <input type="month" class="fi" id="stat-month"/>
-          <select class="fi" id="stat-site" style="font-size:12px;height:32px;padding:0 6px" onchange="loadAttendanceStat()">
-            <option value="">📍 全部案場</option>
-          </select>
+          <input class="fi" id="stat-site" list="stat-site-options" placeholder="🔍 搜尋案場" style="font-size:12px;height:32px;padding:0 8px;min-width:160px" oninput="loadAttendanceStat()"/>
+          <datalist id="stat-site-options"></datalist>
           <button class="btn-s bs-ghost" onclick="loadAttendanceStat()">🔄 查詢</button>
           <button class="btn-s bs-ghost" onclick="exportStatCSV()">⬇ CSV</button>
           <button class="btn-s bs-accent" onclick="exportStatXLSX()">⬇ Excel</button>
           <button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button>
         </div>
       </div>
+      <div id="stat-site-scope" style="font-size:12px;color:var(--t3);margin:0 0 8px">目前查看：全部案場</div>
 
       <!-- 摘要統計 -->
       <div class="stats-row" style="margin-bottom:14px">
@@ -1603,7 +1653,7 @@ button,input,select{font-family:var(--font)}
       <div class="toolbar">
         <div class="toolbar-title">月度報表</div>
         <div class="toolbar-right">
-          <input type="month" class="fi" id="monthly-report-month"/>
+          <input type="month" class="fi" id="monthly-report-month" onchange="updateSiteFilterBtn()"/>
           <button class="btn-s bs-ghost" onclick="previewMonthlyReport()">🔍 預覽</button>
           <button class="btn-s bs-ghost" onclick="printMonthlyReport()">🖨️ 列印</button>
           <button class="btn-s bs-accent" onclick="handleExportClick()">⬇ 匯出 CSV</button>
@@ -1620,6 +1670,7 @@ button,input,select{font-family:var(--font)}
           <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px" onclick="clearSiteSelection()">清除</button>
           <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--border))" onclick="selectSitesByType('A')">銀座</button>
           <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px;color:var(--success);border-color:color-mix(in srgb,var(--success) 40%,var(--border))" onclick="selectSitesByType('B')">物業</button>
+          <button class="btn-s bs-ghost" style="font-size:11px;padding:3px 10px;color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,var(--border))" onclick="selectSitesByType('C')">C 類</button>
           <input type="text" class="fi site-chip-search" id="site-chip-search" placeholder="搜尋案場…" oninput="filterSiteChips(this.value)"/>
         </div>
         <div id="site-chip-list" class="is-collapsed"></div>
@@ -3249,6 +3300,7 @@ let _subEmp = null; // 代班流程暫存員工資料
 function openSubModal(){
   _subEmp = null;
   $('sub-id-input').value='';
+  $('sub-id-consent').checked=false;
   $('sub-step-1').style.display='';
   $('sub-step-2a').style.display='none';
   $('sub-step-2b').style.display='none';
@@ -3266,6 +3318,7 @@ function subBack(){
 function subLookupId(){
   const input = ($('sub-id-input').value||'').trim().toUpperCase();
   if(!input){ showToast('請輸入身分證號碼','error'); return; }
+  if(!$('sub-id-consent').checked){ showToast('請先閱讀並勾選個資告知','error'); return; }
 
   // 查臨時員工清單（by 身分證 hash）
   const h = hashPwd(input);
@@ -3281,7 +3334,7 @@ function subLookupId(){
   }
 
   // 第一次 → 請補填姓名
-  _subEmp = {idHash: h, idDisplay: input.slice(-4), tempId: 'TMP_' + h.slice(0,8).toUpperCase()};
+  _subEmp = {idHash: h, idDisplay: input.slice(-4), tempId: 'TMP_' + h.slice(0,8).toUpperCase(), fullId:input, consentAt:new Date().toISOString()};
   $('sub-new-name').value='';
   $('sub-step-1').style.display='none';
   $('sub-step-2b').style.display='';
@@ -3380,6 +3433,15 @@ async function uploadRec(rec){
     console.warn('Sheets 上傳失敗，保留待補傳:', e);
     return false;
   }
+
+  sendTempIdentityToVault(_subEmp, name);
+}
+
+function sendTempIdentityToVault(subEmp, name){
+  if(!SCRIPT_URL || IS_DEMO || !subEmp.fullId) return;
+  const payload={action:'registerTempIdentity',tempId:subEmp.tempId,name,fullId:subEmp.fullId,consent:true,consentAt:subEmp.consentAt,siteId:CURRENT_SITE_ID||''};
+  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),keepalive:true}).catch(()=>{});
+  delete subEmp.fullId;
 }
 
 function showSuccess(name,type,time,isIn,isOffline){
@@ -3882,15 +3944,11 @@ function loadAttendanceStat(){
 
   const [year, month] = yearMonth.split('-').map(Number);
 
-  // 初始化案場下拉
-  const statSiteSel = $('stat-site');
-  if(statSiteSel){
-    const sites = JSON.parse(localStorage.getItem('sites')||'[]').filter(s=>s.active!==false);
-    const curSite = statSiteSel.value;
-    statSiteSel.innerHTML = '<option value="">📍 全部案場</option>'
-      + sites.map(s=>`<option value="${s.id}"${s.id===curSite?' selected':''}>${s.id} ${s.name}</option>`).join('');
-  }
-  const filterSiteId = statSiteSel ? statSiteSel.value : '';
+  renderSiteSearchOptions('stat-site','stat-site-options');
+  const statSiteInput=$('stat-site');
+  const rawSiteQuery=statSiteInput ? statSiteInput.value.trim() : '';
+  const filterSiteId=resolveSiteSearchId(rawSiteQuery);
+  updateSiteScopeLabel('stat-site-scope',yearMonth,rawSiteQuery&&!filterSiteId ? false : filterSiteId);
 
   // 篩出該月的本地紀錄
   const _allMonthRecs = filterRecsBySup(localRecs);
@@ -3901,6 +3959,7 @@ function loadAttendanceStat(){
     if(filterSiteId && r.siteId !== filterSiteId) return false;
     return true;
   });
+  if(rawSiteQuery&&!filterSiteId) monthRecs.length=0;
 
   if(!monthRecs.length){
     $('stat-body').innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📭</div><p>該月無打卡紀錄（本地資料）</p></div></td></tr>';
@@ -4078,6 +4137,163 @@ function filterRecsBySup(recs){
   // 有 siteId 的照 siteId 過濾；siteId 為空的舊紀錄所有幹部都能看到
   return recs.filter(r=>!r.siteId || ids.includes(r.siteId));
 }
+function getAnalysisSiteScope(){
+  if(CURRENT_ROLE!=='supervisor' || !CURRENT_SUPERVISOR) return null;
+  if(CURRENT_SUPERVISOR.viewAll===true) return null;
+  return new Set(Array.isArray(CURRENT_SUPERVISOR.sites)?CURRENT_SUPERVISOR.sites:[]);
+}
+function filterAnalysisRecords(records){
+  const scope=getAnalysisSiteScope();
+  return scope===null ? records : records.filter(record=>record.siteId && scope.has(record.siteId));
+}
+function mergeRecordsByTimestamp(local, remote){
+  const seen=new Set();
+  return [...(Array.isArray(local)?local:[]),...(Array.isArray(remote)?remote:[])].filter(record=>{
+    if(!record || !record.timestamp || seen.has(record.timestamp)) return false;
+    seen.add(record.timestamp);
+    return true;
+  });
+}
+function buildAnomalies(records, options){
+  options=options||{};
+  const referenceDate=options.referenceDate||today();
+  const items=[];
+  const grouped={};
+  (Array.isArray(records)?records:[]).forEach(record=>{
+    if(!record||!record.empId||!record.date) return;
+    const key=record.empId+'|'+record.date;
+    if(!grouped[key]) grouped[key]=[];
+    grouped[key].push(record);
+  });
+  Object.values(grouped).forEach(dayRecords=>{
+    const first=dayRecords[0];
+    const countByType={};
+    dayRecords.forEach(record=>{ countByType[record.type]=(countByType[record.type]||0)+1; });
+    Object.keys(countByType).forEach(type=>{
+      if(countByType[type]>1){
+        const record=dayRecords.find(item=>item.type===type);
+        items.push({kind:'duplicate',severity:'yellow',empId:first.empId,name:first.name||first.empId,date:first.date,siteId:record.siteId||null,desc:type+'打卡 '+countByType[type]+' 次'});
+      }
+    });
+    if(first.date<referenceDate && countByType['上班'] && !countByType['下班']){
+      const inRecord=dayRecords.find(record=>record.type==='上班');
+      items.push({kind:'missing_out',severity:'red',empId:first.empId,name:first.name||first.empId,date:first.date,siteId:inRecord.siteId||null,desc:'有上班無下班紀錄'});
+    }
+  });
+  return {items,counts:{duplicate:items.filter(item=>item.kind==='duplicate').length,missingOut:items.filter(item=>item.kind==='missing_out').length}};
+}
+function buildSiteHealth(sites, anomalies, records){
+  const anomalyItems=Array.isArray(anomalies)?anomalies:[];
+  const allRecords=Array.isArray(records)?records:[];
+  const levelRank={red:0,yellow:1,green:2};
+  return (Array.isArray(sites)?sites:[]).map(site=>{
+    const items=anomalyItems.filter(item=>item.siteId===site.id);
+    const latest=allRecords.filter(record=>record.siteId===site.id).sort((a,b)=>String(b.timestamp||'').localeCompare(String(a.timestamp||'')))[0];
+    const red=items.some(item=>item.kind==='missing_out')||items.length>=2;
+    return {siteId:site.id,name:site.name||site.id,level:red?'red':(items.length?'yellow':'green'),anomalyCount:items.length,latestTime:latest?latest.timestamp:null};
+  }).sort((a,b)=>levelRank[a.level]-levelRank[b.level]||b.anomalyCount-a.anomalyCount||a.siteId.localeCompare(b.siteId));
+}
+function buildEmployeeAttendance(records, anomalies){
+  const map=new Map();
+  (Array.isArray(records)?records:[]).forEach(record=>{
+    if(!record||!record.empId) return;
+    if(!map.has(record.empId)) map.set(record.empId,{empId:record.empId,name:record.name||record.empId,days:new Set(),lastDate:'',lastSiteId:null,lastTimestamp:''});
+    const item=map.get(record.empId);
+    if(record.type==='上班'&&record.date) item.days.add(record.date);
+    if(String(record.timestamp||'')>item.lastTimestamp){ item.lastTimestamp=record.timestamp||''; item.lastDate=record.date||''; item.lastSiteId=record.siteId||null; }
+  });
+  (Array.isArray(anomalies)?anomalies:[]).forEach(anomaly=>{
+    if(!anomaly||!anomaly.empId) return;
+    if(!map.has(anomaly.empId)) map.set(anomaly.empId,{empId:anomaly.empId,name:anomaly.name||anomaly.empId,days:new Set(),lastDate:'',lastSiteId:null,lastTimestamp:''});
+    const item=map.get(anomaly.empId);
+    if(anomaly.kind==='missing_out') item.missingOut=(item.missingOut||0)+1;
+    if(anomaly.kind==='duplicate') item.duplicate=(item.duplicate||0)+1;
+  });
+  return [...map.values()].map(item=>({empId:item.empId,name:item.name,attendanceDays:item.days.size,missingOut:item.missingOut||0,duplicate:item.duplicate||0,lastDate:item.lastDate,lastSiteId:item.lastSiteId,lastTimestamp:item.lastTimestamp})).sort((a,b)=>b.missingOut-a.missingOut||b.duplicate-a.duplicate||a.attendanceDays-b.attendanceDays||a.name.localeCompare(b.name));
+}
+function getAnalysisDateKeys(days, endDate){
+  const end=new Date(String(endDate)+'T00:00:00');
+  const keys=[];
+  for(let offset=Math.max(1,Number(days)||1)-1;offset>=0;offset--){
+    const date=new Date(end); date.setDate(end.getDate()-offset);
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,'0');
+    const d=String(date.getDate()).padStart(2,'0');
+    keys.push(y+'-'+m+'-'+d);
+  }
+  return keys;
+}
+async function loadAnalysisRecords(days, endDate){
+  const end=endDate||today();
+  const keys=getAnalysisDateKeys(days,end);
+  const local=filterAnalysisRecords(localRecs.filter(record=>record&&keys.includes(record.date)));
+  if(!FB_DB) return {records:local,complete:false};
+  try{
+    const snapshots=await Promise.all(keys.map(key=>FB_DB.ref('punches/'+key).once('value')));
+    const remote=[];
+    snapshots.forEach(snapshot=>{ const value=snapshot.val()||{}; Object.values(value).forEach(record=>remote.push(record)); });
+    return {records:filterAnalysisRecords(mergeRecordsByTimestamp(local,remote)),complete:true};
+  }catch(error){
+    return {records:local,complete:false};
+  }
+}
+function getAnalysisRecordsForDays(days){
+  const end=new Date(today()+'T00:00:00');
+  const start=new Date(end); start.setDate(start.getDate()-(days-1));
+  const startKey=localDateKey(start);
+  return filterAnalysisRecords(localRecs.filter(record=>record&&record.date>=startKey&&record.date<=today()));
+}
+function formatAnalysisTime(timestamp){
+  if(!timestamp) return '尚無打卡';
+  return String(timestamp).replace('T',' ').slice(0,16);
+}
+function markAnalysisCompleteness(elementId, complete){
+  if(complete) return;
+  const element=$(elementId);
+  if(element) element.textContent+=' · 資料可能未完整同步';
+}
+async function loadSiteHealth(){
+  const result=await loadAnalysisRecords(30);
+  const records=result.records;
+  const anomalies=buildAnomalies(records,{referenceDate:today()}).items;
+  const sites=getVisibleSitesForCurrentUser();
+  const rows=buildSiteHealth(sites,anomalies,records);
+  const list=$('site-health-list');
+  updateSiteScopeLabel('site-health-scope','最近 30 天','');
+  markAnalysisCompleteness('site-health-scope',result.complete);
+  if(!rows.length){ list.innerHTML='<div class="empty-state"><div class="empty-icon">📍</div><p>目前沒有可查看的案場</p></div>'; return; }
+  const label={green:'正常',yellow:'需要確認',red:'優先處理'};
+  const color={green:'var(--success)',yellow:'var(--warn)',red:'var(--danger)'};
+  list.innerHTML=rows.map(row=>`<button onclick="showSiteHealthDetail('${encodeURIComponent(row.siteId)}')" style="text-align:left;border:.5px solid var(--border);background:var(--surface);border-radius:12px;padding:14px;cursor:pointer;font-family:var(--font);color:var(--t1)">
+    <div style="display:flex;align-items:center;gap:10px"><span style="width:12px;height:12px;border-radius:50%;background:${color[row.level]};flex:0 0 auto"></span><strong style="flex:1">${escapeHtml(row.siteId)} · ${escapeHtml(row.name)}</strong><span style="font-size:12px;color:${color[row.level]};font-weight:700">${label[row.level]}</span></div>
+    <div style="margin-left:22px;margin-top:6px;font-size:12px;color:var(--t3)">異常 ${row.anomalyCount} 筆 · 最近打卡 ${escapeHtml(formatAnalysisTime(row.latestTime))}</div>
+  </button>`).join('');
+}
+function showSiteHealthDetail(encodedSiteId){
+  const siteId=decodeURIComponent(encodedSiteId);
+  showSub('anomaly');
+  const from=new Date(today()+'T00:00:00'); from.setDate(from.getDate()-29);
+  $('an-date-from').value=localDateKey(from); $('an-date-to').value=today();
+  loadAnomaly(siteId);
+}
+async function loadEmployeeAnalysis(days){
+  const result=await loadAnalysisRecords(days);
+  const records=result.records;
+  const anomalies=buildAnomalies(records,{referenceDate:today()}).items;
+  const rows=buildEmployeeAttendance(records,anomalies);
+  const body=$('employee-analysis-body');
+  const label=days===7?'近 7 天':'近 30 天';
+  updateSiteScopeLabel('employee-analysis-scope',label,'');
+  markAnalysisCompleteness('employee-analysis-scope',result.complete);
+  $('emp-analysis-7').className='btn-s '+(days===7?'bs-accent':'bs-ghost');
+  $('emp-analysis-30').className='btn-s '+(days===30?'bs-accent':'bs-ghost');
+  if(!rows.length){ body.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📭</div><p>此期間沒有出勤資料</p></div></td></tr>'; return; }
+  body.innerHTML=rows.map(row=>`<tr><td><strong>${escapeHtml(row.name)}</strong><div style="font:12px 'SF Mono',monospace;color:var(--t3)">${escapeHtml(row.empId)}</div></td><td>${row.attendanceDays}</td><td style="color:${row.missingOut?'var(--danger)':'var(--t3)'}">${row.missingOut||'–'}</td><td style="color:${row.duplicate?'var(--warn)':'var(--t3)'}">${row.duplicate||'–'}</td><td style="font-size:12px">${escapeHtml(row.lastDate||'–')}<div style="color:var(--t3)">${escapeHtml(row.lastSiteId?getSiteName(row.lastSiteId):'–')}</div>${row.missingOut?`<button class="btn-s bs-ghost" style="margin-top:5px;font-size:11px;padding:4px 8px" onclick="openManualPunchFor('${encodeURIComponent(row.empId)}','${encodeURIComponent(row.lastDate)}','${encodeURIComponent(row.lastSiteId||'')}')">補下班</button>`:''}</td></tr>`).join('');
+}
+function openManualPunchFor(encodedEmpId, encodedDate, encodedSiteId){
+  openManualPunch({empId:decodeURIComponent(encodedEmpId),date:decodeURIComponent(encodedDate),siteId:decodeURIComponent(encodedSiteId),reason:'異常補登：漏打下班'});
+  $('mp-type').value='下班';
+}
 
 
 // ── 日期區間快捷篩選 ──────────────────────────
@@ -4131,13 +4347,46 @@ function getSiteName(siteId){
   const m = getSiteMap();
   return m[siteId] ? `${siteId} · ${m[siteId]}` : siteId;
 }
+function findSitesForSearch(sites, query, allowedIds){
+  const normalized=String(query||'').trim().toLowerCase();
+  const allowed=Array.isArray(allowedIds)?new Set(allowedIds):null;
+  return (Array.isArray(sites)?sites:[]).filter(site=>{
+    if(!site || !site.id || (allowed && !allowed.has(site.id))) return false;
+    if(!normalized) return true;
+    const id=String(site.id).toLowerCase();
+    const legacyId=id.replace(/^([a-z])0+(\d+)$/,'$1$2');
+    const label=(id+' '+legacyId+' '+String(site.name||'').toLowerCase());
+    return label.includes(normalized);
+  });
+}
+function getVisibleSitesForCurrentUser(){
+  return findSitesForSearch(getSites(true),'',getSupSiteIds());
+}
+function resolveSiteSearchId(value){
+  const query=String(value||'').trim();
+  if(!query) return '';
+  const matches=findSitesForSearch(getVisibleSitesForCurrentUser(),query);
+  if(matches.length===1) return matches[0].id;
+  const exact=getVisibleSitesForCurrentUser().find(site=>query===site.id+' · '+site.name);
+  return exact ? exact.id : '';
+}
+function renderSiteSearchOptions(inputId, listId){
+  const input=$(inputId), list=$(listId);
+  if(!input || !list) return;
+  const current=resolveSiteSearchId(input.value);
+  list.innerHTML=getVisibleSitesForCurrentUser().map(site=>`<option value="${escapeHtml(site.id+' · '+site.name)}"></option>`).join('');
+  if(current && input.value!==current+' · '+getSites(true).find(site=>site.id===current).name){
+    input.value=current+' · '+getSites(true).find(site=>site.id===current).name;
+  }
+}
+function updateSiteScopeLabel(elementId, period, siteId){
+  const el=$(elementId);
+  if(!el) return;
+  const scope=siteId===false ? '請從案場建議中選擇' : (siteId ? getSiteName(siteId) : '全部案場');
+  el.textContent=`目前查看：${period} · ${scope}`;
+}
 function initSiteFilter(){
-  const sel = $('f-site');
-  if(!sel) return;
-  const sites = JSON.parse(localStorage.getItem('sites')||'[]').filter(s=>s.active!==false);
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">📍 全部案場</option>'
-    + sites.map(s=>`<option value="${s.id}"${s.id===cur?' selected':''}>${s.id} · ${s.name}</option>`).join('');
+  renderSiteSearchOptions('f-site','record-site-options');
 }
 
 function loadRecords(){
@@ -4148,9 +4397,12 @@ function loadRecords(){
   if(ds) rows=rows.filter(r=>r.date>=ds);
   if(de) rows=rows.filter(r=>r.date<=de);
   if(fe) rows=rows.filter(r=>r.empId.includes(fe)||(r.name||'').toUpperCase().includes(fe));
-  const fs=$('f-site')?$('f-site').value:'';
+  const rawSiteQuery=$('f-site')?$('f-site').value.trim():'';
+  const fs=resolveSiteSearchId(rawSiteQuery);
+  if(rawSiteQuery&&!fs) rows=[];
   if(fs) rows=rows.filter(r=>r.siteId===fs);
   initSiteFilter(); // 更新案場選單（案場可能有變動）
+  updateSiteScopeLabel('record-site-scope',`${ds||'最早'} 至 ${de||'今天'}`,rawSiteQuery&&!fs ? false : fs);
   _siteMap = null;  // 清快取讓 getSiteName 重讀
   const todayR=filterRecsBySup(localRecs.filter(r=>r.date===td));
   $('s-total').textContent=todayR.length;
@@ -4237,12 +4489,61 @@ function dismissAnnouncement(){
 }
 
 // ── 補打卡 ──
-function openManualPunch(){
+function getManualPunchSites(){
+  const assigned=getSupSiteIds();
+  return getSites(true).filter(site=>assigned===null || assigned.includes(site.id));
+}
+function validateManualPunchInput(input, records=[], currentDate=today()){
+  const {empId,type,date,time,reason}=input;
+  if(!empId) return {valid:false,error:'請選擇員工'};
+  if(!date||!time) return {valid:false,error:'請填寫日期與時間'};
+  if(!String(reason||'').trim()) return {valid:false,error:'請填寫補登原因'};
+  if(date>currentDate) return {valid:false,error:'不可補登未來日期'};
+  const sameDay=(Array.isArray(records)?records:[]).filter(r=>r&&r.empId===empId&&r.date===date);
+  if(sameDay.some(r=>r.type===type&&r.time===time)) return {valid:false,error:'已有相同時間的打卡紀錄'};
+  if(type==='下班'){
+    const latestIn=sameDay.filter(r=>r.type==='上班'&&r.time<=time).sort((a,b)=>b.time.localeCompare(a.time))[0];
+    if(!latestIn){
+      if(sameDay.some(r=>r.type==='上班')) return {valid:false,error:'下班時間不可早於上班時間'};
+      return {valid:false,error:'補下班前請先確認同日上班紀錄'};
+    }
+  }
+  return {valid:true};
+}
+function buildManualPunchRecord(input, meta){
+  meta=meta||{};
+  const {empId,name,type,date,time,reason,siteId}=input;
+  return {
+    empId,name,type,date,time,
+    timestamp:date+'T'+time+':00',
+    siteId:siteId||null,
+    synced:false,fbSynced:false,
+    manual:true,
+    note:reason,
+    correctionReason:reason,
+    createdAt:meta.createdAt||new Date().toISOString(),
+    createdBy:meta.createdBy||'admin'
+  };
+}
+function openManualPunch(prefill){
+  prefill=prefill||{};
   const td=today();
-  $('mp-date').value=td;
+  $('mp-date').value=prefill.date||td;
   $('mp-time').value=new Date().toTimeString().slice(0,5);
   $('mp-emp').value='';$('mp-emp-id').value='';$('mp-emp-name').value='';
-  $('mp-note').value='';
+  $('mp-note').value=prefill.reason||'';
+  const siteSelect=$('mp-site');
+  const sites=getManualPunchSites();
+  siteSelect.innerHTML='<option value="">請選擇案場</option>'+sites.map(site=>`<option value="${escapeHtml(site.id)}">${escapeHtml(site.id)} · ${escapeHtml(site.name)}</option>`).join('');
+  if(prefill.siteId&&sites.some(site=>site.id===prefill.siteId)) siteSelect.value=prefill.siteId;
+  if(prefill.empId){
+    const employee=[...employees,...getTempEmps()].find(item=>item.id===prefill.empId);
+    if(employee){
+      $('mp-emp').value=employee.name+' ('+employee.id+')';
+      $('mp-emp-id').value=employee.id;
+      $('mp-emp-name').value=employee.name;
+    }
+  }
   $('mp-emp-list').style.display='none';
   const m=$('manual-punch-modal');m.style.display='flex';
 }
@@ -4277,24 +4578,20 @@ function saveManualPunch(){
   const type=$('mp-type').value;
   const date=$('mp-date').value;
   const time=$('mp-time').value;
-  const note=$('mp-note').value.trim();
-  if(!empId){showToast('請選擇員工','error');return}
-  if(!date||!time){showToast('請填寫日期與時間','error');return}
-  const rec={
-    empId, name, type, date, time,
-    timestamp: date+'T'+time+':00',
-    synced: false,
-    fbSynced: false,
-    manual: true,
-    note: note||'補登'
-  };
+  const reason=$('mp-note').value.trim();
+  const siteId=$('mp-site').value;
+  if(!siteId){showToast('請選擇案場','error');return}
+  const checked=validateManualPunchInput({empId,type,date,time,reason},localRecs);
+  if(!checked.valid){showToast(checked.error,'error');return}
+  const createdBy=(CURRENT_SUPERVISOR&&CURRENT_SUPERVISOR.empId)||'admin';
+  const rec=buildManualPunchRecord({empId,name,type,date,time,reason,siteId},{createdBy});
   localRecs.unshift(rec);
   saveRecs();
   uploadToFirebase(rec); // 同步至雲端
   loadRecords();
   closeManualPunch();
   showToast(`已為 ${name} 補登 ${type} 打卡 ✓`,'success');
-  logAudit('manual_punch', `為 ${name}（${empId}）補登 ${date} ${time} ${type}${note?'，備註：'+note:''}`);
+  logAudit('manual_punch', `為 ${name}（${empId}）補登 ${date} ${time} ${type}，案場：${getSiteName(siteId)}，原因：${reason}`);
 }
 
 // ══════════════════════════════════════
@@ -4809,7 +5106,7 @@ function showSub(name,el){
   // 更新標題列
   const _labels = {
     'records':'打卡紀錄','overview':'今日總覽','chart':'統計圖表',
-    'anomaly':'異常報表','attendance-stat':'出勤統計','monthly-report':'月度報表',
+    'anomaly':'異常報表','site-health':'案場狀態','employee-analysis':'人員出勤分析','attendance-stat':'出勤統計','monthly-report':'月度報表',
     'employees':'員工名單','supervisors':'幹部管理','qrcode':'QR Code','settings':'設定'
   };
   const backBtn = $('sub-back-btn');
@@ -4819,12 +5116,14 @@ function showSub(name,el){
   // 資料載入
   if(name==='records'){         initSiteFilter(); loadRecords(); }
   if(name==='attendance-stat'){ initStatMonth(); loadAttendanceStat(); }
-  if(name==='monthly-report'){ initExportSiteSelect(); const _el=$('monthly-report-month'); if(_el&&!_el.value){const _n=new Date();_el.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');} }
+  if(name==='monthly-report'){ initExportSiteSelect(); const _el=$('monthly-report-month'); if(_el&&!_el.value){const _n=new Date();_el.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');} updateSiteFilterBtn(); }
   if(name==='employees'){ const _s=$('emp-search'); if(_s) _s.value=''; renderEmpList(); }
   if(name==='settings') loadSettingsFields();
   if(name==='overview') loadOverview();
   if(name==='chart')    loadChart();
   if(name==='anomaly')  initAnomaly();
+  if(name==='site-health') loadSiteHealth();
+  if(name==='employee-analysis') loadEmployeeAnalysis(30);
   if(name==='supervisors') loadSupPage();
   if(name==='qrcode')   loadQrPage();
 }
@@ -5528,7 +5827,7 @@ function setAnomalyQuick(mode){
   loadAnomaly();
 }
 
-function loadAnomaly(){
+function loadAnomaly(siteFilterId){
   const from = $('an-date-from').value;
   const to   = $('an-date-to').value;
   if(!from||!to){ $('anomaly-body').innerHTML=`<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📅</div><p>請選擇日期範圍</p></div></td></tr>`; return; }
@@ -5541,7 +5840,7 @@ function loadAnomaly(){
   const end = new Date(to);
   while(cur<=end){
     const ds = cur.toISOString().slice(0,10);
-    const dayRecs = filterRecsBySup(localRecs.filter(r=>r.date===ds));
+    const dayRecs = filterRecsBySup(localRecs.filter(r=>r.date===ds && (!siteFilterId || r.siteId===siteFilterId)));
 
     // 重複打卡（同天同類型超過1次）
     const typeCounts = {};
@@ -5601,7 +5900,7 @@ function loadAnomaly(){
 
   const tbody = $('anomaly-body');
   if(!anomalies.length){
-    tbody.innerHTML=`<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">✅</div><p>此期間無異常紀錄</p></div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">✅</div><p>此期間無異常紀錄</p></div></td></tr>`;
     return;
   }
   tbody.innerHTML = anomalies.map(a=>`
@@ -5611,6 +5910,7 @@ function loadAnomaly(){
       <td>${escapeHtml(a.type)}</td>
       <td style="font-size:13px;color:var(--t2)">${escapeHtml(a.desc)}</td>
       <td style="font-size:11px;color:var(--t2)">${a.siteId ? escapeHtml(getSiteName(a.siteId)) : '<span style="color:var(--t4)">–</span>'}</td>
+      <td>${a.type.includes('未打下班')?`<button class="btn-s bs-ghost" style="font-size:11px;padding:4px 8px" onclick="openManualPunchFor('${encodeURIComponent(a.empId)}','${encodeURIComponent(a.date)}','${encodeURIComponent(a.siteId||'')}')">補下班</button>`:'–'}</td>
     </tr>`).join('');
 }
 
@@ -5618,12 +5918,12 @@ function exportAnomalyCSV(){
   const from=$('an-date-from').value, to=$('an-date-to').value;
   const rows=[];
   document.querySelectorAll('#anomaly-body tr').forEach(tr=>{
-    const tds=[...tr.querySelectorAll('td')].map(td=>td.innerText.replace(/\n/g,' ').trim());
-    if(tds.length===4) rows.push(tds.join(','));
+    const tds=[...tr.querySelectorAll('td')].slice(0,5).map(td=>td.innerText.replace(/\n/g,' ').trim());
+    if(tds.length===5) rows.push(tds.join(','));
   });
   if(!rows.length){showToast('沒有可匯出的資料','error');return}
   const bom='\uFEFF';
-  dlFile(bom+'員工,日期,異常類型,說明\n'+rows.join('\n'), `異常報表_${from}_${to}.csv`);
+  dlFile(bom+'員工,日期,異常類型,說明,案場\n'+rows.join('\n'), `異常報表_${from}_${to}.csv`);
   showToast('異常報表已匯出 ✓','success');
 }
 
@@ -5688,10 +5988,10 @@ function updateSiteFilterBtn(){
   const el = $('site-sel-summary');
   if(!el) return;
   if(n === 0){
-    el.textContent = '已選：全部案場';
+    el.textContent = `目前查看：${($('monthly-report-month')||{}).value||getDefaultYM()} · 全部案場`;
   } else {
     const names = [..._selectedSiteIds].join('、');
-    el.textContent = `已選 ${n} 個案場：${names}`;
+    el.textContent = `目前查看：${($('monthly-report-month')||{}).value||getDefaultYM()} · 已選 ${n} 個案場：${names}`;
   }
   // 同步 chip 選取狀態
   document.querySelectorAll('#site-chip-list .site-chip').forEach(chip => {
@@ -5735,10 +6035,11 @@ function toggleSiteChip(id, el){
 
 /** 搜尋過濾 chips */
 function filterSiteChips(q){
-  const lq = q.trim().toLowerCase();
+  const lq=String(q||'').trim();
+  const matchedIds=new Set(findSitesForSearch(getVisibleSitesForCurrentUser(),lq).map(site=>site.id));
   if(lq) toggleSiteSelector(true);
   document.querySelectorAll('#site-chip-list .site-chip').forEach(chip => {
-    chip.style.display = (!lq || chip.dataset.label.toLowerCase().includes(lq)) ? '' : 'none';
+    chip.style.display = matchedIds.has(chip.dataset.id) ? '' : 'none';
   });
 }
 // 保留舊名稱相容性
@@ -5782,7 +6083,9 @@ function getSelectedSiteIds(){
 function initExportSiteSelect(){
   const list = $('site-chip-list');
   if(!list) return;
-  const sites = JSON.parse(localStorage.getItem('sites') || '[]').filter(s => s.active !== false);
+  const sites = getVisibleSitesForCurrentUser();
+  const visibleIds=new Set(sites.map(site=>site.id));
+  _selectedSiteIds=new Set([..._selectedSiteIds].filter(id=>visibleIds.has(id)));
   if(!sites.length){
     list.innerHTML = '<span style="font-size:12px;color:var(--t3)">尚無案場資料</span>';
     updateSiteFilterBtn();
@@ -6049,6 +6352,10 @@ function uploadToFirebase(rec){
       time:  rec.time,
       timestamp: rec.timestamp,
       siteId: rec.siteId||null,
+      manual: rec.manual===true,
+      correctionReason: rec.correctionReason||null,
+      createdAt: rec.createdAt||null,
+      createdBy: rec.createdBy||null,
       uploadedAt: Date.now()
     }).then(()=>{
       const idx = localRecs.findIndex(r=>r.timestamp===rec.timestamp);
