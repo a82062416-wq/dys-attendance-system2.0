@@ -453,7 +453,7 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.9');
+  assert.equal(notes[0].version, 'v1.4.10');
   assert.equal(notes[0].date, '2026.09');
   assert.ok(notes[0].changes.some(change => change.includes('告知')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
@@ -463,6 +463,26 @@ test('管理員登入不可建立固定預設密碼，且要先同步雲端密�
   assert.doesNotMatch(inlineScript, /localStorage\.setItem\('admin_pwd_hash','aa8abcd'\)/);
   const goAdmin = extractFunction(inlineScript, 'goAdmin');
   assert.ok(goAdmin.indexOf('syncAuthFromFirebase()') < goAdmin.indexOf('if(!getPwdHash())'));
+});
+
+test('新 iPhone 沒有本機設定時，員工打卡不可誤跳初始設定', () => {
+  const setupModal = { classList: { added: false, add() { this.added = true; } } };
+  const navBrand = { textContent: '' };
+  const cfgBar = { style: {} };
+  const cfgUrl = { textContent: '' };
+  const storage = createStorage();
+  const context = {
+    localStorage: storage,
+    SCRIPT_URL: '', IS_DEMO: false, COMPANY: 'DYS 大洋保全', ABSENT_LIMIT: 7, MSG_IN: '', MSG_OUT: '',
+    DEFAULT_SCRIPT_URL: 'https://script.google.com/macros/s/live/exec',
+    getPwdHash: () => '',
+    $: id => ({ 'setup-modal': setupModal, 'nav-brand': navBrand, 'cfg-bar-wrap': cfgBar, 'cfg-bar-url': cfgUrl }[id]),
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'updateCfgBar')}; ${extractFunction(inlineScript, 'loadConfig')}; this.run = loadConfig;`, context);
+  context.run();
+  assert.equal(setupModal.classList.added, false);
+  assert.equal(context.SCRIPT_URL, 'https://script.google.com/macros/s/live/exec');
+  assert.equal(context.IS_DEMO, false);
 });
 
 test('臨時人員身分證僅顯示個資告知，不得要求勾選同意', () => {
