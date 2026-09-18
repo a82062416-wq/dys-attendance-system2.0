@@ -455,7 +455,7 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const notes = context.run();
   assert.equal(notes[0].version, 'v1.4.10');
   assert.equal(notes[0].date, '2026.09');
-  assert.ok(notes[0].changes.some(change => change.includes('告知')));
+  assert.ok(notes[0].changes.some(change => change.includes('新裝置')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
 });
 
