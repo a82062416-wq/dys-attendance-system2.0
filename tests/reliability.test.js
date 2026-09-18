@@ -453,9 +453,9 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.10');
+  assert.equal(notes[0].version, 'v1.4.11');
   assert.equal(notes[0].date, '2026.09');
-  assert.ok(notes[0].changes.some(change => change.includes('新裝置')));
+  assert.ok(notes[0].changes.some(change => change.includes('登入')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
 });
 
@@ -483,6 +483,17 @@ test('新 iPhone 沒有本機設定時，員工打卡不可誤跳初始設定', 
   assert.equal(setupModal.classList.added, false);
   assert.equal(context.SCRIPT_URL, 'https://script.google.com/macros/s/live/exec');
   assert.equal(context.IS_DEMO, false);
+});
+
+test('後台登入提示應清楚區分管理員密碼與幹部員工編號', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'getLoginRoleGuide')}; this.run = getLoginRoleGuide;`, context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run('admin'))), {
+    title: '管理員登入', hint: '請輸入管理員密碼', button: '登入管理後台',
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(context.run('supervisor'))), {
+    title: '幹部登入', hint: '請輸入您的員工編號', button: '以員工編號登入',
+  });
 });
 
 test('臨時人員身分證僅顯示個資告知，不得要求勾選同意', () => {

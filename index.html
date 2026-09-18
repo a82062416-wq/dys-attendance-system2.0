@@ -990,8 +990,8 @@ button,input,select{font-family:var(--font)}
         </div>
         <div style="font-size:13px;font-weight:700;letter-spacing:2px;color:var(--t2);text-transform:uppercase">DYS 大洋保全</div>
       </div>
-      <h2 style="margin-bottom:4px">管理後台</h2>
-      <p style="margin-bottom:20px">請選擇身份並輸入密碼</p>
+      <h2 id="login-role-title" style="margin-bottom:4px">管理員登入</h2>
+      <p id="login-role-hint" style="margin-bottom:20px">請輸入管理員密碼</p>
       <div style="display:flex;gap:6px;margin-bottom:18px">
         <button class="lock-role-btn active" id="role-admin" onclick="switchRole('admin')">👑 管理員</button>
         <button class="lock-role-btn" id="role-supervisor" onclick="switchRole('supervisor')">📋 幹部</button>
@@ -1010,10 +1010,10 @@ button,input,select{font-family:var(--font)}
                style="margin-bottom:0;letter-spacing:2px;width:100%"/>
         <div style="font-size:12px;color:var(--t3);margin-top:8px;text-align:center">輸入您的員工編號即可登入</div>
       </div>
-      <button class="btn-unlock" onclick="tryUnlock()">登入</button>
+      <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.10 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.11 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1206,7 +1206,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.10 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.11 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -3762,9 +3762,19 @@ function doResetPwd(){
   showToast('密碼已重置，主管密碼已清除，請重新登入','success');
 }
 
+function getLoginRoleGuide(role){
+  return role==='supervisor'
+    ? {title:'幹部登入',hint:'請輸入您的員工編號',button:'以員工編號登入'}
+    : {title:'管理員登入',hint:'請輸入管理員密碼',button:'登入管理後台'};
+}
+
 // 角色切換
 function switchRole(role){
   CURRENT_ROLE = role;
+  const guide=getLoginRoleGuide(role);
+  $('login-role-title').textContent=guide.title;
+  $('login-role-hint').textContent=guide.hint;
+  $('login-submit-btn').textContent=guide.button;
   $('role-admin').classList.toggle('active', role==='admin');
   $('role-supervisor').classList.toggle('active', role==='supervisor');
   $('lock-hint').textContent='';
@@ -3791,15 +3801,10 @@ async function goAdmin(el){
   $('lock-input').value='';
   $('sup-emp-input').value='';
   $('lock-hint').textContent='';
-  CURRENT_ROLE='admin';
-  $('role-admin').classList.add('active');
-  $('role-supervisor').classList.remove('active');
-  $('admin-pwd-wrap').style.display='';
-  $('sup-id-wrap').style.display='none';
+  switchRole('admin');
   // 有啟用中的幹部就顯示幹部按鈕
   const activeSups = getSupervisors().filter(s=>s.active);
   $('role-supervisor').style.display = activeSups.length > 0 ? '' : 'none';
-  setTimeout(()=>$('lock-input').focus(),100);
 }
 let lockTries=0;
 function togglePwd(id,btn){
@@ -5235,6 +5240,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.4.11',date:'2026.09',changes:['後台登入畫面清楚區分管理員與幹部','管理員提示輸入密碼，幹部提示輸入員工編號','不影響登入權限、打卡與 QR Code']},
     {version:'v1.4.10',date:'2026.09',changes:['修正新手機誤跳初始設定畫面','新裝置會自動使用公司既有打卡連線','不影響管理員登入、現場打卡或 QR Code']},
     {version:'v1.4.9',date:'2026.09',changes:['修正臨時人員視窗開啟流程，移除已廢止的勾選欄位','開啟後可直接閱讀個資告知並繼續操作','不影響身分證保管、一般打卡與 QR Code']},
     {version:'v1.4.8',date:'2026.09',changes:['臨時人員身分證改為單純個資告知，不再要求勾選','保留系統告知時間，方便公司日後追查','不影響臨時人員身分證保管與一般打卡流程']},

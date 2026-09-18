@@ -5,7 +5,7 @@
 // ══════════════════════════════════════════════
 
 // 每次正式發布都更新版本，讓已安裝的 iPhone PWA 立即淘汰舊首頁快取。
-const CACHE_NAME = 'attendance-v1.4.10';
+const CACHE_NAME = 'attendance-v1.4.11';
 
 self.addEventListener('install', event => {
   event.waitUntil(
