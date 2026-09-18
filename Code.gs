@@ -62,7 +62,7 @@ function getTempIdentityVaultSheet() {
   let sheet = ss.getSheetByName('身分保管');
   if (!sheet) {
     sheet = ss.insertSheet('身分保管');
-    sheet.appendRow(['臨時人員代碼', '姓名', '完整身分證', '末四碼', '伺服器比對值', '同意時間', '首次案場', '最後更新']);
+    sheet.appendRow(['臨時人員代碼', '姓名', '完整身分證', '末四碼', '伺服器比對值', '個資告知時間', '首次案場', '最後更新']);
     sheet.setFrozenRows(1);
   }
   return sheet;
@@ -72,7 +72,7 @@ function registerTempIdentity(payload) {
   const fullId = String(payload.fullId || '').trim().toUpperCase();
   const tempId = String(payload.tempId || '').trim();
   const name = String(payload.name || '').trim();
-  if (!fullId || !tempId || !name || payload.consent !== true) return { status: 'error', message: '資料不完整' };
+  if (!fullId || !tempId || !name) return { status: 'error', message: '資料不完整' };
   const props = PropertiesService.getScriptProperties();
   let secret = props.getProperty(TEMP_VAULT_SECRET_PROPERTY);
   if (!secret) { secret = Utilities.getUuid() + Utilities.getUuid(); props.setProperty(TEMP_VAULT_SECRET_PROPERTY, secret); }
@@ -80,7 +80,8 @@ function registerTempIdentity(payload) {
   const sheet = getTempIdentityVaultSheet();
   const rows = Math.max(0, sheet.getLastRow() - 1);
   if (rows > 0 && sheet.getRange(2, 5, rows, 1).createTextFinder(fingerprint).matchEntireCell(true).findNext()) return { status: 'ok', duplicate: true };
-  sheet.appendRow([tempId, name, fullId, fullId.slice(-4), fingerprint, String(payload.consentAt || new Date().toISOString()), String(payload.siteId || ''), new Date()]);
+  if (sheet.getRange(1, 6).getValue() === '同意時間') sheet.getRange(1, 6).setValue('個資告知時間');
+  sheet.appendRow([tempId, name, fullId, fullId.slice(-4), fingerprint, String(payload.noticeAt || new Date().toISOString()), String(payload.siteId || ''), new Date()]);
   return { status: 'ok', duplicate: false };
 }
 

@@ -1013,7 +1013,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" onclick="tryUnlock()">登入</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.7 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.8 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1206,7 +1206,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.7 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.8 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1297,10 +1297,10 @@ button,input,select{font-family:var(--font)}
         <button class="secondary-action" onclick="openSubModal()">臨時人員打卡</button>
         <button class="secondary-action help" onclick="replayGuide()">查看打卡說明</button>
       </div>
-      <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--t2);margin:0 0 14px">
-        <input id="sub-id-consent" type="checkbox" style="margin-top:3px;accent-color:var(--accent)"/>
-        <span>我已了解：本系統為身分確認、派遣與出勤追查而蒐集完整身分證；僅管理員可查閱，保存與利用依公司個資告知辦理。</span>
-      </label>
+      <div style="font-size:12px;line-height:1.6;color:var(--t2);margin:0 0 14px;padding:10px 12px;background:var(--fill2);border-radius:10px">
+        <strong style="color:var(--t1)">個資告知</strong><br/>
+        本系統為身分確認、派遣與出勤追查而蒐集完整身分證；僅管理員可查閱，保存與利用依公司個資告知辦理。
+      </div>
 
     </div>
   </div>
@@ -3361,8 +3361,6 @@ function subBack(){
 function subLookupId(){
   const input = ($('sub-id-input').value||'').trim().toUpperCase();
   if(!input){ showToast('請輸入身分證號碼','error'); return; }
-  if(!$('sub-id-consent').checked){ showToast('請先閱讀並勾選個資告知','error'); return; }
-
   // 查臨時員工清單（by 身分證 hash）
   const h = hashPwd(input);
   const tempEmp = getTempEmps().find(e=>e.idHash===h);
@@ -3377,7 +3375,7 @@ function subLookupId(){
   }
 
   // 第一次 → 請補填姓名
-  _subEmp = {idHash: h, idDisplay: input.slice(-4), tempId: 'TMP_' + h.slice(0,8).toUpperCase(), fullId:input, consentAt:new Date().toISOString()};
+  _subEmp = {idHash: h, idDisplay: input.slice(-4), tempId: 'TMP_' + h.slice(0,8).toUpperCase(), fullId:input, noticeAt:new Date().toISOString()};
   $('sub-new-name').value='';
   $('sub-step-1').style.display='none';
   $('sub-step-2b').style.display='';
@@ -3482,7 +3480,7 @@ async function uploadRec(rec){
 
 function sendTempIdentityToVault(subEmp, name){
   if(!SCRIPT_URL || IS_DEMO || !subEmp.fullId) return;
-  const payload={action:'registerTempIdentity',tempId:subEmp.tempId,name,fullId:subEmp.fullId,consent:true,consentAt:subEmp.consentAt,siteId:CURRENT_SITE_ID||''};
+  const payload={action:'registerTempIdentity',tempId:subEmp.tempId,name,fullId:subEmp.fullId,noticeAt:subEmp.noticeAt,siteId:CURRENT_SITE_ID||''};
   fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),keepalive:true}).catch(()=>{});
   delete subEmp.fullId;
 }
@@ -5238,6 +5236,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.4.8',date:'2026.09',changes:['臨時人員身分證改為單純個資告知，不再要求勾選','保留系統告知時間，方便公司日後追查','不影響臨時人員身分證保管與一般打卡流程']},
     {version:'v1.4.7',date:'2026.09',changes:['修正管理員登入：先同步雲端密碼再顯示登入畫面','移除錯誤的本機預設密碼回退，避免不同裝置無法登入','幹部持續以各自員工編號登入，不需共用密碼']},
     {version:'v1.4.6',date:'2026.09',changes:['新增管理員後台的版本更新紀錄','每次正式上線會同步更新頁尾版本與此處說明','不影響現場打卡、既有資料或 QR Code']},
     {version:'v1.4.5',date:'2026.09',changes:['新增 Google Drive 月度出勤備份','月結前檢查可選月份後手動備份','備份不包含完整身分證、手機或生日']},
