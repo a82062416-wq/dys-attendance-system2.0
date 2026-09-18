@@ -453,8 +453,14 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.6');
+  assert.equal(notes[0].version, 'v1.4.7');
   assert.equal(notes[0].date, '2026.09');
-  assert.ok(notes[0].changes.some(change => change.includes('版本更新紀錄')));
+  assert.ok(notes[0].changes.some(change => change.includes('登入')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
+});
+
+test('管理員登入不可建立固定預設密碼，且要先同步雲端密碼', () => {
+  assert.doesNotMatch(inlineScript, /localStorage\.setItem\('admin_pwd_hash','aa8abcd'\)/);
+  const goAdmin = extractFunction(inlineScript, 'goAdmin');
+  assert.ok(goAdmin.indexOf('syncAuthFromFirebase()') < goAdmin.indexOf('if(!getPwdHash())'));
 });
