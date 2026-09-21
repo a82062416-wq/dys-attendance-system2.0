@@ -1013,7 +1013,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.12 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.13 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1207,7 +1207,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.12 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.13 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -2092,7 +2092,7 @@ function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-const DEFAULT_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxP51UDDhhoW9omR9egERCJQKlXns2c9qIB8jHYk4zw4aDzLWTxUQ5OgA1Viqat9rwcdQ/exec';
+const DEFAULT_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwHyBtThhmYeRdeTE9k6NRYuOHnIwe77skpKduKIyug-eRSs0XXN2C_Yyz_bzDuFLDPVQ/exec';
 let SCRIPT_URL='', IS_DEMO=false, COMPANY='DYS 大洋保全', ADMIN_UNLOCKED=false;
 
 // ══════════════════════════════════════
@@ -5282,6 +5282,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.4.13',date:'2026.09',changes:['修正 Apps Script 預設連線，員工編號查詢與雲端同步可正常使用']},
     {version:'v1.4.12',date:'2026.09',changes:['補卡入口可快速修改既有上班或下班時間','每次修正保留原始時間、修改者、時間與原因','幹部僅可修改自己分配案場，管理員可修改全公司']},
     {version:'v1.4.11',date:'2026.09',changes:['後台登入畫面清楚區分管理員與幹部','管理員提示輸入密碼，幹部提示輸入員工編號','不影響登入權限、打卡與 QR Code']},
     {version:'v1.4.10',date:'2026.09',changes:['修正新手機誤跳初始設定畫面','新裝置會自動使用公司既有打卡連線','不影響管理員登入、現場打卡或 QR Code']},
