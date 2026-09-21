@@ -1013,7 +1013,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.11 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.12 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1098,8 +1098,9 @@ button,input,select{font-family:var(--font)}
 <!-- 補打卡 Modal -->
 <div id="manual-punch-modal" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
   <div class="modal-box" style="max-width:400px">
-    <h2>➕ 補打卡</h2>
-    <p style="font-size:13px;color:var(--t2);margin-bottom:16px">為員工手動新增一筆打卡紀錄</p>
+    <h2 id="mp-title">➕ 補卡／修改時間</h2>
+    <p id="mp-desc" style="font-size:13px;color:var(--t2);margin-bottom:10px">沒有紀錄時補卡；已有紀錄時可快速修改時間。</p>
+    <div id="mp-audit-note" style="display:none;font-size:12px;line-height:1.6;padding:9px 11px;border-radius:9px;background:var(--fill2);color:var(--t2);margin-bottom:12px"></div>
     <div class="mf" style="margin-bottom:10px">
       <label>員工編號 / 姓名</label>
       <input id="mp-emp" class="fi" type="text" placeholder="輸入員工編號或姓名搜尋" oninput="mpSearchEmp()" style="width:100%" autocomplete="off"/>
@@ -1133,7 +1134,7 @@ button,input,select{font-family:var(--font)}
       <input id="mp-note" class="fi" type="text" maxlength="80" placeholder="例如：忘記打下班卡" style="width:100%"/>
     </div>
     <div class="modal-actions">
-      <button class="btn-s bs-accent" onclick="saveManualPunch()" style="flex:1;padding:11px">儲存</button>
+      <button class="btn-s bs-accent" id="mp-save-btn" onclick="saveManualPunch()" style="flex:1;padding:11px">儲存補卡</button>
       <button class="btn-s bs-ghost" onclick="closeManualPunch()" style="flex:1;padding:11px">取消</button>
     </div>
   </div>
@@ -1206,7 +1207,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.11 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.12 &nbsp;·&nbsp; 2026.09 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -3434,7 +3435,9 @@ function requestSheetUpload(rec){
     const script = document.createElement('script');
     const p = new URLSearchParams({
       empId:rec.empId, name:rec.name, type:rec.type, date:rec.date,
-      time:rec.time, timestamp:rec.timestamp, callback:callbackName
+      time:rec.time, timestamp:rec.timestamp, siteId:rec.siteId||'', manual:rec.manual===true?'1':'',
+      correctionReason:rec.correctionReason||'', originalTime:rec.originalTime||'', originalTimestamp:rec.originalTimestamp||'',
+      correctedAt:rec.correctedAt||'', correctedBy:rec.correctedBy||'', callback:callbackName
     });
     let settled = false;
     const cleanup = ()=>{
@@ -3655,7 +3658,16 @@ async function retryFirebaseSync(){
       await FB_DB.ref('punches/'+rec.date+'/'+key).set({
         empId: rec.empId, name: rec.name, type: rec.type,
         date: rec.date, time: rec.time, timestamp: rec.timestamp,
-        siteId: rec.siteId||null, uploadedAt: Date.now()
+        siteId: rec.siteId||null,
+        manual: rec.manual===true,
+        correctionReason: rec.correctionReason||null,
+        originalTime: rec.originalTime||null,
+        originalTimestamp: rec.originalTimestamp||null,
+        correctedAt: rec.correctedAt||null,
+        correctedBy: rec.correctedBy||null,
+        createdAt: rec.createdAt||null,
+        createdBy: rec.createdBy||null,
+        uploadedAt: Date.now()
       });
       const idx = localRecs.findIndex(r=>r.timestamp===rec.timestamp);
       if(idx>=0){ localRecs[idx].fbSynced=true; }
@@ -4425,6 +4437,12 @@ function openManualPunchFor(encodedEmpId, encodedDate, encodedSiteId){
   openManualPunch({empId:decodeURIComponent(encodedEmpId),date:decodeURIComponent(encodedDate),siteId:decodeURIComponent(encodedSiteId),reason:'異常補登：漏打下班'});
   $('mp-type').value='下班';
 }
+function openManualPunchForRecord(encodedTimestamp){
+  const record=localRecs.find(item=>item.timestamp===decodeURIComponent(encodedTimestamp));
+  if(!record){showToast('找不到原始打卡紀錄，請重新整理後再試','error');return;}
+  if(CURRENT_SUPERVISOR&&!getSupSiteIds().includes(record.siteId)){showToast('您只能修改分配案場的紀錄','error');return;}
+  openManualPunch({record});
+}
 
 
 // ── 日期區間快捷篩選 ──────────────────────────
@@ -4587,7 +4605,7 @@ function loadRecords(){
       <td>${escapeHtml(r.name)||'–'}${manualTag}${subTag}</td>
       <td><span class="badge badge-${r.type==='上班'?'in':'out'}"><span class="badge-dot"></span>${escapeHtml(r.type)}</span>${anomaly}</td>
       <td>${escapeHtml(r.date)}</td>
-      <td style="font-variant-numeric:tabular-nums">${escapeHtml(r.time)}</td>
+      <td style="font-variant-numeric:tabular-nums">${escapeHtml(r.time)}<button class="btn-s bs-ghost" style="margin-left:6px;font-size:11px;padding:3px 6px;min-height:28px" onclick="openManualPunchForRecord('${encodeURIComponent(r.timestamp)}')">修改</button></td>
       <td>${siteDisplay}</td>
       <td>${ipDisplay}</td>
       <td>${syncBadge}</td>
@@ -4669,30 +4687,50 @@ function buildManualPunchRecord(input, meta){
     createdBy:meta.createdBy||'admin'
   };
 }
+function buildCorrectedPunchRecord(original, input, meta){
+  meta=meta||{};
+  const time=String(input.time||'');
+  return {...original,time,timestamp:String(original.date||'')+'T'+time+':00',synced:false,fbSynced:false,
+    manual:true,correctionReason:String(input.reason||''),originalTime:original.originalTime||original.time,
+    originalTimestamp:original.originalTimestamp||original.timestamp,correctedAt:meta.correctedAt||new Date().toISOString(),correctedBy:meta.correctedBy||'admin'};
+}
+let MANUAL_PUNCH_EDIT=null;
 function openManualPunch(prefill){
   prefill=prefill||{};
+  MANUAL_PUNCH_EDIT=prefill.record||null;
   const td=today();
-  $('mp-date').value=prefill.date||td;
-  $('mp-time').value=new Date().toTimeString().slice(0,5);
+  const existing=MANUAL_PUNCH_EDIT;
+  $('mp-date').value=(existing&&existing.date)||prefill.date||td;
+  $('mp-time').value=(existing&&existing.time)||new Date().toTimeString().slice(0,5);
   $('mp-emp').value='';$('mp-emp-id').value='';$('mp-emp-name').value='';
   $('mp-note').value=prefill.reason||'';
   const siteSelect=$('mp-site');
   const sites=getManualPunchSites();
   siteSelect.innerHTML='<option value="">請選擇案場</option>'+sites.map(site=>`<option value="${escapeHtml(site.id)}">${escapeHtml(site.id)} · ${escapeHtml(site.name)}</option>`).join('');
-  if(prefill.siteId&&sites.some(site=>site.id===prefill.siteId)) siteSelect.value=prefill.siteId;
-  if(prefill.empId){
-    const employee=[...employees,...getTempEmps()].find(item=>item.id===prefill.empId);
+  const selectedSite=(existing&&existing.siteId)||prefill.siteId;
+  if(selectedSite&&sites.some(site=>site.id===selectedSite)) siteSelect.value=selectedSite;
+  if((existing&&existing.empId)||prefill.empId){
+    const targetEmp=(existing&&existing.empId)||prefill.empId;
+    const employee=[...employees,...getTempEmps()].find(item=>item.id===targetEmp);
     if(employee){
       $('mp-emp').value=employee.name+' ('+employee.id+')';
       $('mp-emp-id').value=employee.id;
       $('mp-emp-name').value=employee.name;
     }
   }
+  $('mp-type').value=(existing&&existing.type)||prefill.type||'上班';
+  ['mp-emp','mp-type','mp-date','mp-site'].forEach(id=>$(id).disabled=!!existing);
+  $('mp-title').textContent=existing?'✏️ 修改出勤時間':'➕ 補卡／修改時間';
+  $('mp-desc').textContent=existing?'只需修改時間；原始紀錄與此次異動會一併保留。':'沒有紀錄時補卡；已有紀錄時可快速修改時間。';
+  $('mp-save-btn').textContent=existing?'儲存修改':'儲存補卡';
+  $('mp-audit-note').style.display=existing?'block':'none';
+  if(existing) $('mp-audit-note').textContent=`原始時間：${existing.time}　｜　修改後會留下修改人、時間與原因`;
   $('mp-emp-list').style.display='none';
   const m=$('manual-punch-modal');m.style.display='flex';
 }
 function closeManualPunch(){
   $('manual-punch-modal').style.display='none';
+  MANUAL_PUNCH_EDIT=null;
 }
 function mpSearchEmp(){
   const q=$('mp-emp').value.trim().toUpperCase();
@@ -4725,17 +4763,21 @@ function saveManualPunch(){
   const reason=$('mp-note').value.trim();
   const siteId=$('mp-site').value;
   if(!siteId){showToast('請選擇案場','error');return}
-  const checked=validateManualPunchInput({empId,type,date,time,reason},localRecs);
+  const existing=MANUAL_PUNCH_EDIT;
+  const checked=validateManualPunchInput({empId,type,date,time,reason},existing?localRecs.filter(r=>r.timestamp!==existing.timestamp):localRecs);
   if(!checked.valid){showToast(checked.error,'error');return}
   const createdBy=(CURRENT_SUPERVISOR&&CURRENT_SUPERVISOR.empId)||'admin';
-  const rec=buildManualPunchRecord({empId,name,type,date,time,reason,siteId},{createdBy});
-  localRecs.unshift(rec);
+  const rec=existing?buildCorrectedPunchRecord(existing,{time,reason},{correctedBy:createdBy}):buildManualPunchRecord({empId,name,type,date,time,reason,siteId},{createdBy});
+  if(existing){const index=localRecs.findIndex(r=>r.timestamp===existing.timestamp);if(index>=0)localRecs.splice(index,1,rec);}
+  else localRecs.unshift(rec);
   saveRecs();
+  if(existing&&FB_DB&&existing.timestamp!==rec.timestamp){FB_DB.ref('punches/'+existing.date+'/'+existing.timestamp.replace(/[.#$\[\]/]/g,'_')).remove().catch(()=>{});}
   uploadToFirebase(rec); // 同步至雲端
+  if(existing) uploadRec(rec);
   loadRecords();
   closeManualPunch();
-  showToast(`已為 ${name} 補登 ${type} 打卡 ✓`,'success');
-  logAudit('manual_punch', `為 ${name}（${empId}）補登 ${date} ${time} ${type}，案場：${getSiteName(siteId)}，原因：${reason}`);
+  showToast(existing?`已修改 ${name} 的${type}時間 ✓`:`已為 ${name} 補登 ${type} 打卡 ✓`,'success');
+  logAudit(existing?'correct_punch':'manual_punch', existing?`為 ${name}（${empId}）修改 ${date} ${type}：${existing.time} → ${time}，原因：${reason||'未填'}`:`為 ${name}（${empId}）補登 ${date} ${time} ${type}，案場：${getSiteName(siteId)}，原因：${reason}`);
 }
 
 // ══════════════════════════════════════
@@ -5240,6 +5282,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.4.12',date:'2026.09',changes:['補卡入口可快速修改既有上班或下班時間','每次修正保留原始時間、修改者、時間與原因','幹部僅可修改自己分配案場，管理員可修改全公司']},
     {version:'v1.4.11',date:'2026.09',changes:['後台登入畫面清楚區分管理員與幹部','管理員提示輸入密碼，幹部提示輸入員工編號','不影響登入權限、打卡與 QR Code']},
     {version:'v1.4.10',date:'2026.09',changes:['修正新手機誤跳初始設定畫面','新裝置會自動使用公司既有打卡連線','不影響管理員登入、現場打卡或 QR Code']},
     {version:'v1.4.9',date:'2026.09',changes:['修正臨時人員視窗開啟流程，移除已廢止的勾選欄位','開啟後可直接閱讀個資告知並繼續操作','不影響身分證保管、一般打卡與 QR Code']},
@@ -6521,6 +6564,10 @@ function uploadToFirebase(rec){
       siteId: rec.siteId||null,
       manual: rec.manual===true,
       correctionReason: rec.correctionReason||null,
+      originalTime: rec.originalTime||null,
+      originalTimestamp: rec.originalTimestamp||null,
+      correctedAt: rec.correctedAt||null,
+      correctedBy: rec.correctedBy||null,
       createdAt: rec.createdAt||null,
       createdBy: rec.createdBy||null,
       uploadedAt: Date.now()

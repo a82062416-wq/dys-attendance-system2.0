@@ -157,6 +157,21 @@ test('補登紀錄保留原因、建立時間與操作者，不覆寫原始欄�
   });
 });
 
+test('快速修改既有打卡須保留原始時間與完整修正依據', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'buildCorrectedPunchRecord')}; this.run = buildCorrectedPunchRecord;`, context);
+  const record = context.run(
+    { empId: '1001', name: '王小明', type: '上班', date: '2026-09-16', time: '06:18', timestamp: '2026-09-16T06:18:00', siteId: 'A058' },
+    { time: '06:10', reason: '打卡機時間誤差' },
+    { correctedAt: '2026-09-16T07:00:00+08:00', correctedBy: 'S001' },
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(record)), {
+    empId: '1001', name: '王小明', type: '上班', date: '2026-09-16', time: '06:10', timestamp: '2026-09-16T06:10:00', siteId: 'A058',
+    manual: true, correctionReason: '打卡機時間誤差', originalTime: '06:18', originalTimestamp: '2026-09-16T06:18:00',
+    correctedAt: '2026-09-16T07:00:00+08:00', correctedBy: 'S001', synced: false, fbSynced: false,
+  });
+});
+
 test('補登同步到 Firebase 時必須保留稽核欄位', async () => {
   const writes = [];
   const context = {
@@ -166,12 +181,17 @@ test('補登同步到 Firebase 時必須保留稽核欄位', async () => {
   vm.runInNewContext(`${extractFunction(inlineScript, 'uploadToFirebase')}; this.run = uploadToFirebase;`, context);
   context.run({
     empId: '1001', name: '王小明', type: '下班', date: '2026-09-16', time: '17:00', timestamp: '2026-09-16T17:00:00', siteId: 'A058',
-    manual: true, correctionReason: '漏打下班', createdAt: '2026-09-16T18:00:00+08:00', createdBy: 'S001',
+      manual: true, correctionReason: '漏打下班', originalTime: '16:45', originalTimestamp: '2026-09-16T16:45:00',
+      correctedAt: '2026-09-16T18:00:00+08:00', correctedBy: 'S001', createdAt: '2026-09-16T18:00:00+08:00', createdBy: 'S001',
   });
   await Promise.resolve();
-  assert.equal(writes[0].manual, true);
-  assert.equal(writes[0].correctionReason, '漏打下班');
-  assert.equal(writes[0].createdBy, 'S001');
+    assert.equal(writes[0].manual, true);
+    assert.equal(writes[0].correctionReason, '漏打下班');
+    assert.equal(writes[0].originalTime, '16:45');
+    assert.equal(writes[0].originalTimestamp, '2026-09-16T16:45:00');
+    assert.equal(writes[0].correctedAt, '2026-09-16T18:00:00+08:00');
+    assert.equal(writes[0].correctedBy, 'S001');
+    assert.equal(writes[0].createdBy, 'S001');
 });
 
 test('本機沒有幹部名單時，不可把預設名單寫回 Firebase', () => {
@@ -248,6 +268,7 @@ test('Apps Script 對同一 timestamp 僅新增一次打卡資料', () => {
   const rows = [];
   const sheet = {
     getLastRow: () => rows.length + 1,
+    getLastColumn: () => 12,
     getRange: () => ({
       createTextFinder: timestamp => ({
         matchEntireCell: () => ({ findNext: () => rows.some(row => row[5] === timestamp) ? { row: 2 } : null }),
@@ -376,6 +397,7 @@ test('Apps Script 寫入完成後必須釋放文件鎖', () => {
   let released = false;
   const sheet = {
     getLastRow: () => rows.length + 1,
+    getLastColumn: () => 12,
     getRange: () => ({ createTextFinder: () => ({ matchEntireCell: () => ({ findNext: () => null }) }) }),
     appendRow: row => rows.push(row),
   };
@@ -453,9 +475,9 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.11');
+  assert.equal(notes[0].version, 'v1.4.12');
   assert.equal(notes[0].date, '2026.09');
-  assert.ok(notes[0].changes.some(change => change.includes('登入')));
+  assert.ok(notes[0].changes.some(change => change.includes('修改')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
 });
 
