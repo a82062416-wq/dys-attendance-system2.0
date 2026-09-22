@@ -309,6 +309,26 @@ test('員工編號查詢僅在姓名與手機末四碼都相符時回傳編號',
   assert.equal(mismatch.empId, undefined);
 });
 
+test('從員工編號鍵盤開啟查詢時，必須先關閉鍵盤覆蓋層', () => {
+  const modal = { classList: { add() {} }, setAttribute() {} };
+  const fields = {
+    'employee-lookup-modal': modal,
+    'lookup-name': { value: '', focus() {} },
+    'lookup-value': { value: '' },
+    'lookup-result': { textContent: '' },
+  };
+  let drawerClosed = false;
+  const context = {
+    $: id => fields[id],
+    closeDrawer: () => { drawerClosed = true; },
+    updateLookupHint() {},
+    setTimeout: callback => callback(),
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'openEmployeeLookup')}; this.run = openEmployeeLookup;`, context);
+  context.run();
+  assert.equal(drawerClosed, true);
+});
+
 test('上次打卡應顯示白話日期，過久紀錄要提醒確認', () => {
   const context = { pad: value => String(value).padStart(2, '0') };
   vm.runInNewContext(`${extractFunction(inlineScript, 'summarizeLastPunch')}; this.run = summarizeLastPunch;`, context);
@@ -475,9 +495,9 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.13');
+  assert.equal(notes[0].version, 'v1.4.14');
   assert.equal(notes[0].date, '2026.09');
-  assert.ok(notes[0].changes.some(change => change.includes('連線')));
+  assert.ok(notes[0].changes.some(change => change.includes('忘記員工編號')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
 });
 
