@@ -1036,7 +1036,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.16 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.17 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1230,7 +1230,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.16 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.17 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -2884,7 +2884,7 @@ const GUIDE_SVG = [
 ];
 
 const GUIDE_TITLES = [
-  '先把它加入你的手機桌面',
+  '可選擇加入手機桌面',
   '歡迎使用 DYS 打卡系統',
   '點藍色按鈕，輸入編號',
   '用數字鍵盤輸入你的編號',
@@ -2959,19 +2959,10 @@ function guideSkip(){
 let deferredPrompt = null;
 let pwaBannerTimer = null;
 
-function showPwaBannerWhenReady(){
-  if(!deferredPrompt || drawerOpen || localStorage.getItem('pwa_dismissed') || !localStorage.getItem('guide_done')) return;
-  clearTimeout(pwaBannerTimer);
-  pwaBannerTimer=setTimeout(()=>{
-    if(!drawerOpen && !localStorage.getItem('pwa_dismissed') && $('page-checkin').classList.contains('active') && $('lock-screen').style.display!=='flex') $('pwa-banner').classList.add('show');
-  },1200);
-}
-
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   deferredPrompt = e;
-  // 新手引導尚未完成時不打斷；完成後才顯示安裝提示。
-  showPwaBannerWhenReady();
+  // 安裝由使用者自行決定；打卡頁不主動顯示底部浮條。
 });
 
 async function installPWA(){
@@ -3079,7 +3070,6 @@ function openDrawer(){
 function closeDrawer(){
   drawerOpen = false;
   $('keyboard-overlay').classList.remove('show');
-  showPwaBannerWhenReady();
 }
 function toggleDrawer(){
   drawerOpen ? closeDrawer() : openDrawer();
@@ -3887,21 +3877,21 @@ async function goAdmin(el){
   let syncTimeout;
   const supervisorStatus={verified:false,active:true}, authStatus={verified:false,loaded:false,active:true};
   try{
-    // 不使用逾時後的本機權限資料放行；保留原本先同步、再登入的順序。
+    // 先嘗試雲端同步；逾時時只容許已有本機密碼的裝置進入登入畫面。
     const synced=await Promise.race([
       Promise.all([syncSupervisorsFromFirebase(supervisorStatus), syncAuthFromFirebase(authStatus)]).then(()=>true),
       new Promise(resolve=>{syncTimeout=setTimeout(()=>resolve(false),10000)})
     ]);
-    if(!synced){showToast('後台連線逾時，請檢查網路後重試','error');return}
-    const cloudVerified=supervisorStatus.verified&&authStatus.verified;
+    if(!synced) showToast('雲端連線逾時，請以本機密碼登入；資料可能不是最新','warn');
+    const cloudVerified=synced&&supervisorStatus.verified&&authStatus.verified;
     const cloudStatus=$('login-cloud-status');
-    cloudStatus.textContent=cloudVerified?'✓ 雲端資料讀取成功':'⚠ 雲端未完整讀取，使用本機登入資料';
+    cloudStatus.textContent=cloudVerified?'✓ 雲端資料讀取成功':'⚠ 雲端資料未確認，使用本機登入資料';
     cloudStatus.style.color=cloudVerified?'var(--success)':'var(--warn)';
     if(!getPwdHash()){
       if(!authStatus.loaded){showToast('雲端登入資料未確認，請連網後重試','error');return}
       openSetup();return;
     }
-    if(ADMIN_UNLOCKED){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();return}
+    if(ADMIN_UNLOCKED && cloudVerified){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();return}
     navigateTo('admin');showAdminMenu();
     $('lock-screen').style.display='flex';
     $('lock-input').value='';
@@ -5417,6 +5407,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.4.17',date:'2026.10',changes:['後台雲端連線逾時時，可在已有本機密碼的裝置進入登入畫面','雲端未確認時要求重新輸入密碼，並提示資料可能不是最新','加入桌面改為使用者自行參考打卡說明，不再自動顯示底部浮條']},
     {version:'v1.4.16',date:'2026.10',changes:['改善短螢幕後台登入排版，避免加入桌面提示遮住登入框','後台入口顯示雲端讀取狀態，連線逾時會提示重試','修正新手引導後的員工編號鍵盤延遲蓋住登入頁']},
     {version:'v1.4.15',date:'2026.10',changes:['修正手機新手引導與員工編號鍵盤遮住後台鎖頭','整理後台首頁操作入口與視覺引導','改善紀錄匯出、詳細備份及清除前提醒','員工名單雲端同步可更新姓名並保留既有停用設定']},
     {version:'v1.4.14',date:'2026.09',changes:['修正忘記員工編號查詢視窗被鍵盤遮住，手機可直接點選與操作']},

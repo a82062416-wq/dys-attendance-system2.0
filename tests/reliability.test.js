@@ -68,42 +68,42 @@ test('延後備份提醒不應更新上次備份日期，立即備份只呼叫�
   assert.match(inlineScript, /onclick="dismissBackupReminder\(\)"[^>]*>稍後再說/);
 });
 
-test('加入桌面提示在等待期間被稍後再說時不可重新彈出', () => {
-  const storage=createStorage({guide_done:'1'});
-  let timer;
-  const banner={classList:{shown:false,add(){this.shown=true;}}};
-  const context={
-    deferredPrompt:{},drawerOpen:false,pwaBannerTimer:null,localStorage:storage,
-    clearTimeout(){},setTimeout:callback=>{timer=callback;return 1;},
-    $:id=>id==='pwa-banner'?banner:id==='page-checkin'?{classList:{contains:()=>true}}:{style:{display:'none'}},
-  };
-  vm.runInNewContext(`${extractFunction(inlineScript,'showPwaBannerWhenReady')}; this.run=showPwaBannerWhenReady;`,context);
-  context.run();
-  storage.setItem('pwa_dismissed','1');
-  timer();
-  assert.equal(banner.classList.shown,false);
-});
-
-test('後台雲端同步逾時時明確提示且不進入登入頁', async () => {
+test('後台雲端同步逾時但有本機密碼時仍可進入登入頁並標示未確認', async () => {
   const messages=[];
   let supervisorStatus,authStatus;
+  let destination;
   const lockButton={disabled:false,setAttribute(){},removeAttribute(){}};
   const overlay={classList:{remove(){}}};
+  const elements={
+    'login-cloud-status':{textContent:'',style:{}},
+    'lock-screen':{style:{}},'lock-input':{value:'old'},'sup-emp-input':{value:'old'},
+    'lock-hint':{textContent:'old'},'role-supervisor':{style:{}},
+  };
   const context={
     adminOpening:false,pwaBannerTimer:null,_guideDrawerTimer:null,drawerOpen:false,
-    $:id=>id==='tab-admin'?lockButton:id==='guide-overlay'||id==='keyboard-overlay'||id==='pwa-banner'?overlay:null,
+    $:id=>id==='tab-admin'?lockButton:id==='guide-overlay'||id==='keyboard-overlay'||id==='pwa-banner'?overlay:elements[id],
     syncSupervisorsFromFirebase:status=>{supervisorStatus=status;return new Promise(()=>{});},
     syncAuthFromFirebase:status=>{authStatus=status;return new Promise(()=>{});},
     setTimeout:callback=>{queueMicrotask(callback);return 1;},clearTimeout(){},
-    showToast:(message,type)=>messages.push({message,type}),navigateTo(){throw new Error('不可進入後台');},
+    getPwdHash:()=> 'cached-hash',ADMIN_UNLOCKED:true,getSupervisors:()=>[],switchRole(){},showAdminMenu(){},
+    showToast:(message,type)=>messages.push({message,type}),navigateTo:page=>{destination=page;},
   };
   vm.runInNewContext(`${extractFunction(inlineScript,'goAdmin')}; this.run=goAdmin;`,context);
   const settled=await Promise.race([context.run().then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),20))]);
   assert.equal(settled,true,'雲端未回應時登入入口不可無限等待');
   assert.equal(lockButton.disabled,false);
-  assert.ok(messages.some(item=>item.type==='error'&&item.message.includes('逾時')));
+  assert.equal(destination,'admin');
+  assert.equal(elements['lock-screen'].style.display,'flex');
+  assert.match(elements['login-cloud-status'].textContent,/未確認/);
+  assert.ok(messages.some(item=>item.message.includes('逾時')));
   assert.equal(supervisorStatus.active,false);
   assert.equal(authStatus.active,false);
+});
+
+test('加入桌面僅由打卡說明引導，不自動顯示底部浮條', () => {
+  assert.doesNotMatch(inlineScript, /showPwaBannerWhenReady\(\)/);
+  assert.match(html, /onclick="replayGuide\(\)"[^>]*>查看打卡說明/);
+  assert.match(html, /可選擇加入手機桌面/);
 });
 
 test('新裝置雲端登入資料讀取失敗時不可誤開初始設定', async () => {
@@ -858,9 +858,9 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.16');
+  assert.equal(notes[0].version, 'v1.4.17');
   assert.equal(notes[0].date, '2026.10');
-  assert.ok(notes[0].changes.some(change => change.includes('後台登入排版')));
+  assert.ok(notes[0].changes.some(change => change.includes('逾時')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
 });
 

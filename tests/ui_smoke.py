@@ -95,7 +95,8 @@ def verify_login_layout_on_short_phone(browser):
     page.close()
 
 with sync_playwright() as playwright:
-    browser = playwright.chromium.launch(headless=True)
+    import shutil
+    browser = playwright.chromium.launch(headless=True, executable_path=shutil.which("chromium"))
     verify_admin_entry_over_overlays(browser)
     verify_login_layout_on_short_phone(browser)
     verify_viewport(browser, {"width": 390, "height": 844})
