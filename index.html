@@ -522,12 +522,13 @@ body:has(#page-checkin.active) nav{z-index:560}
 ══════════════════════════════════════ */
 #lock-screen{
   position:fixed;inset:0;z-index:200;background:var(--bg);
-  display:flex;align-items:center;justify-content:center;
+  display:flex;align-items:flex-start;justify-content:center;
+  overflow-y:auto;overscroll-behavior:contain;
   padding: calc(24px + var(--safe-top)) calc(24px + var(--safe-right)) calc(24px + var(--safe-bottom)) calc(24px + var(--safe-left));
 }
 .lock-box{
   background:var(--surface);border-radius:24px;padding:40px 32px;
-  max-width:360px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.12),0 1px 3px rgba(0,0,0,.06);text-align:center;border:.5px solid var(--border);
+  max-width:360px;width:100%;margin:auto;box-shadow:0 8px 40px rgba(0,0,0,.12),0 1px 3px rgba(0,0,0,.06);text-align:center;border:.5px solid var(--border);
 }
 .lock-icon{font-size:48px;margin-bottom:16px}
 .lock-box h2{font-size:22px;font-weight:700;margin-bottom:6px;letter-spacing:-.5px}
@@ -559,6 +560,13 @@ body:has(#page-checkin.active) nav{z-index:560}
 }
 .btn-unlock:hover{filter:brightness(1.06)}
 .btn-unlock:active{transform:scale(.98);filter:brightness(.96)}
+@media(max-width:767px) and (max-height:700px){
+  #lock-screen{padding-top:calc(12px + var(--safe-top));padding-bottom:calc(12px + var(--safe-bottom))}
+  .lock-box{padding:22px 20px;border-radius:18px}
+  #lock-panel-login > div:first-child{margin-bottom:12px!important}
+  #login-role-hint{margin-bottom:14px!important}
+  #lock-panel-login > div:last-child{margin-top:12px!important}
+}
 
 .pwd-wrap{position:relative;margin-bottom:14px}
 .pwd-wrap .lock-input{margin-bottom:0;padding-right:52px}
@@ -1010,6 +1018,7 @@ button,input,select{font-family:var(--font)}
         <button class="lock-role-btn active" id="role-admin" onclick="switchRole('admin')">👑 管理員</button>
         <button class="lock-role-btn" id="role-supervisor" onclick="switchRole('supervisor')">📋 幹部</button>
       </div>
+      <div id="login-cloud-status" role="status" aria-live="polite" style="font-size:12px;line-height:1.5;color:var(--t2);margin:-4px 0 14px"></div>
       <!-- 管理員：密碼輸入 -->
       <div class="pwd-wrap" id="admin-pwd-wrap">
         <input class="lock-input" id="lock-input" type="password" placeholder="••••••" maxlength="20"
@@ -1027,7 +1036,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.15 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.16 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1221,7 +1230,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.15 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.16 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -2370,11 +2379,13 @@ async function saveSupervisors(d){
 }
 
 // 從 Firebase 拉取最新幹部資料並更新 localStorage
-async function syncSupervisorsFromFirebase(){
-  if(!FB_DB) return null;
+async function syncSupervisorsFromFirebase(status){
+  if(!FB_DB){if(status) status.verified=false;return null;}
   try{
     const snap = await FB_DB.ref('config/supervisors').once('value');
+    if(status&&status.active===false) return null;
     const data = snap.val();
+    if(status) status.verified=Array.isArray(data)&&data.length>0;
     // 只在 Firebase 有實際資料時才覆蓋（防止空陣列清空本地幹部名單）。
     if(data && Array.isArray(data) && data.length > 0){
       const normalized=normalizeSupervisors(data);
@@ -2383,6 +2394,7 @@ async function syncSupervisorsFromFirebase(){
     }
     return null;
   }catch(e){
+    if(status) status.verified=false;
     console.warn('幹部資料從 Firebase 讀取失敗:', e);
     return null;
   }
@@ -2546,16 +2558,18 @@ function setSupPwdHash(p){
   if(FB_DB) FB_DB.ref('config/auth/supervisor_pwd_hash').set(h).catch(e=>console.warn('幹部密碼同步失敗:',e));
   logAudit('change_supervisor_password', '幹部登入密碼已變更');
 }
-async function syncAuthFromFirebase(){
-  if(!FB_DB) return;
+async function syncAuthFromFirebase(status){
+  if(!FB_DB){if(status) status.verified=false;return;}
   try{
     const snap = await FB_DB.ref('config/auth').once('value');
+    if(status&&status.active===false) return;
     const data = snap.val();
+    if(status){status.loaded=true;status.verified=!!(data&&data.admin_pwd_hash);}
     if(data){
       if(data.admin_pwd_hash) localStorage.setItem('admin_pwd_hash', data.admin_pwd_hash);
       if(data.supervisor_pwd_hash) localStorage.setItem('supervisor_pwd_hash', data.supervisor_pwd_hash);
     }
-  }catch(e){ console.warn('密碼從 Firebase 讀取失敗:',e); }
+  }catch(e){ if(status) status.verified=false; console.warn('密碼從 Firebase 讀取失敗:',e); }
 }
 function getResetKeyHash(){return localStorage.getItem('reset_key_hash')||''}
 function setResetKeyHash(k){localStorage.setItem('reset_key_hash',hashPwd(k))}
@@ -2889,6 +2903,7 @@ const GUIDE_DESCS = [
 ];
 
 let guideStep = 0;
+let _guideDrawerTimer = null;
 
 function showGuide(){
   if(localStorage.getItem('guide_done')) return;
@@ -2931,17 +2946,25 @@ function replayGuide(){
 function guideSkip(){
   $('guide-overlay').classList.remove('show');
   localStorage.setItem('guide_done','1');
-  setTimeout(()=>openDrawer(), 400);
+  clearTimeout(_guideDrawerTimer);
+  _guideDrawerTimer=setTimeout(()=>{
+    _guideDrawerTimer=null;
+    if($('page-checkin').classList.contains('active') && $('lock-screen').style.display!=='flex') openDrawer();
+  },400);
 }
 
 // ══════════════════════════════════════
 //  PWA 安裝提示
 // ══════════════════════════════════════
 let deferredPrompt = null;
+let pwaBannerTimer = null;
 
 function showPwaBannerWhenReady(){
   if(!deferredPrompt || drawerOpen || localStorage.getItem('pwa_dismissed') || !localStorage.getItem('guide_done')) return;
-  setTimeout(()=> $('pwa-banner').classList.add('show'), 1200);
+  clearTimeout(pwaBannerTimer);
+  pwaBannerTimer=setTimeout(()=>{
+    if(!drawerOpen && !localStorage.getItem('pwa_dismissed') && $('page-checkin').classList.contains('active') && $('lock-screen').style.display!=='flex') $('pwa-banner').classList.add('show');
+  },1200);
 }
 
 window.addEventListener('beforeinstallprompt', e => {
@@ -3845,24 +3868,60 @@ function switchRole(role){
   }
 }
 
+let adminOpening=false;
 async function goAdmin(el){
+  if(adminOpening) return;
+  adminOpening=true;
+  const button=$('tab-admin');
+  button.disabled=true;
+  button.textContent='⏳';
   // 從新手引導或員工編號鍵盤進入時，先收起覆蓋層；不更動員工打卡狀態。
   $('guide-overlay').classList.remove('show');
   $('keyboard-overlay').classList.remove('show');
+  clearTimeout(_guideDrawerTimer);
+  _guideDrawerTimer=null;
+  clearTimeout(pwaBannerTimer);
+  $('pwa-banner').classList.remove('show');
   drawerOpen=false;
-  // 先同步，避免本機舊資料或預設名單覆蓋／顯示成最新設定。
-  await Promise.all([syncSupervisorsFromFirebase(), syncAuthFromFirebase()]);
-  if(!getPwdHash()){openSetup();return}
-  if(ADMIN_UNLOCKED){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();return}
-  navigateTo('admin');showAdminMenu();
-  $('lock-screen').style.display='flex';
-  $('lock-input').value='';
-  $('sup-emp-input').value='';
-  $('lock-hint').textContent='';
-  switchRole('admin');
-  // 有啟用中的幹部就顯示幹部按鈕
-  const activeSups = getSupervisors().filter(s=>s.active);
-  $('role-supervisor').style.display = activeSups.length > 0 ? '' : 'none';
+  showToast('正在確認後台資料…','info');
+  let syncTimeout;
+  const supervisorStatus={verified:false,active:true}, authStatus={verified:false,loaded:false,active:true};
+  try{
+    // 不使用逾時後的本機權限資料放行；保留原本先同步、再登入的順序。
+    const synced=await Promise.race([
+      Promise.all([syncSupervisorsFromFirebase(supervisorStatus), syncAuthFromFirebase(authStatus)]).then(()=>true),
+      new Promise(resolve=>{syncTimeout=setTimeout(()=>resolve(false),10000)})
+    ]);
+    if(!synced){showToast('後台連線逾時，請檢查網路後重試','error');return}
+    const cloudVerified=supervisorStatus.verified&&authStatus.verified;
+    const cloudStatus=$('login-cloud-status');
+    cloudStatus.textContent=cloudVerified?'✓ 雲端資料讀取成功':'⚠ 雲端未完整讀取，使用本機登入資料';
+    cloudStatus.style.color=cloudVerified?'var(--success)':'var(--warn)';
+    if(!getPwdHash()){
+      if(!authStatus.loaded){showToast('雲端登入資料未確認，請連網後重試','error');return}
+      openSetup();return;
+    }
+    if(ADMIN_UNLOCKED){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();return}
+    navigateTo('admin');showAdminMenu();
+    $('lock-screen').style.display='flex';
+    $('lock-input').value='';
+    $('sup-emp-input').value='';
+    $('lock-hint').textContent='';
+    switchRole('admin');
+    // 有啟用中的幹部就顯示幹部按鈕
+    const activeSups = getSupervisors().filter(s=>s.active);
+    $('role-supervisor').style.display = activeSups.length > 0 ? '' : 'none';
+  }catch(error){
+    console.warn('後台資料同步失敗:',error);
+    showToast('後台連線失敗，請確認網路後重試','error');
+  }finally{
+    supervisorStatus.active=false;
+    authStatus.active=false;
+    clearTimeout(syncTimeout);
+    button.disabled=false;
+    button.textContent='🔒';
+    adminOpening=false;
+  }
 }
 let lockTries=0;
 function togglePwd(id,btn){
@@ -5358,6 +5417,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.4.16',date:'2026.10',changes:['改善短螢幕後台登入排版，避免加入桌面提示遮住登入框','後台入口顯示雲端讀取狀態，連線逾時會提示重試','修正新手引導後的員工編號鍵盤延遲蓋住登入頁']},
     {version:'v1.4.15',date:'2026.10',changes:['修正手機新手引導與員工編號鍵盤遮住後台鎖頭','整理後台首頁操作入口與視覺引導','改善紀錄匯出、詳細備份及清除前提醒','員工名單雲端同步可更新姓名並保留既有停用設定']},
     {version:'v1.4.14',date:'2026.09',changes:['修正忘記員工編號查詢視窗被鍵盤遮住，手機可直接點選與操作']},
     {version:'v1.4.13',date:'2026.09',changes:['修正 Apps Script 預設連線，員工編號查詢與雲端同步可正常使用']},

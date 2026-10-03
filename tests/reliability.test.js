@@ -68,6 +68,166 @@ test('延後備份提醒不應更新上次備份日期，立即備份只呼叫�
   assert.match(inlineScript, /onclick="dismissBackupReminder\(\)"[^>]*>稍後再說/);
 });
 
+test('加入桌面提示在等待期間被稍後再說時不可重新彈出', () => {
+  const storage=createStorage({guide_done:'1'});
+  let timer;
+  const banner={classList:{shown:false,add(){this.shown=true;}}};
+  const context={
+    deferredPrompt:{},drawerOpen:false,pwaBannerTimer:null,localStorage:storage,
+    clearTimeout(){},setTimeout:callback=>{timer=callback;return 1;},
+    $:id=>id==='pwa-banner'?banner:id==='page-checkin'?{classList:{contains:()=>true}}:{style:{display:'none'}},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'showPwaBannerWhenReady')}; this.run=showPwaBannerWhenReady;`,context);
+  context.run();
+  storage.setItem('pwa_dismissed','1');
+  timer();
+  assert.equal(banner.classList.shown,false);
+});
+
+test('後台雲端同步逾時時明確提示且不進入登入頁', async () => {
+  const messages=[];
+  let supervisorStatus,authStatus;
+  const lockButton={disabled:false,setAttribute(){},removeAttribute(){}};
+  const overlay={classList:{remove(){}}};
+  const context={
+    adminOpening:false,pwaBannerTimer:null,_guideDrawerTimer:null,drawerOpen:false,
+    $:id=>id==='tab-admin'?lockButton:id==='guide-overlay'||id==='keyboard-overlay'||id==='pwa-banner'?overlay:null,
+    syncSupervisorsFromFirebase:status=>{supervisorStatus=status;return new Promise(()=>{});},
+    syncAuthFromFirebase:status=>{authStatus=status;return new Promise(()=>{});},
+    setTimeout:callback=>{queueMicrotask(callback);return 1;},clearTimeout(){},
+    showToast:(message,type)=>messages.push({message,type}),navigateTo(){throw new Error('不可進入後台');},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'goAdmin')}; this.run=goAdmin;`,context);
+  const settled=await Promise.race([context.run().then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),20))]);
+  assert.equal(settled,true,'雲端未回應時登入入口不可無限等待');
+  assert.equal(lockButton.disabled,false);
+  assert.ok(messages.some(item=>item.type==='error'&&item.message.includes('逾時')));
+  assert.equal(supervisorStatus.active,false);
+  assert.equal(authStatus.active,false);
+});
+
+test('新裝置雲端登入資料讀取失敗時不可誤開初始設定', async () => {
+  const messages=[];
+  let setupOpened=false;
+  const elements={
+    'tab-admin':{disabled:false,textContent:''},
+    'guide-overlay':{classList:{remove(){}}},
+    'keyboard-overlay':{classList:{remove(){}}},
+    'pwa-banner':{classList:{remove(){}}},
+    'login-cloud-status':{textContent:'',style:{}},
+  };
+  const context={
+    adminOpening:false,pwaBannerTimer:null,_guideDrawerTimer:null,drawerOpen:false,
+    $:id=>elements[id],clearTimeout(){},setTimeout:()=>1,
+    syncSupervisorsFromFirebase:async status=>{status.verified=false;},
+    syncAuthFromFirebase:async status=>{status.verified=false;status.loaded=false;},
+    getPwdHash:()=>'',openSetup:()=>{setupOpened=true;},
+    showToast:(message,type)=>messages.push({message,type}),
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'goAdmin')}; this.run=goAdmin;`,context);
+  await context.run();
+  assert.equal(setupOpened,false);
+  assert.ok(messages.some(item=>item.type==='error'&&item.message.includes('雲端')));
+});
+
+test('後台登入雲端讀取失敗時應標記為未確認', async () => {
+  const status={verified:true};
+  const context={
+    FB_DB:{ref:()=>({once:()=>Promise.reject(new Error('offline'))})},
+    localStorage:createStorage({admin_pwd_hash:'local-hash'}),
+    console:{warn(){}},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'syncAuthFromFirebase')}; this.run=syncAuthFromFirebase;`,context);
+  await context.run(status);
+  assert.equal(status.verified,false);
+  assert.equal(context.localStorage.getItem('admin_pwd_hash'),'local-hash');
+});
+
+test('後台登入雲端讀取成功時應標記為已確認', async () => {
+  const status={verified:false};
+  const context={
+    FB_DB:{ref:()=>({once:()=>Promise.resolve({val:()=>({admin_pwd_hash:'cloud-hash'})})})},
+    localStorage:createStorage(),console:{warn(){}},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'syncAuthFromFirebase')}; this.run=syncAuthFromFirebase;`,context);
+  await context.run(status);
+  assert.equal(status.verified,true);
+  assert.equal(context.localStorage.getItem('admin_pwd_hash'),'cloud-hash');
+});
+
+test('幹部資料讀取失敗時不可標記為已確認', async () => {
+  const status={verified:true};
+  const context={FB_DB:{ref:()=>({once:()=>Promise.reject(new Error('offline'))})},console:{warn(){}}};
+  vm.runInNewContext(`${extractFunction(inlineScript,'syncSupervisorsFromFirebase')}; this.run=syncSupervisorsFromFirebase;`,context);
+  await context.run(status);
+  assert.equal(status.verified,false);
+});
+
+test('後台同步逾時後晚到的密碼不得覆寫本機資料', async () => {
+  let resolveSnapshot;
+  const storage=createStorage({admin_pwd_hash:'original'});
+  const status={verified:false,active:true};
+  const context={
+    FB_DB:{ref:()=>({once:()=>new Promise(resolve=>{resolveSnapshot=resolve;})})},
+    localStorage:storage,console:{warn(){}},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'syncAuthFromFirebase')}; this.run=syncAuthFromFirebase;`,context);
+  const pending=context.run(status);
+  status.active=false;
+  resolveSnapshot({val:()=>({admin_pwd_hash:'late-hash'})});
+  await pending;
+  assert.equal(storage.getItem('admin_pwd_hash'),'original');
+  assert.equal(status.verified,false);
+});
+
+test('後台同步逾時後晚到的幹部名單不得覆寫本機資料', async () => {
+  let resolveSnapshot;
+  const storage=createStorage({supervisors:'[{"empId":"local"}]'});
+  const status={verified:false,active:true};
+  const context={
+    FB_DB:{ref:()=>({once:()=>new Promise(resolve=>{resolveSnapshot=resolve;})})},
+    localStorage:storage,normalizeSupervisors:data=>data,console:{warn(){}},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'syncSupervisorsFromFirebase')}; this.run=syncSupervisorsFromFirebase;`,context);
+  const pending=context.run(status);
+  status.active=false;
+  resolveSnapshot({val:()=>[{empId:'late'}]});
+  await pending;
+  assert.equal(storage.getItem('supervisors'),'[{"empId":"local"}]');
+  assert.equal(status.verified,false);
+});
+
+test('雲端幹部名單為空時不可把本機舊名單標成已確認', async () => {
+  const storage=createStorage({supervisors:'[{"empId":"local","active":true}]'});
+  const status={verified:false,active:true};
+  const context={FB_DB:{ref:()=>({once:()=>Promise.resolve({val:()=>[]})})},localStorage:storage,console:{warn(){}}};
+  vm.runInNewContext(`${extractFunction(inlineScript,'syncSupervisorsFromFirebase')}; this.run=syncSupervisorsFromFirebase;`,context);
+  await context.run(status);
+  assert.equal(status.verified,false);
+  assert.equal(storage.getItem('supervisors'),'[{"empId":"local","active":true}]');
+});
+
+test('從引導進後台會取消延遲彈出的員工編號鍵盤', () => {
+  const timers=new Map();
+  let next=0,drawerOpens=0;
+  const overlay={classList:{remove(){}}};
+  const context={
+    adminOpening:false,pwaBannerTimer:null,_guideDrawerTimer:null,drawerOpen:false,
+    localStorage:createStorage(),
+    $:()=>overlay,
+    setTimeout:callback=>{const id=++next;timers.set(id,callback);return id;},
+    clearTimeout:id=>timers.delete(id),
+    openDrawer:()=>{drawerOpens++;},
+    syncSupervisorsFromFirebase:()=>new Promise(()=>{}),syncAuthFromFirebase:()=>new Promise(()=>{}),
+    showToast(){},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'guideSkip')}; ${extractFunction(inlineScript,'goAdmin')}; this.skip=guideSkip;this.admin=goAdmin;`,context);
+  context.skip();
+  context.admin();
+  for(const callback of timers.values()) callback();
+  assert.equal(drawerOpens,0);
+});
+
 test('幹部資料雲端同步失敗時保留本機設定並回報失敗', async () => {
   const storage = createStorage();
   const context = {
@@ -698,16 +858,16 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.15');
+  assert.equal(notes[0].version, 'v1.4.16');
   assert.equal(notes[0].date, '2026.10');
-  assert.ok(notes[0].changes.some(change => change.includes('後台鎖頭')));
+  assert.ok(notes[0].changes.some(change => change.includes('後台登入排版')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
 });
 
 test('管理員登入不可建立固定預設密碼，且要先同步雲端密碼', () => {
   assert.doesNotMatch(inlineScript, /localStorage\.setItem\('admin_pwd_hash','aa8abcd'\)/);
   const goAdmin = extractFunction(inlineScript, 'goAdmin');
-  assert.ok(goAdmin.indexOf('syncAuthFromFirebase()') < goAdmin.indexOf('if(!getPwdHash())'));
+  assert.ok(goAdmin.indexOf('syncAuthFromFirebase(authStatus)') < goAdmin.indexOf('if(!getPwdHash())'));
 });
 
 test('新 iPhone 沒有本機設定時，員工打卡不可誤跳初始設定', () => {
