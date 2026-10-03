@@ -39,8 +39,30 @@ def verify_viewport(browser, viewport):
     page.close()
 
 
+def verify_admin_entry_over_overlays(browser):
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    page.set_default_timeout(2000)
+    page.goto(BASE_URL, wait_until="domcontentloaded")
+    page.locator("#guide-overlay.show").wait_for()
+    page.locator("#tab-admin").click()
+    page.locator("#lock-screen").wait_for()
+    assert not page.locator("#guide-overlay").evaluate("el => el.classList.contains('show')")
+    page.close()
+
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    page.add_init_script("localStorage.setItem('guide_done', '1')")
+    page.set_default_timeout(2000)
+    page.goto(BASE_URL, wait_until="domcontentloaded")
+    page.locator("#keyboard-overlay.show").wait_for()
+    page.locator("#tab-admin").click()
+    page.locator("#lock-screen").wait_for()
+    assert not page.locator("#keyboard-overlay").evaluate("el => el.classList.contains('show')")
+    page.close()
+
+
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
+    verify_admin_entry_over_overlays(browser)
     verify_viewport(browser, {"width": 390, "height": 844})
     verify_viewport(browser, {"width": 1440, "height": 900})
     browser.close()

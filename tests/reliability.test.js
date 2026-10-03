@@ -52,6 +52,78 @@ function createStorage(initial = {}) {
   };
 }
 
+test('延後備份提醒不應更新上次備份日期，立即備份只呼叫一次匯出', () => {
+  const banner = { removed: false, remove() { this.removed = true; } };
+  const storage = createStorage();
+  const context = {
+    localStorage: storage,
+    today: () => '2026-10-02',
+    $: id => id === 'backup-banner' ? banner : null,
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'dismissBackupReminder')}; this.dismiss = dismissBackupReminder;`, context);
+  context.dismiss();
+  assert.equal(storage.getItem('last_backup_date'), null);
+  assert.equal(banner.removed, true);
+  assert.match(inlineScript, /onclick="exportAuditBackupJSON\(\)"[^>]*>備份本機全部紀錄/);
+  assert.match(inlineScript, /onclick="dismissBackupReminder\(\)"[^>]*>稍後再說/);
+});
+
+test('幹部資料雲端同步失敗時保留本機設定並回報失敗', async () => {
+  const storage = createStorage();
+  const context = {
+    localStorage: storage,
+    normalizeSupervisors: data => data,
+    FB_DB: { ref: () => ({ set: () => Promise.reject(new Error('offline')) }) },
+    setTimeout,
+    clearTimeout,
+    console: { warn() {} },
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'saveSupervisors')}; this.save = saveSupervisors;`, context);
+  assert.equal(await context.save([{ empId: '1001', active: false }]), false);
+  assert.equal(JSON.parse(storage.getItem('supervisors'))[0].active, false);
+  context.FB_DB = { ref: () => ({ set: () => Promise.resolve() }) };
+  assert.equal(await context.save([{ empId: '1001', active: false }]), true);
+});
+
+test('幹部雲端寫入一直等待時回報尚未同步', async () => {
+  const context = {
+    localStorage: createStorage(),
+    normalizeSupervisors: data => data,
+    FB_DB: { ref: () => ({ set: () => new Promise(() => {}) }) },
+    setTimeout: callback => { queueMicrotask(callback); return 1; },
+    clearTimeout() {},
+    console: { warn() {} },
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'saveSupervisors')}; this.save = saveSupervisors;`, context);
+  assert.equal(await context.save([{ empId: '1001' }]), false);
+});
+
+test('未核對排班的無打卡紀錄只能標示待確認', () => {
+  assert.match(inlineScript, /type:'待確認未打卡'/);
+  assert.doesNotMatch(inlineScript, /type:'❌ 缺勤'/);
+  assert.match(html, /id="an-absent"[^>]*>[^<]*<\/div><div class="stat-lbl">待確認未打卡/);
+});
+
+test('後台分類選單可由鍵盤聚焦與啟動', () => {
+  const menu = html.match(/<div id="admin-menu">([\s\S]*?)<\/div><!-- \/#admin-menu -->/)[1];
+  assert.doesNotMatch(menu, /<div class="admin-menu-item"/);
+  assert.ok((menu.match(/<button type="button" class="admin-menu-item"/g) || []).length >= 10);
+});
+
+test('後台首頁有清楚的今日工作引導且快捷入口不與清單重複', () => {
+  const menu = html.match(/<div id="admin-menu">([\s\S]*?)<\/div><!-- \/#admin-menu -->/)[1];
+  assert.match(menu, /class="admin-menu-intro"/);
+  assert.match(menu, /class="admin-quick-grid"[^>]*aria-label="今日常用操作"/);
+  for(const target of ['daily-actions','records','site-health']){
+    assert.equal((menu.match(new RegExp(`showSub\\('${target}'`, 'g'))||[]).length,1);
+  }
+  assert.match(menu, /class="admin-menu-section admin-only"/);
+});
+
+test('後台異常橫幅連到現有異常子頁且可由鍵盤啟動', () => {
+  assert.match(html, /<button[^>]*id="anomaly-banner"[^>]*onclick="showSub\('anomaly'\)"/);
+});
+
 test('案場搜尋支援正式代碼、舊代碼與名稱，並遵守幹部案場範圍', () => {
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'findSitesForSearch')}; this.run = findSitesForSearch;`, context);
@@ -238,15 +310,17 @@ test('舊版幹部資料缺少 sites 時，載入後必須補為空案場清單'
   assert.deepEqual(JSON.parse(JSON.stringify(supervisor.permissions)), []);
 });
 
-test('儲存幹部資料時必須保留停用狀態並補齊缺少欄位', () => {
+test('儲存幹部資料時必須保留停用狀態並補齊缺少欄位', async () => {
   const storage = createStorage();
   const writes = [];
   const context = {
     localStorage: storage,
-    FB_DB: { ref: () => ({ set: value => { writes.push(value); return { catch() {} }; } }) },
+    FB_DB: { ref: () => ({ set: value => { writes.push(value); return Promise.resolve(); } }) },
+    setTimeout,
+    clearTimeout,
   };
   vm.runInNewContext(`${extractFunction(inlineScript, 'normalizeSupervisors')}; ${extractFunction(inlineScript, 'saveSupervisors')}; this.run = saveSupervisors;`, context);
-  context.run([{ empId: '010', name: '停用主管', active: false }]);
+  await context.run([{ empId: '010', name: '停用主管', active: false }]);
   const [saved] = JSON.parse(storage.getItem('supervisors'));
   assert.equal(saved.active, false);
   assert.deepEqual(saved.sites, []);
@@ -412,6 +486,135 @@ test('從 Sheets 同步員工時必須保留既有手動停用與案場設定', 
   ]);
 });
 
+test('Firebase 名單更新姓名但保留既有停用及案場設定', () => {
+  const storage = createStorage({ employees: JSON.stringify([
+    { id: '1001', name: '舊姓名', disabled: true, manualDisabled: true, siteId: 'A001' },
+  ]) });
+  const context = { localStorage: storage };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'mergeFirebaseEmployees')}; this.run = mergeFirebaseEmployees;`, context);
+  const result = context.run([{ id: '1001', name: '新姓名' }, { id: '1002', name: '新員工' }]);
+  assert.equal(result.added, 1);
+  assert.equal(result.updated, 1);
+  assert.deepEqual(JSON.parse(storage.getItem('employees')), [
+    { id: '1001', name: '新姓名', disabled: true, manualDisabled: true, siteId: 'A001' },
+    { id: '1002', name: '新員工' },
+  ]);
+});
+
+test('CSV 只匯出幹部可見且符合目前案場篩選的紀錄', () => {
+  let downloaded = '';
+  const fields = { 'f-emp': {value:''}, 'f-site': {value:'A001'} };
+  const context = {
+    $: id => fields[id],
+    localRecs: [
+      {empId:'1',name:'甲',type:'上班',date:'2026-10-03',time:'08:00',siteId:'A001'},
+      {empId:'2',name:'乙',type:'上班',date:'2026-10-03',time:'08:00',siteId:'A002'},
+    ],
+    filterRecsBySup: rows => rows.filter(row => row.siteId==='A001'),
+    getDateRange: () => ({s:null,e:null}),
+    resolveSiteSearchId: value => value==='A001' ? value : '',
+    dlFile: csv => { downloaded=csv; },
+    showToast() {}, today: () => '2026-10-03', markBackupDone() {},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'csvCell')}; ${extractFunction(inlineScript, 'exportCSV')}; this.run = exportCSV;`,context);
+  context.run();
+  assert.match(downloaded,/甲/);
+  assert.doesNotMatch(downloaded,/乙/);
+  downloaded=''; fields['f-site'].value='unknown'; context.run();
+  assert.equal(downloaded,'');
+});
+
+test('未同步紀錄存在時不可清除本機打卡資料', () => {
+  let saves=0, confirms=0;
+  const context={
+    localRecs:[{synced:false,fbSynced:true}],
+    confirm:()=>{confirms++;return true;},
+    saveRecs:()=>{saves++;}, loadRecords(){}, showToast(){},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'clearLocal')}; this.run = clearLocal;`,context);
+  context.run();
+  assert.equal(context.localRecs.length,1);
+  assert.equal(saves,0);
+  assert.equal(confirms,0);
+});
+
+test('篩選與本機全部摘要 CSV 均不標記詳細備份日期', () => {
+  const downloads=[];
+  let marked=0;
+  const fields={'f-emp':{value:''},'f-site':{value:'A001'}};
+  const context={
+    $:id=>fields[id],
+    localRecs:[
+      {empId:'1',name:'甲',type:'上班',date:'2026-10-03',time:'08:00',siteId:'A001'},
+      {empId:'2',name:'乙',type:'上班',date:'2026-10-02',time:'08:00',siteId:'A002'},
+    ],
+    filterRecsBySup:rows=>rows,
+    getDateRange:()=>({s:'2026-10-03',e:'2026-10-03'}),
+    resolveSiteSearchId:value=>value,
+    dlFile:(csv,name)=>downloads.push({csv,name}),
+    showToast(){},today:()=> '2026-10-03',markBackupDone:()=>{marked++;},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'csvCell')}; ${extractFunction(inlineScript,'exportCSV')}; ${extractFunction(inlineScript,'exportFullBackupCSV')}; this.filtered=exportCSV; this.full=exportFullBackupCSV;`,context);
+  context.filtered();
+  assert.equal(marked,0);
+  assert.match(downloads[0].csv,/甲/);
+  assert.doesNotMatch(downloads[0].csv,/乙/);
+  context.full();
+  assert.equal(marked,0);
+  assert.match(downloads[1].csv,/甲/);
+  assert.match(downloads[1].csv,/乙/);
+  assert.match(downloads[1].name,/本機全部摘要/);
+});
+
+test('CSV 欄位包含逗號、引號或換行時應正確轉義', () => {
+  const context={};
+  vm.runInNewContext(`${extractFunction(inlineScript,'csvCell')}; this.run=csvCell;`,context);
+  assert.equal(context.run('甲,乙'), '"甲,乙"');
+  assert.equal(context.run('甲"乙'), '"甲""乙"');
+  assert.equal(context.run('甲\n乙'), '"甲\n乙"');
+});
+
+test('詳細備份保留紀錄全部欄位，簡潔 CSV 不標記備份日期', () => {
+  const files=[];
+  let marked=0;
+  const context={
+    localRecs:[{empId:'1',siteId:'A001',timestamp:'2026-10-03T00:00:00Z',originalTime:'08:00',correctionReason:'補正'}],
+    dlFile:(body,name)=>files.push({body,name}),
+    markBackupDone:()=>{marked++;},showToast(){},today:()=> '2026-10-03',
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'exportAuditBackupJSON')}; this.run=exportAuditBackupJSON;`,context);
+  context.run();
+  assert.equal(marked,1);
+  assert.match(files[0].name,/\.json$/);
+  assert.deepEqual(JSON.parse(files[0].body).records,context.localRecs);
+  assert.doesNotMatch(extractFunction(inlineScript,'exportFullBackupCSV'),/markBackupDone\(/);
+});
+
+test('清除前摘要顯示筆數、日期範圍和上次備份日', () => {
+  let message='';
+  const context={
+    localRecs:[{date:'2026-10-02',synced:true,fbSynced:true},{date:'2026-10-01',synced:true,fbSynced:true}],
+    localStorage:createStorage({last_backup_date:'2026-10-02'}),
+    confirm:text=>{message=text;return false;},
+    saveRecs(){},loadRecords(){},showToast(){},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'clearLocal')}; this.run=clearLocal;`,context);
+  context.run();
+  assert.match(message,/2 筆/);
+  assert.match(message,/2026-10-01/);
+  assert.match(message,/2026-10-02/);
+  assert.match(message,/上次備份：2026-10-02/);
+});
+
+test('代班成功提示須在本機紀錄寫入後才出現', () => {
+  assert.match(extractFunction(inlineScript, 'doSubPunch'), /await _saveSubPunchRec\(/);
+  assert.match(extractFunction(inlineScript, 'doSubPunchNew'), /await _saveSubPunchRec\(/);
+});
+
+test('後台紀錄應標示目前是本機已同步資料', () => {
+  assert.match(extractFunction(inlineScript, 'loadRecords'), /本機現有紀錄（較早資料請查詢 Sheets）/);
+});
+
 test('Apps Script 寫入完成後必須釋放文件鎖', () => {
   const rows = [];
   let released = false;
@@ -495,9 +698,9 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.14');
-  assert.equal(notes[0].date, '2026.09');
-  assert.ok(notes[0].changes.some(change => change.includes('忘記員工編號')));
+  assert.equal(notes[0].version, 'v1.4.15');
+  assert.equal(notes[0].date, '2026.10');
+  assert.ok(notes[0].changes.some(change => change.includes('後台鎖頭')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
 });
 
