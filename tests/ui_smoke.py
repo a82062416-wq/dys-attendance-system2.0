@@ -83,11 +83,10 @@ def verify_login_layout_on_short_phone(browser):
     page.set_default_timeout(5000)
     page.goto(BASE_URL, wait_until="domcontentloaded")
     stub_backend_sync(page)
+    assert page.locator("#pwa-banner").count() == 0, "打卡頁不可保留底部安裝浮條"
     page.locator("#keyboard-overlay.show").wait_for()
-    page.evaluate("document.querySelector('#pwa-banner').classList.add('show')")
     page.locator("#tab-admin").click()
     page.locator("#lock-screen").wait_for()
-    assert not page.locator("#pwa-banner").evaluate("el => el.classList.contains('show')")
     page.locator("#login-submit-btn").scroll_into_view_if_needed()
     assert page.locator("#login-submit-btn").is_visible()
     box = page.locator(".lock-box").bounding_box()

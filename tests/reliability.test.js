@@ -80,8 +80,8 @@ test('後台雲端同步逾時但有本機密碼時仍可進入登入頁並標�
     'lock-hint':{textContent:'old'},'role-supervisor':{style:{}},
   };
   const context={
-    adminOpening:false,pwaBannerTimer:null,_guideDrawerTimer:null,drawerOpen:false,
-    $:id=>id==='tab-admin'?lockButton:id==='guide-overlay'||id==='keyboard-overlay'||id==='pwa-banner'?overlay:elements[id],
+    adminOpening:false,_guideDrawerTimer:null,drawerOpen:false,
+    $:id=>id==='tab-admin'?lockButton:id==='guide-overlay'||id==='keyboard-overlay'?overlay:elements[id],
     syncSupervisorsFromFirebase:status=>{supervisorStatus=status;return new Promise(()=>{});},
     syncAuthFromFirebase:status=>{authStatus=status;return new Promise(()=>{});},
     setTimeout:callback=>{queueMicrotask(callback);return 1;},clearTimeout(){},
@@ -100,8 +100,10 @@ test('後台雲端同步逾時但有本機密碼時仍可進入登入頁並標�
   assert.equal(authStatus.active,false);
 });
 
-test('加入桌面僅由打卡說明引導，不自動顯示底部浮條', () => {
-  assert.doesNotMatch(inlineScript, /showPwaBannerWhenReady\(\)/);
+test('加入桌面僅由打卡說明引導，頁面不保留底部安裝浮條', () => {
+  assert.doesNotMatch(html, /id="pwa-banner"/);
+  assert.doesNotMatch(html, /#pwa-banner/);
+  assert.doesNotMatch(inlineScript, /beforeinstallprompt|pwaBannerTimer|dismissPWA/);
   assert.match(html, /onclick="replayGuide\(\)"[^>]*>查看打卡說明/);
   assert.match(html, /可選擇加入手機桌面/);
 });
@@ -113,11 +115,10 @@ test('新裝置雲端登入資料讀取失敗時不可誤開初始設定', async
     'tab-admin':{disabled:false,textContent:''},
     'guide-overlay':{classList:{remove(){}}},
     'keyboard-overlay':{classList:{remove(){}}},
-    'pwa-banner':{classList:{remove(){}}},
     'login-cloud-status':{textContent:'',style:{}},
   };
   const context={
-    adminOpening:false,pwaBannerTimer:null,_guideDrawerTimer:null,drawerOpen:false,
+    adminOpening:false,_guideDrawerTimer:null,drawerOpen:false,
     $:id=>elements[id],clearTimeout(){},setTimeout:()=>1,
     syncSupervisorsFromFirebase:async status=>{status.verified=false;},
     syncAuthFromFirebase:async status=>{status.verified=false;status.loaded=false;},
@@ -212,7 +213,7 @@ test('從引導進後台會取消延遲彈出的員工編號鍵盤', () => {
   let next=0,drawerOpens=0;
   const overlay={classList:{remove(){}}};
   const context={
-    adminOpening:false,pwaBannerTimer:null,_guideDrawerTimer:null,drawerOpen:false,
+    adminOpening:false,_guideDrawerTimer:null,drawerOpen:false,
     localStorage:createStorage(),
     $:()=>overlay,
     setTimeout:callback=>{const id=++next;timers.set(id,callback);return id;},
@@ -858,9 +859,9 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.17');
+  assert.equal(notes[0].version, 'v1.4.18');
   assert.equal(notes[0].date, '2026.10');
-  assert.ok(notes[0].changes.some(change => change.includes('逾時')));
+  assert.ok(notes[0].changes.some(change => change.includes('浮條')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
 });
 
