@@ -152,6 +152,7 @@ body:has(#page-checkin.active) nav{z-index:560}
   flex-direction:column;
   overflow:hidden;
 }
+#page-checkin:not(.active){display:none}
 .checkin-wrap{
   flex:1;
   display:flex;
@@ -615,6 +616,21 @@ body:has(#page-checkin.active) nav{z-index:560}
 .admin-quick-btn:active{background:var(--fill2);transform:scale(.98)}
 .admin-quick-icon{display:block;font-size:24px;margin-bottom:8px}
 .admin-quick-hint{display:block;font-size:11px;font-weight:400;color:var(--t2);margin-top:5px;line-height:1.35}
+#supervisor-home{display:none}
+#admin-menu.supervisor-view #supervisor-home{display:block}
+#admin-menu.supervisor-view .admin-home-only,#admin-menu.supervisor-view #anomaly-banner{display:none!important}
+.supervisor-home-note{font-size:12px;line-height:1.5;color:var(--t2);margin:-6px 0 16px}
+.supervisor-quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:18px}
+.supervisor-quick-btn{display:flex;align-items:center;gap:12px;min-height:96px;padding:14px;text-align:left;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--t1);font:inherit;cursor:pointer;box-shadow:var(--sh1)}
+.supervisor-quick-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.supervisor-quick-btn:active{background:var(--fill2)}
+.supervisor-quick-icon{font-size:24px;flex-shrink:0}
+.supervisor-quick-btn strong{display:block;font-size:15px;margin-bottom:4px}
+.supervisor-quick-btn small{display:block;font-size:12px;line-height:1.4;color:var(--t2)}
+#admin-extra-menu>summary{cursor:pointer;list-style:none;padding:14px 16px;margin-bottom:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);font-size:14px;font-weight:600;color:var(--t1)}
+#admin-extra-menu>summary::-webkit-details-marker{display:none}
+#admin-menu:not(.supervisor-view) #admin-extra-menu>summary{display:none}
+@media(max-width:767px){.supervisor-quick-grid{grid-template-columns:1fr}.supervisor-quick-btn{min-height:76px}}
 .ami-icon{
   width:34px;height:34px;border-radius:9px;
   display:flex;align-items:center;justify-content:center;
@@ -1005,7 +1021,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.18 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.20 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1199,7 +1215,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.18 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.20 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1318,13 +1334,29 @@ button,input,select{font-family:var(--font)}
     <!-- ══ 分類清單選單 ══ -->
     <div id="admin-menu">
 
-      <div class="admin-menu-intro">
+      <div id="supervisor-home">
+        <div class="admin-menu-intro">
+          <div class="admin-menu-intro-kicker">幹部工作台</div>
+          <div class="admin-menu-intro-title" id="supervisor-home-title">我的案場</div>
+          <div class="admin-menu-intro-desc" id="supervisor-home-scope">正在整理您的案場範圍…</div>
+          <div class="admin-menu-intro-desc" id="supervisor-home-sync">登入資料狀態載入中…</div>
+        </div>
+        <div class="admin-menu-hd">先看這三件事</div>
+        <div class="supervisor-quick-grid" aria-label="幹部常用操作">
+          <button type="button" class="supervisor-quick-btn" onclick="showSub('daily-actions',this)"><span class="supervisor-quick-icon">✅</span><span><strong>今日待處理</strong><small>漏下班、重複打卡與待確認紀錄</small></span></button>
+          <button type="button" class="supervisor-quick-btn" onclick="showSub('site-health',this)"><span class="supervisor-quick-icon">🚦</span><span><strong>案場狀態</strong><small>近 30 天狀況與異常原因</small></span></button>
+          <button type="button" class="supervisor-quick-btn" onclick="showSub('records',this)"><span class="supervisor-quick-icon">📋</span><span><strong>查打卡</strong><small>依日期、人員與案場查詢紀錄</small></span></button>
+        </div>
+        <p class="supervisor-home-note">僅顯示您的負責範圍；異常與案場狀態依已取得的出勤紀錄分析，資料不完整時各頁會提示。</p>
+      </div>
+
+      <div class="admin-menu-intro admin-home-only">
         <div class="admin-menu-intro-kicker">管理工作台</div>
         <div class="admin-menu-intro-title">先掌握今天，再處理細節</div>
         <div class="admin-menu-intro-desc">從待處理事項開始；需要查人員或案場時，再進入紀錄與狀態。</div>
       </div>
-      <div class="admin-menu-hd">今日常用操作</div>
-      <div class="admin-quick-grid" aria-label="今日常用操作">
+      <div class="admin-menu-hd admin-home-only">今日常用操作</div>
+      <div class="admin-quick-grid admin-home-only" aria-label="今日常用操作">
         <button type="button" class="admin-quick-btn" onclick="showSub('daily-actions',this)"><span class="admin-quick-icon">✅</span>待處理<span class="admin-quick-hint">先看需要確認的事項</span></button>
         <button type="button" class="admin-quick-btn" onclick="showSub('records',this)"><span class="admin-quick-icon">📋</span>查打卡<span class="admin-quick-hint">依日期與案場查詢</span></button>
         <button type="button" class="admin-quick-btn" onclick="showSub('site-health',this)"><span class="admin-quick-icon">🚦</span>案場狀態<span class="admin-quick-hint">掌握負責案場動態</span></button>
@@ -1341,6 +1373,8 @@ button,input,select{font-family:var(--font)}
         </span>
       </button>
 
+      <details id="admin-extra-menu" open>
+      <summary>更多功能 · 報表與列印</summary>
       <!-- 分析與報表 -->
       <div class="admin-menu-section">
         <div class="admin-menu-hd">分析與報表</div>
@@ -1436,6 +1470,8 @@ button,input,select{font-family:var(--font)}
         </button>
       </div>
 
+      </details>
+
     </div><!-- /#admin-menu -->
 
     <!-- 紀錄 -->
@@ -1444,7 +1480,7 @@ button,input,select{font-family:var(--font)}
         <div class="toolbar-title">打卡紀錄</div>
         <div class="toolbar-right">
           <input type="text" class="fi" id="f-emp"  placeholder="編號 / 姓名" style="width:120px" oninput="loadRecords()"/>
-          <button class="btn-s bs-ghost"  onclick="loadRecords()">🔄</button>
+          <button class="btn-s bs-ghost"  onclick="syncSelectedRecordRange()" title="重新讀取目前日期的雲端紀錄">🔄</button>
           <button class="btn-s bs-ghost"  onclick="openManualPunch()" id="btn-manual-punch" style="display:none">➕ 補打卡</button>
           <button class="btn-s bs-ghost"  onclick="manualSync()" id="btn-manual-sync">☁️ 同步未上傳</button>
           <button class="btn-s bs-ghost"  onclick="syncFromFirebase()" id="btn-fb-sync">🔥 雲端同步</button>
@@ -1465,14 +1501,15 @@ button,input,select{font-family:var(--font)}
         <button class="btn-s dq-btn" onclick="setDateQuick('all',this)">全部</button>
         <button class="btn-s dq-btn" onclick="setDateQuick('custom',this)">自訂 📅</button>
         <span id="custom-range" style="display:none;gap:6px;align-items:center">
-          <input type="date" class="fi" id="f-date-start" onchange="loadRecords()" style="width:130px"/>
+          <input type="date" class="fi" id="f-date-start" onchange="loadRecords();syncSelectedRecordRange()" style="width:130px"/>
           <span style="color:var(--t3);font-size:13px">—</span>
-          <input type="date" class="fi" id="f-date-end" onchange="loadRecords()" style="width:130px"/>
+          <input type="date" class="fi" id="f-date-end" onchange="loadRecords();syncSelectedRecordRange()" style="width:130px"/>
         </span>
         <input class="fi" id="f-site" list="record-site-options" placeholder="🔍 搜尋案場" style="font-size:12px;height:28px;padding:0 8px;min-width:160px;max-width:220px" oninput="loadRecords()"/>
         <datalist id="record-site-options"></datalist>
       </div>
       <div id="record-site-scope" style="font-size:12px;color:var(--t3);margin:0 0 8px">目前查看：全部案場</div>
+      <div id="record-cloud-status" role="status" style="font-size:12px;color:var(--t3);padding:0 16px 8px">近期雲端紀錄尚未確認</div>
       <div id="sync-status-bar" style="display:none" class="cfg-bar" style="background:color-mix(in srgb,var(--warn) 8%,var(--surface))">
         <span id="sync-status-msg" style="font-size:13px;color:var(--t1)"></span>
         <button class="btn-recfg" onclick="manualSync()">立即同步</button>
@@ -1682,6 +1719,7 @@ button,input,select{font-family:var(--font)}
           <button class="btn-s bs-ghost" onclick="previewMonthlyReport()">🔍 預覽</button>
           <button class="btn-s bs-ghost" onclick="printMonthlyReport()">🖨️ 列印</button>
           <button class="btn-s bs-accent" onclick="handleExportClick()">⬇ 匯出 CSV</button>
+          <button class="btn-s bs-ghost" id="yangji-export-btn" style="display:none" onclick="exportYangjiAttendanceXLSX()">⬇ 洋基出勤表 Excel</button>
           <button class="btn-s bs-lock" onclick="lockAdmin()">🔒 登出</button>
         </div>
       </div>
@@ -3631,18 +3669,18 @@ async function manualSync(){
   else showToast(`同步 ${success} 筆，失敗 ${fail} 筆`,'warn');
 }
 
-// 自動補傳：網路恢復時觸發
+// 自動補傳：啟動、網路恢復與頁面重新開啟時觸發。
 
 // Firebase 離線補傳佇列
 function getFbPendingRecs(){
   return localRecs.filter(r => r.fbSynced !== true);
 }
 
-async function retryFirebaseSync(){
+async function retryFirebaseSync(silent=false){
   if(!FB_DB) return;
   const pending = getFbPendingRecs();
   if(!pending.length) return;
-  showToast(`網路恢復，Firebase 補傳 ${pending.length} 筆中…`,'');
+  if(!silent) showToast(`正在補傳 ${pending.length} 筆雲端紀錄…`,'');
   let ok = 0;
   for(const rec of pending){
     try{
@@ -3668,8 +3706,27 @@ async function retryFirebaseSync(){
   }
   if(ok > 0){ saveRecs(); updateFbStatusBar(); }
   const still = getFbPendingRecs().length;
-  if(!still) showToast('所有離線紀錄已補傳至雲端 ✓','success');
-  else showToast(`已補傳 ${ok} 筆，仍有 ${still} 筆失敗`,'warn');
+  if(!silent){
+    if(!still) showToast('所有離線紀錄已補傳至雲端 ✓','success');
+    else showToast(`已補傳 ${ok} 筆，仍有 ${still} 筆失敗`,'warn');
+  }
+}
+
+let _pendingSyncRunning=false;
+async function runPendingSync(){
+  if(!navigator.onLine||_pendingSyncRunning) return;
+  if(!(SCRIPT_URL&&!IS_DEMO&&getPendingRecs().length)&&!(FB_DB&&getFbPendingRecs().length)) return;
+  _pendingSyncRunning=true;
+  try{
+    if(SCRIPT_URL&&!IS_DEMO){
+      for(const rec of getPendingRecs()) await uploadRec(rec);
+    }
+    if(FB_DB&&getFbPendingRecs().length) await retryFirebaseSync(true);
+  }finally{
+    _pendingSyncRunning=false;
+    updateSyncStatusBar();
+    updateFbStatusBar();
+  }
 }
 
 function updateFbStatusBar(){
@@ -3686,21 +3743,9 @@ function updateFbStatusBar(){
   }
 }
 
-window.addEventListener('online', async ()=>{
-  // Google Sheets 補傳
-  if(SCRIPT_URL && !IS_DEMO){
-    const pending = getPendingRecs();
-    if(pending.length){
-      showToast(`網路恢復，正在補傳 ${pending.length} 筆紀錄…`,'');
-      for(const rec of pending){ await uploadRec(rec); }
-      const stillPending = getPendingRecs().length;
-      if(!stillPending) showToast('所有離線紀錄已補傳 ✓','success');
-      updateSyncStatusBar();
-    }
-  }
-  // Firebase 補傳
-  retryFirebaseSync();
-});
+window.addEventListener('online',runPendingSync);
+window.addEventListener('focus',runPendingSync);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden) runPendingSync()});
 
 // ══════════════════════════════════════
 //  Admin lock
@@ -3826,7 +3871,7 @@ async function goAdmin(el){
       if(!authStatus.loaded){showToast('雲端登入資料未確認，請連網後重試','error');return}
       openSetup();return;
     }
-    if(ADMIN_UNLOCKED && cloudVerified){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();return}
+    if(ADMIN_UNLOCKED && cloudVerified){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();syncRecentAdminRecords();return}
     navigateTo('admin');showAdminMenu();
     $('lock-screen').style.display='flex';
     $('lock-input').value='';
@@ -3869,6 +3914,7 @@ function tryUnlock(){
       resetIdleTimer();
       checkBackupReminder();
       checkAndAutoDisable();loadRecords();renderEmpList();
+      syncRecentAdminRecords();
     }else{
       lockTries++;
       $('lock-input').className='lock-input shake';
@@ -3888,6 +3934,7 @@ function tryUnlock(){
       applyRoleUI('supervisor');
       resetIdleTimer();
       loadRecords();
+      syncRecentAdminRecords();
     } else {
       $('sup-emp-input').className='lock-input shake';
       $('lock-hint').textContent='查無此員工編號，請確認後再試';
@@ -3948,9 +3995,9 @@ function applyRoleUI(role){
   const qrSec = $('sup-section-qrprint');
   if(qrSec) qrSec.style.display = !isAdmin ? '' : 'none';
 
-  // 幹部進入後預設顯示紀錄頁
+  // 幹部先看自己的工作台，再選擇需要查詢的資料。
   if(!isAdmin){
-    showSub('records', null);
+    showAdminMenu();
   }
 }
 
@@ -4358,11 +4405,58 @@ async function loadAnalysisRecords(days, endDate){
   try{
     const snapshots=await Promise.all(keys.map(key=>FB_DB.ref('punches/'+key).once('value')));
     const remote=[];
-    snapshots.forEach(snapshot=>{ const value=snapshot.val()||{}; Object.values(value).forEach(record=>remote.push(record)); });
+    snapshots.forEach(snapshot=>{ const value=snapshot.val()||{}; Object.values(value).forEach(record=>remote.push({...record,fbSynced:true,synced:true,fromCloud:true})); });
     return {records:filterAnalysisRecords(mergeRecordsByTimestamp(local,remote)),complete:true};
   }catch(error){
     return {records:local,complete:false};
   }
+}
+let _recordSyncGeneration=0;
+async function syncRecentAdminRecords(){
+  const generation=++_recordSyncGeneration;
+  const status=$('record-cloud-status');
+  if(status) status.textContent='正在核對近 31 天雲端紀錄…';
+  const result=await loadAnalysisRecords(31,today());
+  if(!ADMIN_UNLOCKED||generation!==_recordSyncGeneration) return;
+  if(!result.complete){
+    if(status) status.textContent='雲端紀錄未確認；目前僅顯示本機已保存的資料';
+    return;
+  }
+  const before=localRecs.length;
+  localRecs=mergeRecordsByTimestamp(localRecs,result.records).sort((a,b)=>String(b.timestamp).localeCompare(String(a.timestamp)));
+  try{saveRecs()}catch(error){console.warn('近期雲端紀錄無法寫入本機快取:',error)}
+  if(status) status.textContent=`近 31 天雲端已核對 · 補入 ${localRecs.length-before} 筆`;
+  loadRecords();
+}
+async function syncSelectedRecordRange(){
+  if(!ADMIN_UNLOCKED) return;
+  const generation=++_recordSyncGeneration;
+  const {s,e}=getDateRange();
+  const status=$('record-cloud-status');
+  if(!s||!e){
+    if(status) status.textContent=_dateMode==='all'
+      ? '全部歷史紀錄請按「雲端同步」；目前顯示本機已保存資料'
+      : '請選擇開始與結束日期，再核對雲端紀錄';
+    return;
+  }
+  const start=new Date(s+'T12:00:00'),end=new Date(e+'T12:00:00');
+  const days=Math.round((end-start)/86400000)+1;
+  if(!Number.isFinite(days)||days<1||days>93){
+    if(status) status.textContent='此日期範圍無法自動核對；請縮小範圍或按「雲端同步」';
+    return;
+  }
+  if(status) status.textContent='正在核對所選日期的雲端紀錄…';
+  const result=await loadAnalysisRecords(days,e);
+  if(!ADMIN_UNLOCKED||generation!==_recordSyncGeneration||getDateRange().s!==s||getDateRange().e!==e) return;
+  if(!result.complete){
+    if(status) status.textContent='雲端紀錄未確認；目前僅顯示本機已保存的資料';
+    return;
+  }
+  const before=localRecs.length;
+  localRecs=mergeRecordsByTimestamp(localRecs,result.records).sort((a,b)=>String(b.timestamp).localeCompare(String(a.timestamp)));
+  try{saveRecs()}catch(error){console.warn('雲端紀錄無法寫入本機快取:',error)}
+  if(status) status.textContent=`${s} 至 ${e} 雲端已核對 · 補入 ${localRecs.length-before} 筆`;
+  loadRecords();
 }
 function getAnalysisRecordsForDays(days){
   const end=new Date(today()+'T00:00:00');
@@ -4487,6 +4581,7 @@ function setDateQuick(mode, btn){
   const cr = $('custom-range');
   if(cr) cr.style.display = (mode==='custom') ? 'flex' : 'none';
   loadRecords();
+  syncSelectedRecordRange();
 }
 function getDateRange(){
   const td = today();
@@ -4495,7 +4590,7 @@ function getDateRange(){
     const d=new Date(td), day=d.getDay();
     const mon=new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
     const sun=new Date(mon); sun.setDate(mon.getDate()+6);
-    return {s:mon.toISOString().slice(0,10), e:sun.toISOString().slice(0,10)};
+    return {s:localDateKey(mon), e:localDateKey(sun)};
   }
   if(_dateMode==='month'){
     const [y,m]=td.split('-');
@@ -4584,7 +4679,7 @@ function loadRecords(){
   if(rawSiteQuery&&!fs) rows=[];
   if(fs) rows=rows.filter(r=>r.siteId===fs);
   initSiteFilter(); // 更新案場選單（案場可能有變動）
-  updateSiteScopeLabel('record-site-scope',`${ds||'最早'} 至 ${de||'今天'} · 本機現有紀錄（較早資料請查詢 Sheets）`,rawSiteQuery&&!fs ? false : fs);
+  updateSiteScopeLabel('record-site-scope',`${ds||'最早'} 至 ${de||'今天'} · 已取得紀錄（雲端狀態見下方；較早資料可查詢 Sheets）`,rawSiteQuery&&!fs ? false : fs);
   _siteMap = null;  // 清快取讓 getSiteName 重讀
   const todayR=filterRecsBySup(localRecs.filter(r=>r.date===td));
   $('s-total').textContent=todayR.length;
@@ -5263,7 +5358,7 @@ function updateAnomalyBanner(){
   const banner = $('anomaly-banner');
   if(!banner || !ADMIN_UNLOCKED) return;
   const td = today();
-  const todayRecs = localRecs.filter(r => r.date === td);
+  const todayRecs = filterAnalysisRecords(localRecs.filter(r => r.date === td));
 
   // 統計每人上/下班次數
   const empMap = {};
@@ -5289,18 +5384,35 @@ function updateAnomalyBanner(){
   }
 }
 
+function renderSupervisorHome(){
+  if(!CURRENT_SUPERVISOR) return;
+  const sup=CURRENT_SUPERVISOR;
+  $('supervisor-home-title').textContent=`${sup.name||'幹部'}的工作台`;
+  const visibleSites=getVisibleSitesForCurrentUser();
+  $('supervisor-home-scope').textContent=sup.viewAll
+    ? '查看範圍：全部案場'
+    : `負責範圍：${visibleSites.length} 個案場${visibleSites.length===0?' · 尚無可查看的案場':''}`;
+  const cloudConfirmed=$('login-cloud-status').textContent.startsWith('✓');
+  $('supervisor-home-sync').textContent=cloudConfirmed
+    ? '登入資料已確認；出勤紀錄請以各頁更新結果為準'
+    : '登入資料未經雲端確認；案場與權限可能不是最新';
+}
 function showAdminMenu(){
   adminViewState = 'menu';
   document.querySelectorAll('.sub-page').forEach(p => p.classList.remove('active'));
   const menu = $('admin-menu');
-  if(menu) menu.style.display = '';
+  const isSupervisor=CURRENT_ROLE==='supervisor'&&!!CURRENT_SUPERVISOR;
+  if(menu){
+    menu.style.display = '';
+    menu.classList.toggle('supervisor-view',isSupervisor);
+  }
+  $('admin-extra-menu').open=!isSupervisor;
   // 標題列：隱藏返回鍵，顯示「管理後台」
   const backBtn = $('sub-back-btn');
   const titleEl = $('admin-page-title');
   if(backBtn) backBtn.style.display = 'none';
-  if(titleEl) titleEl.textContent = '管理後台';
+  if(titleEl) titleEl.textContent = isSupervisor?'幹部工作台':'管理後台';
   updateNavBackBtn();
-  updateAnomalyBanner(); // 每次回到首頁都更新異常橫幅
 
   // 幹部授權：每次回到選單都從 localStorage 重新讀取，確保即時反映最新設定
   if(CURRENT_SUPERVISOR){
@@ -5317,6 +5429,8 @@ function showAdminMenu(){
     const attItem = $('menu-item-attendance-stat');
     if(attItem) attItem.style.display = perms.includes('attendance-stat') ? '' : 'none';
   }
+  if(isSupervisor) renderSupervisorHome();
+  updateAnomalyBanner(); // 每次回到首頁都更新異常橫幅
 }
 
 /** 返回上一頁（如已在首頁則無動作） */
@@ -5342,6 +5456,8 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.4.20',date:'2026.10',changes:['後台查打卡與月度報表按所選日期核對雲端紀錄，讀取失敗時標示資料未確認','待上傳紀錄在開啟網站、恢復網路與返回頁面時自動補傳，改善雲端同步','洋基美光案場新增六欄 Excel 出勤表匯出；舊紀錄未存哨點時留空','員工長按打卡與 QR 驗證流程維持原樣']},
+    {version:'v1.4.19',date:'2026.10',changes:['幹部登入後先看到簡潔的幹部工作台與負責案場範圍','待處理、案場狀態與查打卡入口直接說明可查資訊，其餘功能收進更多功能','幹部首頁異常提醒只計入已分配案場，打卡流程不變']},
     {version:'v1.4.18',date:'2026.10',changes:['完整移除打卡頁底部殘留的加入桌面浮條與相關位移樣式','加入桌面方式仍可從打卡說明查看，打卡流程不變']},
     {version:'v1.4.17',date:'2026.10',changes:['後台雲端連線逾時時，可在已有本機密碼的裝置進入登入畫面','雲端未確認時要求重新輸入密碼，並提示資料可能不是最新','加入桌面改為使用者自行參考打卡說明，不再自動顯示底部浮條']},
     {version:'v1.4.16',date:'2026.10',changes:['改善短螢幕後台登入排版，避免加入桌面提示遮住登入框','後台入口顯示雲端讀取狀態，連線逾時會提示重試','修正新手引導後的員工編號鍵盤延遲蓋住登入頁']},
@@ -6299,6 +6415,11 @@ function updateSiteFilterBtn(){
   document.querySelectorAll('#site-chip-list .site-chip').forEach(chip => {
     chip.classList.toggle('sc-selected', _selectedSiteIds.has(chip.dataset.id));
   });
+  const yangjiBtn=$('yangji-export-btn');
+  if(yangjiBtn){
+    const selected=getSites().filter(site=>_selectedSiteIds.has(site.id));
+    yangjiBtn.style.display=selected.length===n&&n>0&&selected.every(isYangjiReportSite)?'':'none';
+  }
 }
 function mergeSheetEmployees(existing, sheetEmployees){
   const currentById=new Map((Array.isArray(existing)?existing:[]).map(emp=>[emp.id,emp]));
@@ -6415,10 +6536,89 @@ function handleExportClick(){
   exportDYSReportFinal(ym, ids);
 }
 
+function isYangjiReportSite(site){
+  return !!site && /洋基/.test(site.name||'') && /美光/.test(site.name||'') && /早|晚/.test(site.name||'');
+}
+
+/** 與洋基原始出勤表相同的六欄；夜班隔日早上的下班記在上班月份。 */
+function buildYangjiAttendanceRows(records, siteById, yearMonth, selectedIds){
+  const headers=['時間戳記','保全員姓名','服務案場','值班哨點','班別','上(下)班'];
+  const allowed=new Set(selectedIds||[]);
+  const rows=(records||[]).filter(record=>{
+    const site=siteById[record.siteId];
+    if(!allowed.has(record.siteId)||!isYangjiReportSite(site)) return false;
+    const shift=/晚/.test(site.name)?'晚班':'早班';
+    let dutyDate=record.date;
+    if(shift==='晚班'&&record.type==='下班'&&String(record.time||'')<'12:00:00'){
+      const previous=new Date(String(record.date)+'T12:00:00');
+      previous.setDate(previous.getDate()-1);
+      const previousDate=previous.getFullYear()+'-'+String(previous.getMonth()+1).padStart(2,'0')+'-'+String(previous.getDate()).padStart(2,'0');
+      const matchingIn=(records||[]).some(candidate=>candidate.type==='上班'&&candidate.date===previousDate&&candidate.siteId===record.siteId&&
+        (record.empId&&candidate.empId?candidate.empId===record.empId:candidate.name===record.name));
+      if(!matchingIn) return false;
+      dutyDate=previousDate;
+    }
+    return String(dutyDate||'').startsWith(yearMonth+'-');
+  }).sort((a,b)=>String(a.date+' '+a.time).localeCompare(String(b.date+' '+b.time)));
+  return [headers,...rows.map(record=>{
+    const site=siteById[record.siteId];
+    const post=String(record.postName||'').trim().replace(/^東哨\/?D2$/,'東哨D2');
+    return [record.date+' '+record.time,record.name||'', '洋基(美光廠)',post,/晚/.test(site.name)?'晚班':'早班',record.type||''];
+  })];
+}
+
+async function exportYangjiAttendanceXLSX(){
+  const ym=($('monthly-report-month')||{}).value||getDefaultYM();
+  const ids=getSelectedSiteIds();
+  const sites=getSites();
+  const siteById=Object.fromEntries(sites.map(site=>[site.id,site]));
+  if(!/^\d{4}-\d{2}$/.test(ym)||!ids.length||!ids.every(id=>isYangjiReportSite(siteById[id]))){
+    showToast('請只選擇洋基美光的早班、晚班案場','error');return;
+  }
+  const [year,month]=ym.split('-').map(Number);
+  const nextMonth=localDateKey(new Date(year,month,1));
+  const result=await loadAnalysisRecords(new Date(year,month,0).getDate()+1,nextMonth);
+  if(!result.complete){showToast('雲端紀錄未完整載入，請連線後再匯出','error');return;}
+  const rows=buildYangjiAttendanceRows(result.records,siteById,ym,ids);
+  if(rows.length===1){showToast('所選月份沒有洋基打卡紀錄','error');return;}
+  try{
+    if(typeof XLSX==='undefined'){
+      await new Promise((resolve,reject)=>{
+        const script=document.createElement('script');
+        script.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
+      });
+    }
+    const sheet=XLSX.utils.aoa_to_sheet(rows);
+    sheet['!cols']=[{wch:24},{wch:18},{wch:18},{wch:18},{wch:12},{wch:14}];
+    const book=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book,sheet,'工作表1');
+    XLSX.writeFile(book,`洋基(美光廠)_${ym}_出勤表.xlsx`);
+    const missing=rows.slice(1).filter(row=>!row[3]).length;
+    showToast(missing?`已匯出；${missing} 筆舊紀錄沒有哨點，該欄留空`:'洋基出勤表 Excel 已匯出 ✓',missing?'warn':'success');
+  }catch(error){
+    console.warn('洋基出勤表匯出失敗:',error);
+    showToast('Excel 匯出失敗，請確認網路後重試','error');
+  }
+}
+
 /** 取得預設年月（本月） */
 function getDefaultYM(){
   const n = new Date();
   return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0');
+}
+async function loadMonthlyReportRecords(yearMonth){
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(yearMonth)){
+    showToast('請選擇有效月份','error');return null;
+  }
+  const [year,month]=yearMonth.split('-').map(Number);
+  const nextMonth=localDateKey(new Date(year,month,1));
+  const result=await loadAnalysisRecords(new Date(year,month,0).getDate()+1,nextMonth);
+  if(!result.complete){
+    showToast('雲端紀錄未完整載入，請連線後重試','error');
+    return null;
+  }
+  return result.records;
 }
 
 /** 原始工時計算（支援跨日） */
@@ -6443,7 +6643,7 @@ function getDYSStepHours(h){
  *  @param {string}   targetYM      "YYYY-MM"
  *  @param {string[]} filterSiteIds 空陣列 = 全部案場
  */
-function buildMonthlyMatrix(targetYM, filterSiteIds){
+function buildMonthlyMatrix(targetYM, filterSiteIds, sourceRecords){
   // 向下相容：若傳入字串（舊格式）自動轉陣列
   if(typeof filterSiteIds === 'string'){
     filterSiteIds = filterSiteIds ? [filterSiteIds] : [];
@@ -6452,8 +6652,15 @@ function buildMonthlyMatrix(targetYM, filterSiteIds){
 
   const [year, month] = targetYM.split('-').map(Number);
   const daysInMonth   = new Date(year, month, 0).getDate();
+  const allRecs       = Array.isArray(sourceRecords)?sourceRecords:JSON.parse(localStorage.getItem('local_records') || '[]');
   const emps          = JSON.parse(localStorage.getItem('employees') || '[]');
-  const allRecs       = JSON.parse(localStorage.getItem('local_records') || '[]');
+  const knownIds=new Set(emps.map(emp=>emp.id));
+  allRecs.forEach(record=>{
+    if(record.empId&&!knownIds.has(record.empId)){
+      emps.push({id:record.empId,name:record.name||record.empId});
+      knownIds.add(record.empId);
+    }
+  });
 
   let totalHours = 0, anomalyCount = 0, crossdayCount = 0;
   const rows = [];
@@ -6468,7 +6675,7 @@ function buildMonthlyMatrix(targetYM, filterSiteIds){
       if(d > daysInMonth){ dayData.push({h:'', note:''}); continue; }
 
       const dateStr  = year + '-' + String(month).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-      const nextDate = new Date(year, month-1, d+1).toISOString().slice(0,10);
+      const nextDate = localDateKey(new Date(year, month-1, d+1));
 
       let dayRecs  = allRecs.filter(r => r.empId===emp.id && r.date===dateStr);
       let nextRecs = allRecs.filter(r => r.empId===emp.id && r.date===nextDate);
@@ -6521,23 +6728,24 @@ function buildMonthlyMatrix(targetYM, filterSiteIds){
 
 /** 預覽月度報表（前 20 人） */
 // 月度報表列印
-function printMonthlyReport(){
+async function printMonthlyReport(){
   const ym = $('monthly-report-month') ? $('monthly-report-month').value : '';
   if(!ym){ showToast('請先選擇年月','error'); return; }
   // 更新列印標題
   const hdr = $('print-report-title');
   if(hdr) hdr.textContent = `DYS 大洋保全 ${ym} 月度出勤報表`;
   // 確保預覽已產生
-  previewMonthlyReport();
-  setTimeout(()=>{ window.print(); }, 400);
+  if(await previewMonthlyReport()) window.print();
 }
 
 let _mrLastRows = [];
 
-function previewMonthlyReport(){
+async function previewMonthlyReport(){
   const ym  = ($('monthly-report-month')||{}).value || getDefaultYM();
   const ids = getSelectedSiteIds();
-  const {rows, daysInMonth, totalHours, anomalyCount, crossdayCount} = buildMonthlyMatrix(ym, ids);
+  const monthRecords=await loadMonthlyReportRecords(ym);
+  if(!monthRecords) return false;
+  const {rows, daysInMonth, totalHours, anomalyCount, crossdayCount} = buildMonthlyMatrix(ym, ids, monthRecords);
   _mrLastRows = rows;
 
   $('monthly-empty-state').style.display   = 'none';
@@ -6556,6 +6764,7 @@ function previewMonthlyReport(){
   const searchEl = $('mr-emp-search');
   if(searchEl) searchEl.value='';
   renderMonthlyPreviewBody(rows);
+  return true;
 }
 
 /** 依 mr-emp-search 關鍵字重新篩選並渲染月度報表預覽表格（不重算矩陣） */
@@ -6594,14 +6803,16 @@ function renderMonthlyPreviewBody(rows){
  *  @param {string}   targetYM      "YYYY-MM"
  *  @param {string[]} filterSiteIds 空陣列 = 全部案場
  */
-function exportDYSReportFinal(targetYM, filterSiteIds){
+async function exportDYSReportFinal(targetYM, filterSiteIds){
   // 向下相容
   if(typeof filterSiteIds === 'string'){
     filterSiteIds = filterSiteIds ? [filterSiteIds] : [];
   }
   filterSiteIds = filterSiteIds || [];
 
-  const {rows, daysInMonth} = buildMonthlyMatrix(targetYM, filterSiteIds);
+  const monthRecords=await loadMonthlyReportRecords(targetYM);
+  if(!monthRecords) return;
+  const {rows, daysInMonth} = buildMonthlyMatrix(targetYM, filterSiteIds, monthRecords);
   if(!rows.length){ showToast('本月（此案場）無出勤紀錄可匯出', 'error'); return; }
 
   let headers = ['員工編號','姓名'];
@@ -6677,11 +6888,13 @@ function uploadToFirebase(rec){
 // 從 Firebase 拉取所有紀錄合併入 localStorage（管理員手動觸發）
 async function syncFromFirebase(){
   if(!FB_DB){ showToast('Firebase 未連線','error'); return; }
+  const status=$('record-cloud-status');
+  if(status) status.textContent='正在讀取全部雲端紀錄…';
   try{
     showToast('正在同步雲端資料…','info');
     const snap = await FB_DB.ref('punches').once('value');
     const data = snap.val();
-    if(!data){ showToast('雲端目前無資料','warn'); return; }
+    if(!data){ if(status) status.textContent='雲端目前無紀錄';showToast('雲端目前無資料','warn'); return; }
     let added = 0;
     Object.values(data).forEach(dayData=>{
       if(!dayData) return;
@@ -6700,7 +6913,9 @@ async function syncFromFirebase(){
       if(ADMIN_UNLOCKED){ loadRecords(); loadOverview(); }
     }
     showToast('已同步 '+added+' 筆新紀錄'+(added===0?' （已是最新）':' ✓'), 'success');
+    if(status) status.textContent=`全部雲端紀錄已讀取 · 補入 ${added} 筆`;
   }catch(e){
+    if(status) status.textContent='全部雲端紀錄讀取失敗；目前僅顯示本機已保存的資料';
     showToast('同步失敗：'+e.message,'error');
     console.error('syncFromFirebase error:', e);
   }
@@ -6751,6 +6966,8 @@ localRecs.forEach(r=>{ if(r.synced===undefined) r.synced=true; });
 saveRecs();
 updateSyncStatusBar();
 restoreLastEmp();
+setTimeout(runPendingSync,3000);
+setInterval(runPendingSync,60000);
 
 // ══════════════════════════════════════
 //  QR Code URL 偵測（掃碼進入）

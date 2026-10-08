@@ -12,6 +12,87 @@ const inlineScript = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>
   .filter(Boolean)
   .at(-1);
 
+test('洋基出勤列保留六欄格式，晚班跨日歸上班月份，舊紀錄哨點留空', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'isYangjiReportSite')}; ${extractFunction(inlineScript, 'buildYangjiAttendanceRows')}; this.build = buildYangjiAttendanceRows;`, context);
+  const sites = { C151: { name: '洋基美光－早' }, N151: { name: '洋基美光－晚' } };
+  const records = [
+    { date: '2026-08-31', time: '18:31:00', name: '甲', siteId: 'N151', type: '上班', postName: '東哨/D2' },
+    { date: '2026-09-01', time: '07:01:00', name: '甲', siteId: 'N151', type: '下班', postName: '東哨/D2' },
+    { date: '2026-09-01', time: '07:02:00', name: '丁', siteId: 'N151', type: '下班' },
+    { date: '2026-08-31', time: '06:31:00', name: '乙', siteId: 'C151', type: '上班' },
+    { date: '2026-09-01', time: '06:31:00', name: '丙', siteId: 'C151', type: '上班', postName: '工務所E' },
+  ];
+  const rows = context.build(records, sites, '2026-08', ['C151', 'N151']);
+  assert.deepEqual(Array.from(rows[0]), ['時間戳記', '保全員姓名', '服務案場', '值班哨點', '班別', '上(下)班']);
+  assert.equal(rows.length, 4);
+  assert.deepEqual(Array.from(rows[1]), ['2026-08-31 06:31:00', '乙', '洋基(美光廠)', '', '早班', '上班']);
+  assert.deepEqual(Array.from(rows[2]), ['2026-08-31 18:31:00', '甲', '洋基(美光廠)', '東哨D2', '晚班', '上班']);
+  assert.deepEqual(Array.from(rows[3]), ['2026-09-01 07:01:00', '甲', '洋基(美光廠)', '東哨D2', '晚班', '下班']);
+});
+
+test('月度報表只在指定月份雲端資料完整時返回紀錄', async () => {
+  const calls = [];
+  const notices = [];
+  const context = {
+    loadAnalysisRecords: async (days, endDate) => { calls.push([days, endDate]); return {complete:false,records:[{empId:'1'}]}; },
+    localDateKey: date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`,
+    showToast: message => notices.push(message),
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'loadMonthlyReportRecords')}; this.load = loadMonthlyReportRecords;`, context);
+  assert.equal(await context.load('2026-08'), null);
+  assert.deepEqual(calls, [[32, '2026-09-01']]);
+  assert.match(notices[0], /雲端紀錄未完整載入/);
+  context.loadAnalysisRecords = async () => ({complete:true,records:[{empId:'1'}]});
+  assert.equal((await context.load('2026-08'))[0].empId, '1');
+});
+
+test('管理員近期雲端讀取失敗時保留本機紀錄並明示未確認', async () => {
+  const status = {textContent:''};
+  const context = {
+    $: id => id === 'record-cloud-status' ? status : null,
+    today: () => '2026-10-07',
+    ADMIN_UNLOCKED: true,
+    _recordSyncGeneration: 0,
+    localRecs: [{timestamp:'local',date:'2026-10-07'}],
+    loadAnalysisRecords: async () => ({complete:false,records:[]}),
+    mergeRecordsByTimestamp: () => {throw Error('不應合併')},
+    saveRecs: () => {throw Error('不應覆寫')},
+    loadRecords: () => {throw Error('不應刷新')},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'syncRecentAdminRecords')}; this.sync = syncRecentAdminRecords;`, context);
+  await context.sync();
+  assert.deepEqual(context.localRecs, [{timestamp:'local',date:'2026-10-07'}]);
+  assert.match(status.textContent, /雲端紀錄未確認/);
+});
+
+test('恢復連線後背景補傳 Sheets 與 Firebase，重入不會重複送出', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let sheets = 0, firebase = 0;
+  const context = {
+    navigator: {onLine:true},
+    SCRIPT_URL: 'test-url',
+    IS_DEMO: false,
+    FB_DB: {},
+    _pendingSyncRunning: false,
+    getPendingRecs: () => [{timestamp:'one'}],
+    getFbPendingRecs: () => [{timestamp:'one'}],
+    uploadRec: async () => {sheets++; await gate; return true;},
+    retryFirebaseSync: async () => {firebase++;},
+    updateSyncStatusBar: () => {},
+    updateFbStatusBar: () => {},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'runPendingSync')}; this.run = runPendingSync;`, context);
+  const first = context.run();
+  await context.run();
+  assert.equal(sheets, 1);
+  release();
+  await first;
+  assert.equal(firebase, 1);
+  assert.equal(context._pendingSyncRunning, false);
+});
+
 function extractFunction(source, name) {
   const functionStart = source.indexOf(`function ${name}(`);
   assert.notEqual(functionStart, -1, `找不到 ${name}`);
@@ -106,6 +187,23 @@ test('加入桌面僅由打卡說明引導，頁面不保留底部安裝浮條',
   assert.doesNotMatch(inlineScript, /beforeinstallprompt|pwaBannerTimer|dismissPWA/);
   assert.match(html, /onclick="replayGuide\(\)"[^>]*>查看打卡說明/);
   assert.match(html, /可選擇加入手機桌面/);
+});
+
+test('幹部首頁異常提醒只統計自己負責案場', () => {
+  const banner={style:{}}, label={textContent:''};
+  const context={
+    CURRENT_ROLE:'supervisor',CURRENT_SUPERVISOR:{sites:['A058'],viewAll:false},ADMIN_UNLOCKED:true,
+    localRecs:[
+      {date:'2026-10-04',empId:'1001',type:'上班',siteId:'A058'},
+      {date:'2026-10-04',empId:'2002',type:'上班',siteId:'B002'},
+      {date:'2026-10-04',empId:'3003',type:'上班'},
+    ],
+    today:()=> '2026-10-04',
+    $:id=>id==='anomaly-banner'?banner:label,
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'getAnalysisSiteScope')}; ${extractFunction(inlineScript,'filterAnalysisRecords')}; ${extractFunction(inlineScript,'getSupSiteIds')}; ${extractFunction(inlineScript,'filterRecsBySup')}; ${extractFunction(inlineScript,'updateAnomalyBanner')}; this.run=updateAnomalyBanner;`,context);
+  context.run();
+  assert.match(label.textContent,/1 筆異常/);
 });
 
 test('新裝置雲端登入資料讀取失敗時不可誤開初始設定', async () => {
@@ -274,9 +372,10 @@ test('後台分類選單可由鍵盤聚焦與啟動', () => {
 test('後台首頁有清楚的今日工作引導且快捷入口不與清單重複', () => {
   const menu = html.match(/<div id="admin-menu">([\s\S]*?)<\/div><!-- \/#admin-menu -->/)[1];
   assert.match(menu, /class="admin-menu-intro"/);
-  assert.match(menu, /class="admin-quick-grid"[^>]*aria-label="今日常用操作"/);
+  assert.match(menu, /class="admin-quick-grid admin-home-only"[^>]*aria-label="今日常用操作"/);
+  assert.match(menu, /id="supervisor-home"/);
   for(const target of ['daily-actions','records','site-health']){
-    assert.equal((menu.match(new RegExp(`showSub\\('${target}'`, 'g'))||[]).length,1);
+    assert.equal((menu.match(new RegExp(`showSub\\('${target}'`, 'g'))||[]).length,2);
   }
   assert.match(menu, /class="admin-menu-section admin-only"/);
 });
@@ -773,7 +872,7 @@ test('代班成功提示須在本機紀錄寫入後才出現', () => {
 });
 
 test('後台紀錄應標示目前是本機已同步資料', () => {
-  assert.match(extractFunction(inlineScript, 'loadRecords'), /本機現有紀錄（較早資料請查詢 Sheets）/);
+  assert.match(extractFunction(inlineScript, 'loadRecords'), /已取得紀錄（雲端狀態見下方；較早資料可查詢 Sheets）/);
 });
 
 test('Apps Script 寫入完成後必須釋放文件鎖', () => {
@@ -859,9 +958,11 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.18');
+  assert.equal(notes[0].version, 'v1.4.20');
+  assert.match(notes[0].changes.join(' '), /雲端.*同步|同步.*雲端/);
+  assert.match(notes[0].changes.join(' '), /洋基.*出勤表/);
   assert.equal(notes[0].date, '2026.10');
-  assert.ok(notes[0].changes.some(change => change.includes('浮條')));
+  assert.ok(notes.find(note => note.version==='v1.4.19').changes.some(change => change.includes('幹部工作台')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
 });
 

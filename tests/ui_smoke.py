@@ -93,11 +93,39 @@ def verify_login_layout_on_short_phone(browser):
     assert box["y"] >= 12 and box["y"] + box["height"] <= 556, "短螢幕登入卡片應完整顯示"
     page.close()
 
+
+def verify_supervisor_home(browser):
+    page = new_test_page(browser, {"width": 390, "height": 844})
+    page.add_init_script("""
+      localStorage.setItem('guide_done', '1');
+      localStorage.setItem('supervisors', JSON.stringify([{
+        empId: '7001', name: '測試幹部', title: '主任', active: true,
+        sites: ['A058'], permissions: [], viewAll: false
+      }]));
+    """)
+    page.goto(BASE_URL, wait_until="domcontentloaded")
+    stub_backend_sync(page)
+    page.locator("#tab-admin").click()
+    page.locator("#role-supervisor").click()
+    page.locator("#sup-emp-input").fill("7001")
+    page.locator("#login-submit-btn").click()
+    assert page.locator("#supervisor-home").is_visible()
+    assert not page.locator("#page-checkin").is_visible(), "進入後台後打卡首頁不可佔用畫面"
+    assert "測試幹部" in page.locator("#supervisor-home-title").inner_text()
+    assert "1 個案場" in page.locator("#supervisor-home-scope").inner_text()
+    assert page.locator("#supervisor-home").get_by_role("button").count() == 3
+    assert not page.locator("#sub-records").is_visible()
+    assert not page.locator("#admin-extra-menu .admin-menu-section").first.is_visible()
+    page.locator("#admin-extra-menu summary").click()
+    assert page.locator("#admin-extra-menu .admin-menu-section").first.is_visible()
+    page.close()
+
 with sync_playwright() as playwright:
     import shutil
     browser = playwright.chromium.launch(headless=True, executable_path=shutil.which("chromium"))
     verify_admin_entry_over_overlays(browser)
     verify_login_layout_on_short_phone(browser)
+    verify_supervisor_home(browser)
     verify_viewport(browser, {"width": 390, "height": 844})
     verify_viewport(browser, {"width": 1440, "height": 900})
     browser.close()
