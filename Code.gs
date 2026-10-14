@@ -127,17 +127,17 @@ function writePunch(params) {
   // 第一次使用時自動建立工作表＋標題列
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_RECORDS);
-    sheet.appendRow(['員工編號', '姓名', '打卡類型', '日期', '時間', 'Timestamp', '案場', '原始時間', '原始Timestamp', '修改原因', '修改時間', '修改者']);
+    sheet.appendRow(['員工編號', '姓名', '打卡類型', '日期', '時間', 'Timestamp', '案場', '原始時間', '原始Timestamp', '修改原因', '修改時間', '修改者', '值班哨點']);
     sheet.setFrozenRows(1);
     // 標題列樣式
-    sheet.getRange(1, 1, 1, 12)
+    sheet.getRange(1, 1, 1, 13)
       .setBackground('#1a73e8')
       .setFontColor('#ffffff')
       .setFontWeight('bold');
-    sheet.setColumnWidths(1, 12, 130);
+    sheet.setColumnWidths(1, 13, 130);
   }
 
-  const headers = ['員工編號', '姓名', '打卡類型', '日期', '時間', 'Timestamp', '案場', '原始時間', '原始Timestamp', '修改原因', '修改時間', '修改者'];
+  const headers = ['員工編號', '姓名', '打卡類型', '日期', '時間', 'Timestamp', '案場', '原始時間', '原始Timestamp', '修改原因', '修改時間', '修改者', '值班哨點'];
   if (sheet.getLastColumn() < headers.length) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
   const timestamp = String(params.timestamp || new Date().toISOString());
@@ -146,7 +146,7 @@ function writePunch(params) {
   if (originalTimestamp && dataRows > 0) {
     const original = sheet.getRange(2, 6, dataRows, 1).createTextFinder(originalTimestamp).matchEntireCell(true).findNext();
     if (original) {
-      sheet.getRange(original.getRow(), 1, 1, 12).setValues([[params.empId||'', params.name||'', params.type||'', params.date||'', params.time||'', timestamp, params.siteId||'', params.originalTime||'', originalTimestamp, params.correctionReason||'', params.correctedAt||new Date().toISOString(), params.correctedBy||'']]);
+      sheet.getRange(original.getRow(), 1, 1, 13).setValues([[params.empId||'', params.name||'', params.type||'', params.date||'', params.time||'', timestamp, params.siteId||'', params.originalTime||'', originalTimestamp, params.correctionReason||'', params.correctedAt||new Date().toISOString(), params.correctedBy||'', params.postName||'']]);
       return { status: 'ok', corrected: true };
     }
   }
@@ -158,7 +158,7 @@ function writePunch(params) {
     if (duplicate) return { status: 'ok', duplicate: true };
   }
 
-  sheet.appendRow([params.empId||'', params.name||'', params.type||'', params.date||'', params.time||'', timestamp, params.siteId||'', params.originalTime||'', originalTimestamp, params.correctionReason||'', params.correctedAt||'', params.correctedBy||'']);
+  sheet.appendRow([params.empId||'', params.name||'', params.type||'', params.date||'', params.time||'', timestamp, params.siteId||'', params.originalTime||'', originalTimestamp, params.correctionReason||'', params.correctedAt||'', params.correctedBy||'', params.postName||'']);
   return { status: 'ok', duplicate: false };
   } finally {
     lock.releaseLock();
@@ -192,7 +192,8 @@ function getRecords(yearMonth) {
         originalTimestamp: String(row[8] || '').trim() || null,
         correctionReason: String(row[9] || '').trim() || null,
         correctedAt: String(row[10] || '').trim() || null,
-        correctedBy: String(row[11] || '').trim() || null
+        correctedBy: String(row[11] || '').trim() || null,
+        postName: String(row[12] || '').trim() || null
       });
     }
   }

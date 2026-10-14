@@ -120,12 +120,48 @@ def verify_supervisor_home(browser):
     assert page.locator("#admin-extra-menu .admin-menu-section").first.is_visible()
     page.close()
 
+
+def verify_yangji_post_selection(browser):
+    page = new_test_page(browser, {"width": 390, "height": 844})
+    page.add_init_script("""
+      localStorage.setItem('guide_done', '1');
+      localStorage.setItem('employees', JSON.stringify([{id:'70000001', name:'測試人員'}]));
+      localStorage.setItem('sites_catalog_version', '2026-09-10');
+      localStorage.setItem('sites', JSON.stringify([
+        {id:'C151', name:'洋基美光－早', active:true},
+        {id:'A001', name:'一般案場', active:true}
+      ]));
+    """)
+    page.goto(BASE_URL, wait_until="domcontentloaded")
+    page.evaluate("""() => {
+      CURRENT_SITE_ID = 'C151'; currentId = '70000001';
+      fetchClientIP = async () => null;
+      uploadToFirebase = () => {};
+      SCRIPT_URL = ''; IS_DEMO = true;
+      doPunch('上班');
+    }""")
+    page.locator("#yangji-post-modal.show").wait_for()
+    assert page.locator("#yangji-post-options").get_by_role("button", name="東哨D2").count() == 1
+    page.locator("#yangji-post-options").get_by_role("button", name="東哨D2").click()
+    page.wait_for_function("localRecs.length === 1")
+    assert page.evaluate("localRecs[0].postName") == "東哨D2"
+
+    page.evaluate("""() => {
+      CURRENT_SITE_ID = 'A001';
+      doPunch('下班');
+    }""")
+    page.wait_for_function("localRecs.length === 2")
+    assert not page.locator("#yangji-post-modal").evaluate("el => el.classList.contains('show')")
+    assert page.evaluate("localRecs[0].postName") is None
+    page.close()
+
 with sync_playwright() as playwright:
     import shutil
     browser = playwright.chromium.launch(headless=True, executable_path=shutil.which("chromium"))
     verify_admin_entry_over_overlays(browser)
     verify_login_layout_on_short_phone(browser)
     verify_supervisor_home(browser)
+    verify_yangji_post_selection(browser)
     verify_viewport(browser, {"width": 390, "height": 844})
     verify_viewport(browser, {"width": 1440, "height": 900})
     browser.close()

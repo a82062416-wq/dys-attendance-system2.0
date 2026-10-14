@@ -31,6 +31,20 @@ test('洋基出勤列保留六欄格式，晚班跨日歸上班月份，舊紀�
   assert.deepEqual(Array.from(rows[3]), ['2026-09-01 07:01:00', '甲', '洋基(美光廠)', '東哨D2', '晚班', '下班']);
 });
 
+test('洋基早晚班只提供各自可選的哨點，其他案場不要求選擇', () => {
+  const context = {};
+  vm.runInNewContext(`${extractFunction(inlineScript, 'isYangjiReportSite')}; ${extractFunction(inlineScript, 'getYangjiPostOptions')}; this.getOptions = getYangjiPostOptions;`, context);
+  assert.deepEqual(
+    Array.from(context.getOptions({name:'洋基美光－早'})),
+    ['工務所E','東門哨A2','西南哨A','東哨D2'],
+  );
+  assert.deepEqual(
+    Array.from(context.getOptions({name:'洋基美光－晚'})),
+    ['工務所E','東門哨A2','西南哨A','東哨D2','管制哨C'],
+  );
+  assert.deepEqual(Array.from(context.getOptions({name:'一般案場'})), []);
+});
+
 test('月度報表只在指定月份雲端資料完整時返回紀錄', async () => {
   const calls = [];
   const notices = [];
@@ -602,7 +616,7 @@ test('Apps Script 對同一 timestamp 僅新增一次打卡資料', () => {
   const rows = [];
   const sheet = {
     getLastRow: () => rows.length + 1,
-    getLastColumn: () => 12,
+    getLastColumn: () => 13,
     getRange: () => ({
       createTextFinder: timestamp => ({
         matchEntireCell: () => ({ findNext: () => rows.some(row => row[5] === timestamp) ? { row: 2 } : null }),
@@ -615,12 +629,13 @@ test('Apps Script 對同一 timestamp 僅新增一次打卡資料', () => {
     LockService: { getDocumentLock: () => ({ waitLock() {}, releaseLock() {} }) },
   };
   vm.runInNewContext(`${codeGs}; this.run = writePunch;`, context);
-  const punch = { empId: '10000001', name: '測試員工', type: '上班', date: '2026-09-10', time: '08:00', timestamp: 'unique-1' };
+  const punch = { empId: '10000001', name: '測試員工', type: '上班', date: '2026-09-10', time: '08:00', timestamp: 'unique-1', postName: '東哨D2' };
   const first = context.run(punch);
   const second = context.run(punch);
   assert.equal(first.status, 'ok');
   assert.equal(second.duplicate, true);
   assert.equal(rows.length, 1);
+  assert.equal(rows[0][12], '東哨D2');
 });
 
 test('員工編號查詢僅在姓名與手機末四碼都相符時回傳編號', () => {
@@ -880,7 +895,7 @@ test('Apps Script 寫入完成後必須釋放文件鎖', () => {
   let released = false;
   const sheet = {
     getLastRow: () => rows.length + 1,
-    getLastColumn: () => 12,
+    getLastColumn: () => 13,
     getRange: () => ({ createTextFinder: () => ({ matchEntireCell: () => ({ findNext: () => null }) }) }),
     appendRow: row => rows.push(row),
   };
@@ -958,9 +973,9 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.20');
-  assert.match(notes[0].changes.join(' '), /雲端.*同步|同步.*雲端/);
-  assert.match(notes[0].changes.join(' '), /洋基.*出勤表/);
+  assert.equal(notes[0].version, 'v1.4.21');
+  assert.match(notes[0].changes.join(' '), /Firebase.*Google Sheets/);
+  assert.match(notes[0].changes.join(' '), /洋基.*哨點/);
   assert.equal(notes[0].date, '2026.10');
   assert.ok(notes.find(note => note.version==='v1.4.19').changes.some(change => change.includes('幹部工作台')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
