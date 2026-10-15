@@ -77,6 +77,7 @@
       const siteId = String(record.siteId ?? '').trim();
       const postName = String(record.postName ?? '').trim();
       return { id, index, epoch, empId, siteId, postName, type: record.type,
+        isSubstitute: record.isSubstitute !== undefined && record.isSubstitute !== false,
         key: JSON.stringify([empId, siteId, postName]) };
     }).sort((a, b) => (a.epoch ?? Infinity) - (b.epoch ?? Infinity) || a.index - b.index);
     const simultaneousTypes = new Map();
@@ -98,6 +99,7 @@
       return {
         dutyId: `duty:${encodeURIComponent(first.key)}:${encodeURIComponent(first.id)}`,
         status, empId: first.empId || null, siteId: first.siteId || null,
+        ...(first.isSubstitute ? { isSubstitute: true } : {}),
         postName: first.postName || null, sourceRecordIds,
         startedAt, endedAt,
         eventAt: first.epoch !== null ? new Date(first.epoch).toISOString() : null,
@@ -232,5 +234,81 @@
     };
   }
 
-  return { buildDutyPairs, buildDutySummary, predictDutyEnd };
+  /**
+   * Advisory only. Call after the incoming clock-in has been saved successfully.
+   * Pass a complete recent duty snapshot; an incomplete snapshot cannot prove
+   * that another overlapping duty is absent. No records or storage are changed.
+   * Returns null when uncertain; seenKeys is caller-owned display state.
+   */
+  function buildHandoverReminder(duties, incomingRecord, options = {}) {
+    if (!Array.isArray(duties) || !incomingRecord || !options ||
+        options.clockInSucceeded !== true || incomingRecord.type !== '上班') return null;
+    const minGapHours = options.minGapHours === undefined ? 4 : options.minGapHours;
+    const maxGapHours = options.maxGapHours === undefined ? 16 : options.maxGapHours;
+    if (!Number.isFinite(minGapHours) || !Number.isFinite(maxGapHours) ||
+        minGapHours <= 0 || maxGapHours < minGapHours || maxGapHours >= 24) return null;
+    const timeZone = options.timeZone || 'Asia/Taipei';
+    const identity = value => typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '';
+    const substituteUncertain = value => value.isSubstitute !== undefined && value.isSubstitute !== false;
+    const empId = identity(incomingRecord.empId);
+    const siteId = identity(incomingRecord.siteId);
+    const postName = identity(incomingRecord.postName);
+    if (!empId || !siteId || !postName || substituteUncertain(incomingRecord) || /^TMP_/i.test(empId)) return null;
+    let incomingAt;
+    try { incomingAt = parseEventTime(incomingRecord, timeZone); }
+    catch (_) { return null; }
+    if (incomingAt === null) return null;
+    const candidates = [];
+    for (const duty of duties) {
+      if (!duty || typeof duty !== 'object') return null;
+      const dutySite = identity(duty.siteId);
+      const dutyPost = identity(duty.postName);
+      if ((dutySite && dutySite !== siteId) || (dutyPost && dutyPost !== postName)) continue;
+      const dutyEmp = identity(duty.empId);
+      if (!dutySite || !dutyPost || !dutyEmp || !identity(duty.dutyId) ||
+          !Array.isArray(duty.sourceRecordIds) || !duty.sourceRecordIds.length ||
+          duty.sourceRecordIds.some(id => !identity(id))) return null;
+      let start;
+      let end;
+      try {
+        start = duty.startedAt ? parseEventTime({ timestamp: duty.startedAt }, timeZone) : null;
+        end = duty.endedAt ? parseEventTime({ timestamp: duty.endedAt }, timeZone) : null;
+      } catch (_) { return null; }
+      if (start === null) return null;
+      if (duty.status === 'complete' && end !== null && end > start && end <= incomingAt) continue;
+      // The newly saved incoming duty may already be in the snapshot.
+      if (dutyEmp === empId && start === incomingAt && duty.status === 'missing_out' &&
+          duty.endedAt === null && !substituteUncertain(duty)) continue;
+      // Complete-but-overlapping, duplicate and ambiguous duties all prevent
+      // choosing a previous colleague, even if another candidate looks valid.
+      if (duty.status !== 'missing_out' || duty.endedAt !== null ||
+          substituteUncertain(duty) || /^TMP_/i.test(dutyEmp) || dutyEmp === empId ||
+          duty.sourceRecordIds.length !== 1 || start >= incomingAt) return null;
+      candidates.push(start);
+    }
+    if (candidates.length !== 1) return null;
+    const gap = incomingAt - candidates[0];
+    if (gap < minGapHours * 60 * MINUTE || gap > maxGapHours * 60 * MINUTE) return null;
+
+    // A compact display-deduplication digest, not an authorization token.
+    // Hash only the recipient's own clock-in and scope, never another duty's
+    // employee ID, event ID, name or attendance times.
+    const input = JSON.stringify([siteId, postName, empId, incomingAt]);
+    let first = 2166136261;
+    let second = 3339675911;
+    for (let index = 0; index < input.length; index += 1) {
+      first = Math.imul(first ^ input.charCodeAt(index), 16777619);
+      second = Math.imul(second ^ input.charCodeAt(index), 2246822519);
+    }
+    const key = `handover:v1:${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`;
+    const seenKeys = options.seenKeys;
+    if ((Array.isArray(seenKeys) && seenKeys.includes(key)) ||
+        (seenKeys && typeof seenKeys.has === 'function' && seenKeys.has(key))) return null;
+    return {
+      key, title: '交接班貼心提醒',
+      message: '交接勤務時，請順便提醒上一班同仁記得完成下班打卡。\n感謝同仁互相協助！',
+    };
+  }
+
+  return { buildDutyPairs, buildDutySummary, predictDutyEnd, buildHandoverReminder };
 });

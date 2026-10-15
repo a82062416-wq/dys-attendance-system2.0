@@ -228,3 +228,135 @@ test('勤務摘要只統計有真實上班與下班事件的完整勤務', () =>
     medianMinutes: 540,
   });
 });
+
+const handoverOptions = { timeZone: 'Asia/Taipei', clockInSucceeded: true };
+
+function incoming(extra = {}) {
+  return event('incoming', '上班', '2026-10-15', '20:00', { empId: 'E2', ...extra });
+}
+
+function previous(extra = {}) {
+  return pair([event('previous', '上班', '2026-10-15', '08:00', extra)])[0];
+}
+
+test('交接提醒是瀏覽器與 Node 共用的純函式', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../smart-attendance-v4.js'), 'utf8');
+  const context = {};
+  vm.runInNewContext(source, context);
+  assert.equal(typeof core.buildHandoverReminder, 'function');
+  assert.equal(typeof context.SmartAttendanceV4.buildHandoverReminder, 'function');
+  const records = [event('previous', '上班', '2026-10-15', '08:00'), incoming()];
+  const duties = pair(records);
+  const snapshot = JSON.stringify({ records, duties, handoverOptions });
+  const reminder = core.buildHandoverReminder(duties, records[1], handoverOptions);
+  const browserReminder = context.SmartAttendanceV4.buildHandoverReminder(duties, records[1], handoverOptions);
+  assert.deepEqual(JSON.parse(JSON.stringify(browserReminder)), reminder);
+  assert.equal(JSON.stringify({ records, duties, handoverOptions }), snapshot);
+});
+
+test('同案場同哨點唯一未下班勤務可提醒，輸出只含不透明鍵與固定文字', () => {
+  const duty = previous({ empId: 'PRIVATE_EMPLOYEE', name: '秘密完整姓名', ip: '192.0.2.1' });
+  const reminder = core.buildHandoverReminder([duty], incoming(), handoverOptions);
+  assert.ok(reminder);
+  assert.deepEqual(Object.keys(reminder).sort(), ['key', 'message', 'title']);
+  assert.equal(reminder.title, '交接班貼心提醒');
+  assert.equal(reminder.message, '交接勤務時，請順便提醒上一班同仁記得完成下班打卡。\n感謝同仁互相協助！');
+  assert.match(reminder.key, /^handover:v1:[a-f0-9]+$/);
+  for (const privateValue of ['PRIVATE_EMPLOYEE', '秘密完整姓名', '192.0.2.1', duty.dutyId,
+    duty.startedAt, '08:00', '2026-10-15', 'previous', 'S1', 'P1']) {
+    assert.ok(!JSON.stringify(reminder).includes(privateValue), privateValue);
+  }
+});
+
+test('交接提醒只允許明確上班成功之後的呼叫', () => {
+  for (const settings of [{}, { clockInSucceeded: false }, { clockInSucceeded: 'true' }]) {
+    assert.equal(core.buildHandoverReminder([previous()], incoming(), settings), null);
+  }
+  assert.equal(core.buildHandoverReminder([previous()], incoming({ type: '下班' }), handoverOptions), null);
+});
+
+test('不同案場或哨點不構成交接，也不干擾唯一的同組候選', () => {
+  const wrongSite = previous({ siteId: 'S2' });
+  const wrongPost = previous({ postName: 'P2' });
+  assert.equal(core.buildHandoverReminder([wrongSite, wrongPost], incoming(), handoverOptions), null);
+  assert.ok(core.buildHandoverReminder([wrongSite, wrongPost, previous()], incoming(), handoverOptions));
+});
+
+test('上一班已有下班卡一律不提醒，包括尚未到接班時間的完整勤務', () => {
+  for (const outTime of ['19:59', '20:00', '20:01']) {
+    const duties = pair([
+      event('previous', '上班', '2026-10-15', '08:00'),
+      event('out', '下班', '2026-10-15', outTime),
+    ]);
+    assert.equal(core.buildHandoverReminder(duties, incoming(), handoverOptions), null);
+  }
+});
+
+test('資料不足、無法辨認案場哨點身分或時間時不猜測交接對象', () => {
+  for (const value of [null, {}, [], [null], [previous({ siteId: null })],
+    [previous({ postName: '' })], [previous({ empId: '' })],
+    [{ ...previous(), startedAt: null }], [{ ...previous(), sourceRecordIds: [] }],
+    [{ ...previous(), sourceRecordIds: [null] }], [{ ...previous(), dutyId: {} }],
+    [{ ...previous(), status: 'ambiguous' }], [{ ...previous(), status: 'missing_in' }],
+    [{ ...previous(), status: 'duplicate' }], [{ ...previous(), endedAt: 'invalid' }]]) {
+    assert.equal(core.buildHandoverReminder(value, incoming(), handoverOptions), null);
+  }
+  for (const extra of [{ siteId: null }, { postName: '' }, { empId: '' },
+    { time: 'invalid' }, { date: '2026-02-30' }]) {
+    assert.equal(core.buildHandoverReminder([previous()], incoming(extra), handoverOptions), null);
+  }
+});
+
+test('多人同時值勤或多個上一班候選時略過，不挑最近或任一同仁', () => {
+  const first = previous();
+  const other = previous({ empId: 'E3' });
+  const recentlyStarted = pair([event('recent', '上班', '2026-10-15', '19:30', { empId: 'E3' })])[0];
+  const overlappingComplete = pair([
+    event('third', '上班', '2026-10-15', '09:00', { empId: 'E3' }),
+    event('third-out', '下班', '2026-10-15', '21:00', { empId: 'E3' }),
+  ])[0];
+  for (const duties of [[first, other], [first, first], [first, recentlyStarted],
+    [first, overlappingComplete], [first, { ...other, status: 'ambiguous' }]]) {
+    assert.equal(core.buildHandoverReminder(duties, incoming(), handoverOptions), null);
+  }
+  assert.equal(core.buildHandoverReminder([previous({ empId: 'E2' })], incoming(), handoverOptions), null);
+});
+
+test('代班不明與臨時身分不建立交接提醒，勤務配對不遺失代班旗標', () => {
+  for (const extra of [{ isSubstitute: true }, { isSubstitute: 'unknown' }, { empId: 'TMP_ABCDEF12' }]) {
+    assert.equal(core.buildHandoverReminder([previous(extra)], incoming(), handoverOptions), null);
+    assert.equal(core.buildHandoverReminder([previous()], incoming(extra), handoverOptions), null);
+  }
+  assert.equal(core.buildHandoverReminder([{ ...previous(), isSubstitute: true }], incoming(), handoverOptions), null);
+});
+
+test('交接預設僅接受相隔 4 至 16 小時，跨日可用且 24 小時略過', () => {
+  for (const [time, allowed] of [['11:59', false], ['12:00', true], ['20:00', true]]) {
+    const reminder = core.buildHandoverReminder([previous()], incoming({ time }), handoverOptions);
+    assert.equal(Boolean(reminder), allowed, time);
+  }
+  for (const [date, time, allowed] of [
+    ['2026-10-16', '00:00', true], ['2026-10-16', '00:01', false],
+    ['2026-10-16', '08:00', false], ['2026-10-15', '08:00', false],
+    ['2026-10-15', '07:59', false],
+  ]) {
+    assert.equal(Boolean(core.buildHandoverReminder([previous()], incoming({ date, time }), handoverOptions)), allowed);
+  }
+  assert.equal(core.buildHandoverReminder([previous()], incoming(), { ...handoverOptions, maxGapHours: 10 }), null);
+  assert.equal(core.buildHandoverReminder([previous()], incoming(), { ...handoverOptions, minGapHours: 13 }), null);
+  for (const extra of [{ minGapHours: -1 }, { minGapHours: 0 }, { maxGapHours: 24 },
+    { maxGapHours: Infinity }, { minGapHours: 15, maxGapHours: 10 }, { timeZone: 'invalid' }]) {
+    assert.equal(core.buildHandoverReminder([previous()], incoming(), { ...handoverOptions, ...extra }), null);
+  }
+});
+
+test('同一交接的去重鍵不受輸入順序影響，可由已顯示鍵略過', () => {
+  const duties = [previous(), previous({ siteId: 'S2' })];
+  const reminder = core.buildHandoverReminder(duties, incoming(), handoverOptions);
+  assert.ok(reminder);
+  assert.deepEqual(core.buildHandoverReminder(duties.slice().reverse(), incoming({ eventId: 'retry' }), handoverOptions), reminder);
+  assert.equal(core.buildHandoverReminder(duties, incoming(), { ...handoverOptions, seenKeys: [reminder.key] }), null);
+  assert.equal(core.buildHandoverReminder(duties, incoming(), { ...handoverOptions, seenKeys: new Set([reminder.key]) }), null);
+  const next = core.buildHandoverReminder([previous()], incoming({ time: '21:00' }), handoverOptions);
+  assert.notEqual(next.key, reminder.key);
+});
