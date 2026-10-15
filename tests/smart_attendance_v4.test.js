@@ -113,6 +113,71 @@ test('兩卡之間有未知班別事件時不跨過衝突自動配對', () => {
   assert.equal(new Set(duties.flatMap(duty => duty.sourceRecordIds)).size, 3);
 });
 
+test('未知班別與上下班同一瞬間時，各種輸入順序都必須待確認', () => {
+  for (const unknownTime of ['08:00', '17:00']) {
+    const records = [
+      event('in', '上班', '2026-10-15', '08:00'),
+      event('out', '下班', '2026-10-15', '17:00'),
+      event('unknown', '換班', '2026-10-15', unknownTime),
+    ];
+    for (const order of [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]) {
+      const duties = pair(order.map(index => records[index]));
+      assert.ok(duties.every(duty => duty.status === 'ambiguous'), `${unknownTime}: ${order}`);
+      assert.equal(duties.flatMap(duty => duty.sourceRecordIds).length, 3);
+    }
+  }
+});
+
+test('ISO 不可能日期不可經 Date.parse 正規化成完整勤務', () => {
+  for (const timestamp of ['2026-02-30T08:00:00+08:00', '2026-02-30T00:00:00Z']) {
+    const duties = pair([
+      event('invalid', '上班', null, null, { timestamp }),
+      event('out', '下班', '2026-03-02', '17:00'),
+    ]);
+    assert.equal(duties.find(duty => duty.sourceRecordIds.includes('invalid')).eventAt, null);
+    assert.ok(duties.every(duty => duty.status !== 'complete'));
+  }
+});
+
+test('同組無效時間無法定位時不得跨過資料配對，其他組仍可配對', () => {
+  const duties = pair([
+    event('in', '上班', '2026-10-15', '08:00'),
+    event('invalid', '換班', '2026-10-15', 'invalid'),
+    event('out', '下班', '2026-10-15', '17:00'),
+    event('other-in', '上班', '2026-10-15', '08:00', { empId: 'E2' }),
+    event('other-out', '下班', '2026-10-15', '17:00', { empId: 'E2' }),
+  ]);
+  assert.ok(duties.filter(duty => duty.empId === 'E1').every(duty => duty.status === 'ambiguous'));
+  assert.deepEqual(duties.filter(duty => duty.status === 'complete').map(duty => duty.sourceRecordIds),
+    [['other-in', 'other-out']]);
+});
+
+test('原始 ID 與自動去重字尾重疊時，每張來源卡仍有唯一 ID', () => {
+  const duties = pair([
+    event('a', '上班', '2026-10-15', '08:00'),
+    event('a#2', '下班', '2026-10-15', '17:00'),
+    event('a', '上班', '2026-10-16', '08:00'),
+  ]);
+  const sourceIds = duties.flatMap(duty => duty.sourceRecordIds);
+  assert.equal(sourceIds.length, 3);
+  assert.equal(new Set(sourceIds).size, 3);
+  assert.equal(new Set(duties.map(duty => duty.dutyId)).size, duties.length);
+});
+
+test('預測不能使用目標上班後才結束的勤務', () => {
+  const history = pair([
+    event('past-in', '上班', '2026-10-08', '08:00'),
+    event('past-out', '下班', '2026-10-08', '17:00'),
+    event('future-in', '上班', '2026-10-15', '07:00'),
+    event('future-out', '下班', '2026-10-15', '18:00'),
+  ]);
+  const duty = pair([event('current', '上班', '2026-10-15', '08:00')])[0];
+  const prediction = core.predictDutyEnd(history, duty, options);
+  assert.equal(prediction.sampleSize, 1);
+  assert.equal(prediction.medianMinutes, 540);
+  assert.equal(prediction.predictedEndAt, '2026-10-15T09:00:00.000Z');
+});
+
 test('預測僅使用最近 60 天同條件的完整勤務，以中位數及離散度解釋高可信度', () => {
   const starts = ['2026-10-01', '2026-10-02', '2026-10-05', '2026-10-06', '2026-10-07'];
   const ends = ['17:00', '17:05', '16:55', '17:00', '17:00'];

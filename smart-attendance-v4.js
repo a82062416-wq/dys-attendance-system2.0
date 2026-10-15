@@ -26,6 +26,9 @@
   function parseEventTime(record, timeZone) {
     const timestamp = typeof record.timestamp === 'string' ? record.timestamp.trim() : '';
     if (/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d+)?)?(?:Z|[+-]\d\d:\d\d)$/i.test(timestamp)) {
+      const calendarDate = new Date(`${timestamp.slice(0, 10)}T00:00:00Z`);
+      if (!Number.isFinite(calendarDate.getTime()) ||
+          calendarDate.toISOString().slice(0, 10) !== timestamp.slice(0, 10)) return null;
       const epoch = Date.parse(timestamp);
       return Number.isFinite(epoch) ? epoch : null;
     }
@@ -66,7 +69,8 @@
       if (!record || typeof record !== 'object') throw new TypeError('each record must be an object');
       const rawId = record.eventId ?? record.recordId ?? record.id ?? `index:${index}`;
       let id = String(rawId);
-      if (usedIds.has(id)) id = `${id}#${index}`;
+      let suffix = index;
+      while (usedIds.has(id)) id = `${rawId}#${suffix++}`;
       usedIds.add(id);
       const epoch = parseEventTime(record, timeZone);
       const empId = String(record.empId ?? '').trim();
@@ -76,7 +80,10 @@
         key: JSON.stringify([empId, siteId, postName]) };
     }).sort((a, b) => (a.epoch ?? Infinity) - (b.epoch ?? Infinity) || a.index - b.index);
     const simultaneousTypes = new Map();
+    const invalidTimeGroups = new Set();
     for (const event of events) {
+      // Without a timestamp, this group's event order cannot be established safely.
+      if (event.epoch === null) invalidTimeGroups.add(event.key);
       const key = `${event.key}|${event.epoch}`;
       if (!simultaneousTypes.has(key)) simultaneousTypes.set(key, new Set());
       simultaneousTypes.get(key).add(event.type);
@@ -100,6 +107,10 @@
     }
 
     for (const current of events) {
+      if (invalidTimeGroups.has(current.key)) {
+        result.push(makeDuty('ambiguous', current));
+        continue;
+      }
       if (!current.empId || !current.siteId || !current.postName || current.epoch === null ||
           (current.type !== '上班' && current.type !== '下班')) {
         if (current.empId && current.siteId && current.postName && current.epoch !== null) {
@@ -120,7 +131,7 @@
         groups.set(current.key, state);
       }
       const atSameMoment = simultaneousTypes.get(`${current.key}|${current.epoch}`);
-      if (atSameMoment.has('上班') && atSameMoment.has('下班')) {
+      if (atSameMoment.size > 1) {
         if (state.open) result.push(makeDuty('ambiguous', state.open));
         result.push(makeDuty('ambiguous', current));
         state.open = null;
@@ -194,7 +205,8 @@
       const itemStart = Date.parse(item.startedAt);
       const itemEnd = Date.parse(item.endedAt);
       if (!Number.isFinite(itemStart) || !Number.isFinite(itemEnd) || itemStart >= start ||
-          start - itemStart > 60 * DAY || itemEnd <= itemStart || itemEnd - itemStart > 24 * 60 * MINUTE) return false;
+          itemEnd > start || start - itemStart > 60 * DAY || itemEnd <= itemStart ||
+          itemEnd - itemStart > 24 * 60 * MINUTE) return false;
       const local = partsAt(itemStart, timeZone);
       const minutes = local.hour * 60 + local.minute;
       const weekend = [0, 6].includes(new Date(Date.UTC(local.year, local.month - 1, local.day)).getUTCDay());
