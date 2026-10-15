@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright
 
@@ -9,6 +10,8 @@ BASE_URL = os.environ.get("DYS_TEST_URL", Path(__file__).resolve().parents[1].jo
 
 def new_test_page(browser, viewport):
     page = browser.new_page(viewport=viewport)
+    # 冒煙只存取本機，測試待補傳紀錄不可連上正式 Firebase／Sheets。
+    page.route("**/*", lambda route: route.continue_() if urlsplit(route.request.url).netloc == urlsplit(BASE_URL).netloc else route.abort())
     page.add_init_script("localStorage.setItem('admin_pwd_hash', 'test-only-hash')")
     return page
 
@@ -155,6 +158,59 @@ def verify_yangji_post_selection(browser):
     assert page.evaluate("localRecs[0].postName") is None
     page.close()
 
+
+def verify_local_duty_status_and_handover(browser):
+    page = new_test_page(browser, {"width": 320, "height": 568})
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.add_init_script("""
+      localStorage.setItem('guide_done', '1');
+      localStorage.setItem('last_emp_id', '70000001');
+      localStorage.setItem('employees', JSON.stringify([{id:'70000001',name:'本人同仁'}]));
+      localStorage.setItem('sites_catalog_version', '2026-09-10');
+      localStorage.setItem('sites', JSON.stringify([{id:'A001',name:'一般案場',active:true},{id:'C151',name:'洋基美光－早',active:true}]));
+      localStorage.setItem('local_records', JSON.stringify([
+        {empId:'70000001',siteId:'A001',type:'上班',date:'2026-10-14',time:'20:00:00',timestamp:'2026-10-14T20:00:00+08:00',synced:false,fbSynced:false},
+        {empId:'70000001',siteId:'A001',type:'下班',date:'2026-10-15',time:'04:00:00',timestamp:'2026-10-15T04:00:00+08:00',synced:false,fbSynced:false}
+      ]));
+    """)
+    page.goto(BASE_URL, wait_until="domcontentloaded")
+    assert page.locator("#my-duty-card").count() == 1
+    assert not page.locator("#my-duty-card").is_visible(), "僅還原上次編號不應顯示個人勤務"
+    page.evaluate("() => { currentId='70000001'; confirmId(); }")
+    assert page.locator("#my-duty-card").is_visible()
+    assert "10/14" in page.locator("#my-duty-in").inner_text()
+    assert "10/15" in page.locator("#my-duty-out").inner_text()
+    assert page.locator("#my-duty-status").inner_text() == "已儲存待同步"
+    page.locator("#btn-in").scroll_into_view_if_needed()
+    assert page.locator("#btn-in").is_visible(), "短手機仍可捲動到打卡按鈕"
+    assert page.evaluate("document.querySelector('#change-btn').getBoundingClientRect().top >= document.querySelector('#btn-in').getBoundingClientRect().bottom"), "打卡按鈕不可與換人按鈕重疊"
+    page.evaluate("openDrawer()")
+    assert not page.locator("#my-duty-card").is_visible()
+    assert page.locator("#my-duty-in").inner_text() == ""
+    page.evaluate("""() => {
+      closeDrawer(); currentId='70000001'; confirmId();
+      const incoming={empId:'70000001',siteId:'C151',postName:'東哨D2',type:'上班',date:'2026-10-15',time:'20:00:00',timestamp:'2026-10-15T20:00:00+08:00'};
+      localRecs=[{...incoming,empId:'other',name:'不應公開姓名',time:'08:00:00',timestamp:'2026-10-15T08:00:00+08:00'},incoming];
+      showLocalHandoverReminder(incoming);
+    }""")
+    page.locator("#handover-reminder-modal.show").wait_for()
+    reminder = page.locator("#handover-reminder-modal").inner_text()
+    assert "交接班貼心提醒" in reminder
+    assert "不應公開姓名" not in reminder and "other" not in reminder and "08:00" not in reminder
+    assert page.locator("#handover-reminder-modal").get_by_role("button").count() == 1
+    page.get_by_role("button", name="知道了", exact=True).click()
+    assert not page.locator("#handover-reminder-modal").is_visible()
+    page.evaluate("showLocalHandoverReminder(localRecs[1])")
+    assert not page.locator("#handover-reminder-modal").is_visible()
+    page.evaluate("""() => {
+      CURRENT_SITE_ID=null; IS_DEMO=false; getSites=()=>[{id:'A001',active:true}];
+      window.beforeQrPunch=localRecs.length; doPunch('上班');
+    }""")
+    assert page.evaluate("localRecs.length === beforeQrPunch"), "未掃 QR 時不得新增打卡"
+    assert not page_errors, f"頁面 JavaScript 錯誤：{page_errors}"
+    page.close()
+
 with sync_playwright() as playwright:
     import shutil
     browser = playwright.chromium.launch(headless=True, executable_path=shutil.which("chromium"))
@@ -162,6 +218,7 @@ with sync_playwright() as playwright:
     verify_login_layout_on_short_phone(browser)
     verify_supervisor_home(browser)
     verify_yangji_post_selection(browser)
+    verify_local_duty_status_and_handover(browser)
     verify_viewport(browser, {"width": 390, "height": 844})
     verify_viewport(browser, {"width": 1440, "height": 900})
     browser.close()

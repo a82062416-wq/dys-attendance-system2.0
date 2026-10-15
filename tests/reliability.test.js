@@ -12,6 +12,113 @@ const inlineScript = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>
   .filter(Boolean)
   .at(-1);
 
+const smartAttendance = require('../smart-attendance-v4.js');
+
+function myDutyContext(records = []) {
+  const nodes = Object.fromEntries(['my-duty-card','my-duty-in','my-duty-out','my-duty-status'].map(id => [id,{hidden:true,textContent:''}]));
+  const storage = new Map([['last_emp_id','70000001']]);
+  const context = {
+    SmartAttendanceV4: smartAttendance, localRecs:records, _myDutyEmpId:'70000001',
+    localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},
+    findEmp:id=>id==='70000001'?{id,name:'本人同仁'}:null,
+    $:id=>nodes[id], getSiteById:id=>({id,name:'一般案場'}),
+    getYangjiPostOptions:()=>[], console,
+  };
+  const functions = ['buildMyDutyStatus','updateMyDutyStatus','showLocalHandoverReminder'];
+  vm.runInNewContext(functions.map(name=>extractFunction(inlineScript,name)).join(';'),context);
+  return {context,nodes,storage};
+}
+
+function ownPunch(type,date,time,extra={}) {
+  return {empId:'70000001',siteId:'A001',postName:null,type,date,time,timestamp:`${date}T${time}+08:00`,synced:true,fbSynced:true,...extra};
+}
+
+test('個人勤務卡載入 v4，完整配對正常、跨日與同日多班，只讀本人本機資料',()=>{
+  assert.match(html, /<script src="smart-attendance-v4\.js"><\/script>/);
+  const {context}=myDutyContext();
+  const records=[ownPunch('上班','2026-10-14','20:00:00'),ownPunch('下班','2026-10-15','04:00:00')];
+  const night=context.buildMyDutyStatus(records,'70000001');
+  assert.equal(night.status,'雲端已同步');
+  assert.match(night.clockIn,/10\/14.*20:00/);
+  assert.match(night.clockOut,/10\/15.*04:00/);
+  const latest=context.buildMyDutyStatus([...records,ownPunch('上班','2026-10-15','08:00:00'),ownPunch('下班','2026-10-15','12:00:00'),ownPunch('上班','2026-10-15','16:00:00'),ownPunch('下班','2026-10-15','20:00:00'),ownPunch('上班','2026-10-16','08:00:00',{empId:'other'})],'70000001');
+  assert.match(latest.clockIn,/16:00/);
+  assert.match(latest.clockOut,/20:00/);
+  assert.equal(records[0].postName,null,'不得改寫原始記錄');
+});
+
+test('個人勤務卡待同步與資料待確認不武斷宣稱未打卡，未確認本人時清除個資',()=>{
+  const {context,nodes}=myDutyContext([ownPunch('上班','2026-10-15','08:00:00',{synced:false})]);
+  const pending=context.buildMyDutyStatus(context.localRecs,'70000001');
+  assert.equal(pending.status,'已儲存待同步');
+  assert.doesNotMatch(pending.clockOut,/未打卡|漏打/);
+  assert.equal(context.buildMyDutyStatus([],'70000001').status,'資料待確認');
+  assert.equal(context.buildMyDutyStatus([ownPunch('上班','2026-10-15','08:00:00',{siteId:null})],'70000001').status,'資料待確認');
+  context.updateMyDutyStatus();
+  assert.equal(nodes['my-duty-card'].hidden,false);
+  assert.match(nodes['my-duty-in'].textContent,/08:00/);
+  context._myDutyEmpId='';
+  context.updateMyDutyStatus();
+  assert.equal(nodes['my-duty-card'].hidden,true);
+  assert.equal(nodes['my-duty-in'].textContent,'');
+});
+
+test('只有下班卡或哨點不明時保留本人已存時間並明示資料待確認',()=>{
+  const {context}=myDutyContext();
+  const out=context.buildMyDutyStatus([ownPunch('下班','2026-10-15','17:00:00')],'70000001');
+  assert.equal(out.status,'資料待確認');
+  assert.match(out.clockOut,/17:00/);
+  context.getYangjiPostOptions=()=>['東哨D2'];
+  const ambiguous=context.buildMyDutyStatus([ownPunch('上班','2026-10-15','08:00:00')],'70000001');
+  assert.equal(ambiguous.status,'資料待確認');
+  assert.match(ambiguous.clockIn,/08:00/);
+});
+
+test('交接提醒只用完整本機快照，已下班不提示、顯示去重且不洩露他人資料',()=>{
+  const incoming=ownPunch('上班','2026-10-15','20:00:00',{postName:'東哨D2'});
+  const previous=ownPunch('上班','2026-10-15','08:00:00',{empId:'other',name:'不應公開姓名',postName:'東哨D2'});
+  const {context,nodes,storage}=myDutyContext([previous,incoming]);
+  const classes=new Set();
+  nodes['handover-reminder-modal']={classList:{add:value=>classes.add(value)},setAttribute(){}};
+  nodes['handover-reminder-message']={textContent:''};
+  nodes['handover-reminder-ok']={focus(){}};
+  context.showLocalHandoverReminder(incoming);
+  assert.equal(classes.has('show'),true);
+  assert.doesNotMatch(nodes['handover-reminder-message'].textContent,/不應公開姓名|other|08:00/);
+  assert.equal(JSON.parse(storage.get('smart_attendance_v4_handover_seen')).length,1);
+  classes.clear();
+  context.showLocalHandoverReminder(incoming);
+  assert.equal(classes.size,0);
+  storage.delete('smart_attendance_v4_handover_seen');
+  context.localRecs.push(ownPunch('下班','2026-10-15','19:55:00',{empId:'other',postName:'東哨D2'}));
+  context.showLocalHandoverReminder(incoming);
+  assert.equal(classes.size,0);
+});
+
+test('上班先完成本機寫入與成功畫面，再非阻塞排入交接提醒，原同步順序保持',async()=>{
+  const events=[],tasks=[];
+  const context={
+    localStorage:{getItem:()=> '70000001'},currentId:'',getSites:()=>[],CURRENT_SITE_ID:'A001',IS_DEMO:false,SCRIPT_URL:'test',
+    employees:[{id:'70000001'}],findEmp:()=>({id:'70000001',name:'本人同仁'}),getSiteById:()=>({}),getYangjiPostOptions:()=>[],getYangjiPostSelection:()=>null,
+    localRecs:[],pad:value=>String(value).padStart(2,'0'),fetchClientIP:async()=>null,
+    saveRecs:()=>events.push('saved'),uploadToFirebase:()=>events.push('firebase'),pruneOldRecs:()=>{},
+    $:()=>({disabled:false}),vibratePunch:()=>{},navigator:{onLine:true},showSuccess:()=>events.push('success'),
+    setEmpDisplay:()=>{},updateMyDutyStatus:()=>{},setTimeout:(fn,delay)=>{tasks.push({fn,delay});},
+    showLocalHandoverReminder:rec=>{assert.equal(context.localRecs[0],rec);events.push('reminder');},
+    uploadRec:()=>events.push('sheets'),showToast:()=>{},console,
+  };
+  vm.runInNewContext(extractFunction(inlineScript,'doPunch'),context);
+  await context.doPunch('上班');
+  assert.deepEqual(events,['saved','firebase','success','sheets']);
+  for(const task of tasks) task.fn();
+  assert.equal(events.at(-1),'reminder');
+  assert.ok(tasks.some(task=>task.delay>=3000),'提醒應在成功畫面之後');
+  events.length=0; tasks.length=0; context.localRecs=[];
+  await context.doPunch('下班');
+  for(const task of tasks) task.fn();
+  assert.equal(events.includes('reminder'),false);
+});
+
 test('洋基出勤列保留六欄格式，晚班跨日歸上班月份，舊紀錄哨點留空', () => {
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'isYangjiReportSite')}; ${extractFunction(inlineScript, 'buildYangjiAttendanceRows')}; this.build = buildYangjiAttendanceRows;`, context);

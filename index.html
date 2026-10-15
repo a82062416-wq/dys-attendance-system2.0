@@ -28,6 +28,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="smart-attendance-v4.js"></script>
 <script>
   // 註冊 Service Worker
   if ('serviceWorker' in navigator) {
@@ -162,8 +163,17 @@ body:has(#page-checkin.active) nav{z-index:560}
   margin:0 auto;
   padding: calc(56px + var(--safe-top) + 16px) calc(18px + var(--safe-left)) calc(20px + var(--safe-bottom)) calc(18px + var(--safe-right));
   gap:14px;
-  overflow:hidden;
+  overflow-y:auto;
 }
+.my-duty-card{flex-shrink:0;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--surface);font-size:13px;line-height:1.6}
+.my-duty-card[hidden]{display:none}
+.my-duty-card:not([hidden]) ~ .main-card{flex:0 0 auto}
+.my-duty-card:not([hidden]) ~ .main-card .big-punch-row{min-height:110px}
+.my-duty-heading{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.my-duty-status{color:var(--accent);font-weight:600}
+.my-duty-times{display:grid;grid-template-columns:40px 1fr;gap:2px 8px;font-variant-numeric:tabular-nums}
+.my-duty-note{font-size:11px;color:var(--t2);margin:6px 0 0}
+#handover-reminder-message{white-space:pre-line}
 @media(min-width:768px){
   .checkin-wrap{ max-width:680px; }
 }
@@ -933,6 +943,14 @@ button,input,select{font-family:var(--font)}
 </div>
 
 <!-- ══ 洋基美光哨點選擇 ══ -->
+<div id="handover-reminder-modal" class="lookup-modal" aria-hidden="true">
+  <div class="lookup-modal-backdrop"></div>
+  <div class="modal-box lookup-modal-box" role="dialog" aria-modal="true" aria-labelledby="handover-reminder-title">
+    <h2 id="handover-reminder-title">交接班貼心提醒</h2>
+    <p id="handover-reminder-message"></p>
+    <button id="handover-reminder-ok" type="button" class="confirm-btn" onclick="$('handover-reminder-modal').classList.remove('show');$('handover-reminder-modal').setAttribute('aria-hidden','true')">知道了</button>
+  </div>
+</div>
 <div id="yangji-post-modal" class="lookup-modal" aria-hidden="true">
   <div class="lookup-modal-backdrop"></div>
   <div class="modal-box lookup-modal-box" role="dialog" aria-modal="true" aria-labelledby="yangji-post-title">
@@ -1269,6 +1287,12 @@ button,input,select{font-family:var(--font)}
           + '<span class="announce-dismiss" onclick="dismissAnnouncement()" title="今日不再顯示">✕</span>';
       })();
     </script>
+
+    <section id="my-duty-card" class="my-duty-card" hidden aria-labelledby="my-duty-title" aria-live="polite">
+      <div class="my-duty-heading"><strong id="my-duty-title">我的本班打卡狀態</strong><span id="my-duty-status" class="my-duty-status"></span></div>
+      <div class="my-duty-times"><span>上班</span><span id="my-duty-in"></span><span>下班</span><span id="my-duty-out"></span></div>
+      <p class="my-duty-note">僅供同仁核對本機最近一班紀錄；其他裝置紀錄可能尚未取得。</p>
+    </section>
 
     <!-- 主打卡卡片 -->
     <div class="main-card">
@@ -2993,6 +3017,69 @@ function vibratePunch(){
 // ══════════════════════════════════════
 let currentId = '';
 let drawerOpen = false;
+let _myDutyEmpId = '';
+
+function buildMyDutyStatus(records, empId){
+  const uncertain={clockIn:'本機資料待確認',clockOut:'本機資料待確認',status:'資料待確認'};
+  const own=records.filter(record=>record&&String(record.empId)===String(empId)).map((record,index)=>{
+    const site=getSiteById(record.siteId);
+    // 一般案場沒有哨點欄位；僅在讀取投影補上分組值，不改動原始卡。
+    return {...record,eventId:`own:${index}`,postName:record.postName||((site&&!getYangjiPostOptions(site).length)?'__site__':null)};
+  });
+  if(!own.length) return uncertain;
+  const duties=SmartAttendanceV4.buildDutyPairs(own);
+  const latest=duties.slice().sort((a,b)=>Date.parse(b.endedAt||b.eventAt||'9999-12-31')-Date.parse(a.endedAt||a.eventAt||'9999-12-31'))[0];
+  if(!latest) return uncertain;
+  const sources=own.filter(record=>latest.sourceRecordIds.includes(record.eventId));
+  const format=timestamp=>{
+    if(!timestamp) return '本機尚無可配對紀錄';
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(timestamp));
+    const value=type=>parts.find(part=>part.type===type).value;
+    return `${value('month')}/${value('day')} ${value('hour')}:${value('minute')}`;
+  };
+  const status=['complete','missing_out'].includes(latest.status)?
+    sources.some(record=>record.synced===false||record.fbSynced===false)?'已儲存待同步':
+      sources.every(record=>record.synced===true&&record.fbSynced===true)?'雲端已同步':'資料待確認':'資料待確認';
+  const onlyOut=sources.length===1&&sources[0].type==='下班';
+  return {clockIn:format(latest.startedAt),clockOut:format(latest.endedAt||(onlyOut?latest.eventAt:null)),status};
+}
+
+function updateMyDutyStatus(){
+  const card=$('my-duty-card');
+  if(!card) return;
+  card.hidden=true;
+  $('my-duty-in').textContent=$('my-duty-out').textContent=$('my-duty-status').textContent='';
+  const saved=localStorage.getItem('last_emp_id');
+  const emp=saved&&findEmp(saved);
+  if(!_myDutyEmpId||_myDutyEmpId!==saved||!emp||emp.disabled) return;
+  try{
+    const state=buildMyDutyStatus(localRecs,saved);
+    $('my-duty-in').textContent=state.clockIn;
+    $('my-duty-out').textContent=state.clockOut;
+    $('my-duty-status').textContent=state.status;
+    card.hidden=false;
+  }catch(error){console.warn('本機勤務狀態暫時無法顯示',error);}
+}
+
+function showLocalHandoverReminder(rec){
+  try{
+    if(!rec||rec.type!=='上班'||_myDutyEmpId!==rec.empId||localStorage.getItem('last_emp_id')!==rec.empId) return;
+    const emp=findEmp(rec.empId);
+    if(!emp||emp.disabled) return;
+    // 使用目前完整本機事件快照，保留下班與不明紀錄供配對器排除；不查詢其他裝置。
+    const snapshot=localRecs.map(record=>({...record}));
+    if(!snapshot.some(record=>record.timestamp===rec.timestamp&&record.empId===rec.empId)) return;
+    const seen=JSON.parse(localStorage.getItem('smart_attendance_v4_handover_seen')||'[]');
+    if(!Array.isArray(seen)) return;
+    const reminder=SmartAttendanceV4.buildHandoverReminder(SmartAttendanceV4.buildDutyPairs(snapshot),rec,{clockInSucceeded:true,seenKeys:seen});
+    if(!reminder) return;
+    localStorage.setItem('smart_attendance_v4_handover_seen',JSON.stringify([...seen,reminder.key]));
+    $('handover-reminder-message').textContent=reminder.message;
+    $('handover-reminder-modal').classList.add('show');
+    $('handover-reminder-modal').setAttribute('aria-hidden','false');
+    $('handover-reminder-ok').focus();
+  }catch(error){console.warn('本機交接提醒暫時略過',error);}
+}
 
 // 載入時從記憶還原上次的員工
 function restoreLastEmp(){
@@ -3015,7 +3102,9 @@ function maskName(name){
   return `${surname} ${stars}`;
 }
 
-function setEmpDisplay(emp){
+function setEmpDisplay(emp,confirmed=false){
+  if(confirmed) _myDutyEmpId=emp.disabled?'':emp.id;
+  updateMyDutyStatus();
   const disp = $('emp-display');
   $('emp-av').textContent = emp.name.slice(0,1);
   $('emp-av').style.background = avatarColor(emp.id);
@@ -3041,6 +3130,7 @@ function setEmpDisplay(emp){
 }
 
 function setNoEmpDisplay(){
+  _myDutyEmpId=''; updateMyDutyStatus();
   $('emp-av').textContent = '👤';
   $('emp-av').style.background = 'var(--fill1)';
   $('emp-disp-name').textContent = '尚未選擇帳號';
@@ -3051,6 +3141,7 @@ function setNoEmpDisplay(){
 }
 
 function openDrawer(){
+  _myDutyEmpId=''; updateMyDutyStatus();
   drawerOpen = true;
   currentId = '';
   $('id-display-text').textContent = '';
@@ -3147,7 +3238,7 @@ async function lookupEmployeeIdFromServer(){
     if(!data || data.status !== 'ok' || !data.empId) throw new Error((data&&data.message)||'查無符合資料，請確認後再試一次');
     const emp = findEmp(data.empId) || {id:data.empId,name};
     localStorage.setItem('last_emp_id', data.empId);
-    setEmpDisplay(emp);
+    setEmpDisplay(emp,true);
     closeEmployeeLookup();
     closeDrawer();
     showToast(`已找到您的員工編號：${data.empId}`,'success');
@@ -3171,7 +3262,7 @@ function confirmId(){
     const emp = findEmp(id);
     if(!emp){ showToast('查無此員工編號','error'); return; }
     localStorage.setItem('last_emp_id', id);
-    setEmpDisplay(emp);
+    setEmpDisplay(emp,true);
   } else {
     // 尚未建立名單，直接記憶
     $('emp-av').textContent = id.slice(-2);
@@ -3360,6 +3451,8 @@ async function doPunch(type){
     $('btn-in').disabled=$('btn-out').disabled=true;
     vibratePunch();
     showSuccess(name,type,timeStr,type==='上班',!navigator.onLine);
+    if(emp){ _myDutyEmpId=emp.id; setTimeout(updateMyDutyStatus,0); }
+    if(type==='上班') setTimeout(()=>showLocalHandoverReminder(rec),3200);
     CURRENT_SITE_ID = null; // 打卡完成後清除，下次打卡需重新掃描 QR Code
     if(emp) setTimeout(()=>setEmpDisplay(emp),3100);
     setTimeout(()=>{ $('btn-in').disabled=$('btn-out').disabled=false; },2000);
@@ -3576,6 +3669,7 @@ const ADMIN_RETAIN_DAYS = 30;  // 管理後台本地保留天數（舊資料從 
 
 function saveRecs(){
   localStorage.setItem('local_records', JSON.stringify(localRecs));
+  setTimeout(updateMyDutyStatus,0);
 }
 
 // 滾動式清理
