@@ -252,9 +252,67 @@ def verify_restored_identity_punch_privacy(browser):
             assert page.evaluate("localStorage.getItem('smart_attendance_v4_handover_seen')") is None
         page.close()
 
+def verify_local_makeup_draft(browser):
+    page = new_test_page(browser, {"width": 320, "height": 568})
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.add_init_script("""
+      localStorage.setItem('guide_done','1');
+      localStorage.setItem('last_emp_id','70000001');
+      localStorage.setItem('employees',JSON.stringify([{id:'70000001',name:'本人同仁'}]));
+      localStorage.setItem('sites_catalog_version','2026-09-10');
+      localStorage.setItem('sites',JSON.stringify([{id:'A001',name:'一般案場',active:true}]));
+      const prior = new Date(Date.now()-30*60*60*1000);
+      localStorage.setItem('local_records',JSON.stringify([{empId:'70000001',siteId:'A001',postName:null,type:'上班',timestamp:prior.toISOString(),date:prior.toISOString().slice(0,10),time:'20:00:00',synced:true,fbSynced:true}]));
+    """)
+    page.goto(BASE_URL, wait_until="domcontentloaded")
+    assert page.locator('#makeup-modal').count() == 1
+    assert not page.locator('#makeup-modal').is_visible(), '還原編號不得顯示補卡資料'
+    page.evaluate("() => { currentId='70000001'; confirmId(); }")
+    page.evaluate("""async () => {
+      CURRENT_SITE_ID='A001';IS_DEMO=false;SCRIPT_URL='';
+      fetchClientIP=async()=>null;uploadToFirebase=()=>{};
+      window.originalPrior = JSON.stringify(localRecs[0]);
+      await doPunch('上班');
+    }""")
+    page.locator('#makeup-modal.show').wait_for()
+    box = page.locator('#makeup-modal .modal-box').bounding_box()
+    assert box['y'] >= 0 and box['y'] + box['height'] <= 568, '短手機補卡視窗須完整顯示並可捲動'
+    assert '前次出勤待確認' in page.locator('#makeup-modal').inner_text()
+    assert page.evaluate('localRecs.length') == 2
+    page.get_by_role('button', name='稍後處理', exact=True).click()
+    assert not page.locator('#makeup-modal').is_visible()
+    page.evaluate("() => { openDrawer();currentId='70000001';confirmId(); }")
+    page.locator('#makeup-modal.show').wait_for()
+    assert page.evaluate("JSON.parse(localStorage.getItem('smart_attendance_v4_makeup_cases')).length") == 2
+    page.locator('#makeup-date').fill('2000-01-01')
+    page.locator('#makeup-time').fill('08:00')
+    page.get_by_role('button', name='儲存本機補卡申請', exact=True).click()
+    assert '不得早於' in page.locator('#makeup-error').inner_text()
+    date, time = page.evaluate("""() => {
+      const end = new Date(Date.parse(localRecs[1].timestamp)+12*60*60*1000);
+      const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(end);
+      const p=type=>parts.find(item=>item.type===type).value;
+      return [`${p('year')}-${p('month')}-${p('day')}`,`${p('hour')}:${p('minute')}`];
+    }""")
+    page.locator('#makeup-date').fill(date)
+    page.locator('#makeup-time').fill(time)
+    page.get_by_role('button', name='儲存本機補卡申請', exact=True).click()
+    assert page.locator('#makeup-message').inner_text() == '已儲存待主管核實，本裝置尚未送至雲端'
+    assert page.evaluate('JSON.stringify(localRecs[1]) === originalPrior')
+    assert page.evaluate('localRecs.length') == 2
+    assert page.evaluate("JSON.parse(localStorage.getItem('smart_attendance_v4_makeup_cases')).at(-1).status") == 'requested'
+    page.get_by_role('button', name='關閉', exact=True).click()
+    page.reload(wait_until='domcontentloaded')
+    assert not page.locator('#makeup-modal').is_visible()
+    assert not page_errors, f'補卡頁面 JavaScript 錯誤：{page_errors}'
+    page.close()
+
+
 with sync_playwright() as playwright:
     import shutil
     browser = playwright.chromium.launch(headless=True, executable_path=shutil.which("chromium"))
+    verify_local_makeup_draft(browser)
     verify_admin_entry_over_overlays(browser)
     verify_login_layout_on_short_phone(browser)
     verify_supervisor_home(browser)

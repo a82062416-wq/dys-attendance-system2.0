@@ -750,6 +750,7 @@ tr:hover td{background:var(--surface2)}
 .lookup-modal.show{display:flex}
 .lookup-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(10px)}
 .lookup-modal-box{position:relative;z-index:1;max-width:420px;padding:28px 24px}
+#makeup-modal .lookup-modal-box{box-sizing:border-box;max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto}
 .yangji-post-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
 .yangji-post-option{min-height:58px;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);color:var(--t1);font:inherit;font-size:15px;font-weight:700;cursor:pointer}
 .yangji-post-option:active{transform:scale(.98);background:var(--fill2)}
@@ -948,7 +949,26 @@ button,input,select{font-family:var(--font)}
   <div class="modal-box lookup-modal-box" role="dialog" aria-modal="true" aria-labelledby="handover-reminder-title">
     <h2 id="handover-reminder-title">交接班貼心提醒</h2>
     <p id="handover-reminder-message"></p>
-    <button id="handover-reminder-ok" type="button" class="confirm-btn" onclick="$('handover-reminder-modal').classList.remove('show');$('handover-reminder-modal').setAttribute('aria-hidden','true')">知道了</button>
+    <button id="handover-reminder-ok" type="button" class="confirm-btn" onclick="closeLocalHandoverReminder()">知道了</button>
+  </div>
+</div>
+<div id="makeup-modal" class="lookup-modal" aria-hidden="true">
+  <div class="lookup-modal-backdrop"></div>
+  <div class="modal-box lookup-modal-box" role="dialog" aria-modal="true" aria-labelledby="makeup-title">
+    <h2 id="makeup-title">前次出勤待確認</h2>
+    <p id="makeup-summary"></p>
+    <p>若前次已結束勤務，請填寫實際下班日期與時間，留待主管核實。</p>
+    <div id="makeup-form">
+      <label for="makeup-date">下班日期</label>
+      <input id="makeup-date" type="date" class="lock-input" style="width:100%;box-sizing:border-box"/>
+      <label for="makeup-time">下班時間</label>
+      <input id="makeup-time" type="time" class="lock-input" style="width:100%;box-sizing:border-box"/>
+      <p id="makeup-error" role="alert" style="color:var(--danger)"></p>
+      <button id="makeup-submit" type="button" class="confirm-btn" onclick="saveLocalMakeupConfirmation('requested')">儲存本機補卡申請</button>
+      <button id="makeup-defer" type="button" class="btn-s bs-ghost" style="margin-top:12px;width:100%" onclick="saveLocalMakeupConfirmation('deferred')">稍後處理</button>
+    </div>
+    <p id="makeup-message" role="status">僅儲存在本裝置，尚未送至雲端；不會新增正式打卡。</p>
+    <button id="makeup-close" type="button" class="confirm-btn" hidden onclick="clearLocalMakeup()">關閉</button>
   </div>
 </div>
 <div id="yangji-post-modal" class="lookup-modal" aria-hidden="true">
@@ -3018,6 +3038,108 @@ function vibratePunch(){
 let currentId = '';
 let drawerOpen = false;
 let _myDutyEmpId = '';
+let _activeMakeupCaseId = '';
+let _queuedMakeupCaseId = '';
+const _makeupShownCases = new Set();
+
+function readLocalMakeupCases(){
+  const cases=JSON.parse(localStorage.getItem('smart_attendance_v4_makeup_cases')||'[]');
+  if(!Array.isArray(cases)) throw new Error('invalid local makeup ledger');
+  return cases;
+}
+
+function getLocalMakeupCase(id=_activeMakeupCaseId){
+  const emp=_myDutyEmpId&&findEmp(_myDutyEmpId);
+  if(!emp||emp.disabled||localStorage.getItem('last_emp_id')!==_myDutyEmpId) return null;
+  return readLocalMakeupCases().filter(item=>item&&item.id===id&&item.empId===_myDutyEmpId).at(-1)||null;
+}
+
+function clearLocalMakeup(){
+  _activeMakeupCaseId='';
+  _queuedMakeupCaseId='';
+  const modal=$('makeup-modal');
+  if(!modal) return;
+  modal.classList.remove('show');modal.setAttribute('aria-hidden','true');
+  for(const id of ['makeup-summary','makeup-error','makeup-message']) $(id).textContent='';
+  $('makeup-date').value=$('makeup-time').value='';
+}
+
+function showMakeupCase(item){
+  if(!item||item.status==='requested'||!getLocalMakeupCase(item.id)) return false;
+  const handover=$('handover-reminder-modal');
+  if(handover&&handover.classList.contains('show')){_queuedMakeupCaseId=item.id;return false;}
+  _activeMakeupCaseId=item.id;
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(item.originalClockIn.timestamp));
+  const value=type=>parts.find(part=>part.type===type).value;
+  const date=`${value('year')}-${value('month')}-${value('day')}`;
+  $('makeup-summary').textContent=`前次上班：${date} ${value('hour')}:${value('minute')}`;
+  $('makeup-date').value=date;$('makeup-time').value='';
+  $('makeup-error').textContent='';
+  $('makeup-message').textContent='僅儲存在本裝置，尚未送至雲端；不會新增正式打卡。';
+  $('makeup-form').hidden=false;
+  if($('makeup-close')) $('makeup-close').hidden=true;
+  $('makeup-modal').classList.add('show');$('makeup-modal').setAttribute('aria-hidden','false');
+  $('makeup-defer').focus();
+  return true;
+}
+
+function closeLocalHandoverReminder(){
+  $('handover-reminder-modal').classList.remove('show');
+  $('handover-reminder-modal').setAttribute('aria-hidden','true');
+  if(_queuedMakeupCaseId){
+    const id=_queuedMakeupCaseId;_queuedMakeupCaseId='';
+    showMakeupCase(getLocalMakeupCase(id));
+  }
+}
+
+function showLocalMakeupReminder(rec){
+  try{
+    const emp=_myDutyEmpId&&findEmp(_myDutyEmpId);
+    if(!rec||rec.type!=='上班'||!emp||emp.disabled||rec.empId!==_myDutyEmpId||
+        localStorage.getItem('last_emp_id')!==_myDutyEmpId) return;
+    const shownKey=JSON.stringify([rec.empId,rec.timestamp]);
+    if(_makeupShownCases.has(shownKey)) return;
+    const cases=readLocalMakeupCases();
+    const own=localRecs.filter(record=>record&&record.empId===rec.empId).map(record=>{
+      const site=getSiteById(record.siteId);
+      return {...record,postName:record.postName||((site&&!getYangjiPostOptions(site).length)?'__site__':null)};
+    });
+    const incoming=own.find(record=>record.timestamp===rec.timestamp&&record.type==='上班');
+    const candidate=SmartAttendanceV4.findPreviousMissingOut(own,incoming,{clockInSucceeded:true,cases});
+    if(!candidate) return;
+    const id=crypto.randomUUID?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),byte=>byte.toString(16).padStart(2,'0')).join('');
+    const next=SmartAttendanceV4.appendMakeupCase(cases,candidate,'draft',{empId:_myDutyEmpId,id,now:new Date().toISOString()});
+    localStorage.setItem('smart_attendance_v4_makeup_cases',JSON.stringify(next));
+    _makeupShownCases.add(shownKey);
+    showMakeupCase(next.at(-1));
+  }catch(error){console.warn('本機補卡提醒暫時略過',error);}
+}
+
+function resumeLocalMakeupCase(){
+  try{
+    const latest=new Map();
+    for(const item of readLocalMakeupCases()) if(item&&item.empId===_myDutyEmpId) latest.set(item.id,item);
+    const pending=Array.from(latest.values()).filter(item=>item.status==='deferred'||item.status==='draft').at(-1);
+    if(pending) showMakeupCase(pending);
+  }catch(error){console.warn('本機補卡草稿暫時略過',error);}
+}
+
+function saveLocalMakeupConfirmation(action){
+  try{
+    const item=getLocalMakeupCase();
+    if(!item){clearLocalMakeup();return;}
+    const next=SmartAttendanceV4.appendMakeupCase(readLocalMakeupCases(),item,action,{
+      empId:_myDutyEmpId,now:new Date().toISOString(),endedDate:$('makeup-date').value,endedTime:$('makeup-time').value,
+    });
+    localStorage.setItem('smart_attendance_v4_makeup_cases',JSON.stringify(next));
+    if(action==='deferred'){clearLocalMakeup();return;}
+    $('makeup-error').textContent='';$('makeup-form').hidden=true;
+    if($('makeup-close')) $('makeup-close').hidden=false;
+    $('makeup-message').textContent='已儲存待主管核實，本裝置尚未送至雲端';
+  }catch(error){
+    $('makeup-error').textContent=error.message.includes('time')?'請填寫有效日期與時間，下班不得早於前次上班。':'尚未儲存，請重試或稍後處理。';
+  }
+}
 
 function buildMyDutyStatus(records, empId){
   const uncertain={clockIn:'本機資料待確認',clockOut:'本機資料待確認',status:'資料待確認'};
@@ -3130,6 +3252,7 @@ function setEmpDisplay(emp,confirmed=false){
 }
 
 function setNoEmpDisplay(){
+  clearLocalMakeup();
   _myDutyEmpId=''; updateMyDutyStatus();
   $('emp-av').textContent = '👤';
   $('emp-av').style.background = 'var(--fill1)';
@@ -3141,6 +3264,7 @@ function setNoEmpDisplay(){
 }
 
 function openDrawer(){
+  clearLocalMakeup();
   _myDutyEmpId=''; updateMyDutyStatus();
   drawerOpen = true;
   currentId = '';
@@ -3274,6 +3398,7 @@ function confirmId(){
     localStorage.setItem('last_emp_id', id);
   }
   closeDrawer();
+  resumeLocalMakeupCase();
 }
 
 // ══════════════════════════════════════
@@ -3407,6 +3532,7 @@ async function fetchClientIP(){
 
 async function doPunch(type){
   const id = localStorage.getItem('last_emp_id')||currentId.trim();
+  const makeupIdentityConfirmed=typeof _myDutyEmpId!=='undefined'&&_myDutyEmpId===id;
   if(!id){showToast('請先輸入員工編號','error');openDrawer();return}
 
   // ── QR Code 強制掃碼機制 ──
@@ -3453,6 +3579,7 @@ async function doPunch(type){
     showSuccess(name,type,timeStr,type==='上班',!navigator.onLine);
     if(emp) setTimeout(updateMyDutyStatus,0);
     if(type==='上班') setTimeout(()=>showLocalHandoverReminder(rec),3200);
+    if(type==='上班'&&makeupIdentityConfirmed) setTimeout(()=>showLocalMakeupReminder(rec),3300);
     CURRENT_SITE_ID = null; // 打卡完成後清除，下次打卡需重新掃描 QR Code
     if(emp) setTimeout(()=>setEmpDisplay(emp),3100);
     setTimeout(()=>{ $('btn-in').disabled=$('btn-out').disabled=false; },2000);

@@ -310,5 +310,64 @@
     };
   }
 
-  return { buildDutyPairs, buildDutySummary, predictDutyEnd, buildHandoverReminder };
+  function findPreviousMissingOut(records, incoming, options = {}) {
+    if (!Array.isArray(records) || !incoming || incoming.type !== '上班' ||
+        options.clockInSucceeded !== true || !incoming.empId || incoming.isSubstitute) return null;
+    const timeZone = options.timeZone || 'Asia/Taipei';
+    const currentAt = parseEventTime(incoming, timeZone);
+    if (currentAt === null) return null;
+    const own = records.filter(record => record && String(record.empId) === String(incoming.empId));
+    const current = own.filter(record => parseEventTime(record, timeZone) === currentAt);
+    if (current.length !== 1 || current[0].type !== '上班') return null;
+    const prior = own.filter(record => parseEventTime(record, timeZone) !== currentAt &&
+      (parseEventTime(record, timeZone) === null || parseEventTime(record, timeZone) < currentAt));
+    if (!prior.length || prior.some(record => parseEventTime(record, timeZone) === null)) return null;
+    const ordered = prior.slice().sort((a, b) => parseEventTime(b, timeZone) - parseEventTime(a, timeZone));
+    const previous = ordered[0];
+    const previousAt = parseEventTime(previous, timeZone);
+    if (previous.type !== '上班' || previous.isSubstitute || !previous.siteId || !previous.postName ||
+        prior.filter(record => parseEventTime(record, timeZone) === previousAt).length !== 1) return null;
+    const projected = prior.map((record, index) => ({...record, eventId: `makeup:${index}`}));
+    const previousIndex = prior.indexOf(previous);
+    const duties = buildDutyPairs(projected, {timeZone});
+    const duty = duties.find(item => item.sourceRecordIds.includes(`makeup:${previousIndex}`));
+    if (!duty || duty.status !== 'missing_out' || duty.sourceRecordIds.length !== 1) return null;
+    const originalClockIn = {
+      timestamp: new Date(previousAt).toISOString(), siteId: String(previous.siteId),
+      postName: String(previous.postName),
+      eventId: String(previous.eventId ?? previous.recordId ?? previous.id ?? previous.timestamp ?? ''),
+    };
+    const candidate = {empId: String(incoming.empId), originalClockIn};
+    if ((options.cases || []).some(item => item && item.empId === candidate.empId &&
+        item.originalClockIn && item.originalClockIn.timestamp === originalClockIn.timestamp)) return null;
+    return candidate;
+  }
+
+  // Append immutable case revisions: original evidence and earlier confirmations
+  // remain present in the local ledger. This never creates an attendance event.
+  function appendMakeupCase(cases, candidate, action, options = {}) {
+    if (!Array.isArray(cases) || !candidate || !candidate.originalClockIn ||
+        !options.empId || String(options.empId) !== candidate.empId) throw new Error('identity mismatch');
+    if (!Number.isFinite(Date.parse(options.now))) throw new Error('invalid time');
+    if (action === 'draft') {
+      if (!options.id || cases.some(item => item.empId === candidate.empId && item.originalClockIn &&
+          item.originalClockIn.timestamp === candidate.originalClockIn.timestamp)) throw new Error('case exists or invalid id');
+      return [...cases, {id: options.id, empId: candidate.empId,
+        originalClockIn: {...candidate.originalClockIn}, status: 'draft', createdAt: options.now, confirmations: []}];
+    }
+    const latest = cases.filter(item => item.id === candidate.id).at(-1);
+    if (!latest || latest.empId !== candidate.empId) throw new Error('identity mismatch');
+    if (latest.status === 'requested') throw new Error('already requested');
+    if (!['deferred', 'requested'].includes(action)) throw new Error('invalid action');
+    const confirmation = {action, confirmedAt: options.now};
+    if (action === 'requested') {
+      const endedAt = parseEventTime({date: options.endedDate, time: options.endedTime}, options.timeZone || 'Asia/Taipei');
+      if (endedAt === null || endedAt < Date.parse(latest.originalClockIn.timestamp)) throw new Error('invalid end time');
+      confirmation.proposedEndedAt = new Date(endedAt).toISOString();
+    }
+    return [...cases, {...latest, originalClockIn: {...latest.originalClockIn}, status: action,
+      confirmations: [...latest.confirmations, confirmation]}];
+  }
+
+  return { buildDutyPairs, buildDutySummary, predictDutyEnd, buildHandoverReminder, findPreviousMissingOut, appendMakeupCase };
 });

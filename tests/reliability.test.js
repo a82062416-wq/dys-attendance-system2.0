@@ -33,6 +33,100 @@ function ownPunch(type,date,time,extra={}) {
   return {empId:'70000001',siteId:'A001',postName:null,type,date,time,timestamp:`${date}T${time}+08:00`,synced:true,fbSynced:true,...extra};
 }
 
+function makeupContext(records = []) {
+  const state = myDutyContext(records);
+  const {context,nodes} = state;
+  for(const id of ['makeup-modal','makeup-summary','makeup-date','makeup-time','makeup-error','makeup-form','makeup-message','makeup-defer','makeup-submit']){
+    const classes = new Set();
+    nodes[id] = {textContent:'',value:'',hidden:false,focus(){},setAttribute(){},classList:{add:key=>classes.add(key),remove:key=>classes.delete(key),contains:key=>classes.has(key)}};
+  }
+  context.crypto = require('node:crypto').webcrypto;
+  context._activeMakeupCaseId = '';
+  context._queuedMakeupCaseId = '';
+  context._makeupShownCases = new Set();
+  const functions = ['readLocalMakeupCases','getLocalMakeupCase','showMakeupCase','showLocalMakeupReminder','resumeLocalMakeupCase','saveLocalMakeupConfirmation','clearLocalMakeup','closeLocalHandoverReminder'];
+  vm.runInNewContext(functions.map(name=>extractFunction(inlineScript,name)).join(';'),context);
+  return state;
+}
+
+test('本人成功上班才建立不可猜 id 的本機補卡 draft，僅還原上次編號不顯示',()=>{
+  const old=ownPunch('上班','2026-01-31','20:00:00');
+  const current=ownPunch('上班','2026-02-01','08:00:00');
+  for(const confirmed of [false,true]){
+    const {context,nodes,storage}=makeupContext([old,current]);
+    context._myDutyEmpId=confirmed?'70000001':'';
+    const snapshot=JSON.stringify(context.localRecs);
+    context.showLocalMakeupReminder(current);
+    assert.equal(nodes['makeup-modal'].classList.contains('show'),confirmed);
+    assert.equal(storage.has('smart_attendance_v4_makeup_cases'),confirmed);
+    if(confirmed){
+      const cases=JSON.parse(storage.get('smart_attendance_v4_makeup_cases'));
+      assert.match(cases[0].id,/^[0-9a-f-]{36}$/);
+      assert.match(nodes['makeup-summary'].textContent,/2026.*01.*31.*20:00/);
+      context.showLocalMakeupReminder(current);
+      assert.equal(JSON.parse(storage.get('smart_attendance_v4_makeup_cases')).length,1);
+    }
+    assert.equal(JSON.stringify(context.localRecs),snapshot);
+  }
+});
+
+test('補卡稍後可在再次確認本人恢復同一 case，填寫跨日只追加本機申請並誠實提示',()=>{
+  const old=ownPunch('上班','2026-01-31','20:00:00');
+  const current=ownPunch('上班','2026-02-01','08:00:00');
+  const {context,nodes,storage}=makeupContext([old,current]);
+  context.showLocalMakeupReminder(current);
+  context.saveLocalMakeupConfirmation('deferred');
+  const deferred=JSON.parse(storage.get('smart_attendance_v4_makeup_cases'));
+  assert.equal(deferred.length,2);
+  assert.equal(deferred[1].status,'deferred');
+  assert.equal(nodes['makeup-modal'].classList.contains('show'),false);
+  context._myDutyEmpId='';context.resumeLocalMakeupCase();
+  assert.equal(nodes['makeup-modal'].classList.contains('show'),false);
+  context._myDutyEmpId='70000001';context.resumeLocalMakeupCase();
+  assert.equal(nodes['makeup-modal'].classList.contains('show'),true);
+  nodes['makeup-date'].value='2026-01-31';nodes['makeup-time'].value='19:59';
+  context.saveLocalMakeupConfirmation('requested');
+  assert.match(nodes['makeup-error'].textContent,/不得早於/);
+  assert.equal(JSON.parse(storage.get('smart_attendance_v4_makeup_cases')).length,2);
+  nodes['makeup-date'].value='2026-02-01';nodes['makeup-time'].value='07:00';
+  context.saveLocalMakeupConfirmation('requested');
+  const requested=JSON.parse(storage.get('smart_attendance_v4_makeup_cases'));
+  assert.equal(requested.length,3);
+  assert.equal(requested[2].id,deferred[0].id);
+  assert.equal(requested[2].status,'requested');
+  assert.deepEqual(requested.slice(0,2),deferred);
+  assert.equal(nodes['makeup-message'].textContent,'已儲存待主管核實，本裝置尚未送至雲端');
+  assert.equal(context.localRecs.length,2);
+  context.clearLocalMakeup();
+  assert.equal(nodes['makeup-summary'].textContent,'');
+  assert.equal(nodes['makeup-date'].value,'');
+});
+
+test('換人或未確認本人不可提交或恢復他人的本機補卡',()=>{
+  const {context,nodes,storage}=makeupContext([ownPunch('上班','2026-01-31','20:00:00'),ownPunch('上班','2026-02-01','08:00:00')]);
+  context.showLocalMakeupReminder(context.localRecs[1]);
+  const snapshot=storage.get('smart_attendance_v4_makeup_cases');
+  context._myDutyEmpId='other';
+  context.saveLocalMakeupConfirmation('deferred');
+  assert.equal(storage.get('smart_attendance_v4_makeup_cases'),snapshot);
+  assert.equal(nodes['makeup-modal'].classList.contains('show'),false);
+  context.resumeLocalMakeupCase();
+  assert.equal(nodes['makeup-modal'].classList.contains('show'),false);
+});
+
+test('交接與自主補卡提醒依序顯示，不覆蓋已顯示的交接提醒',()=>{
+  const {context,nodes,storage}=makeupContext([ownPunch('上班','2026-01-31','20:00:00'),ownPunch('上班','2026-02-01','08:00:00')]);
+  const classes=new Set(['show']);
+  nodes['handover-reminder-modal']={classList:{contains:key=>classes.has(key),remove:key=>classes.delete(key)},setAttribute(){}};
+  context.showLocalMakeupReminder(context.localRecs[1]);
+  assert.equal(classes.has('show'),true);
+  assert.equal(nodes['makeup-modal'].classList.contains('show'),false);
+  assert.equal(JSON.parse(storage.get('smart_attendance_v4_makeup_cases')).length,1);
+  context.closeLocalHandoverReminder();
+  assert.equal(classes.has('show'),false);
+  assert.equal(nodes['makeup-modal'].classList.contains('show'),true);
+});
+
 test('個人勤務卡載入 v4，完整配對正常、跨日與同日多班，只讀本人本機資料',()=>{
   assert.match(html, /<script src="smart-attendance-v4\.js"><\/script>/);
   const {context}=myDutyContext();
@@ -133,6 +227,7 @@ test('成功打卡不提升上次儲存的身分，僅已確認本人可更新�
       saveRecs:()=>{},uploadToFirebase:()=>{},pruneOldRecs:()=>{},vibratePunch:()=>{},
       navigator:{onLine:true},showSuccess:()=>{},setEmpDisplay:()=>context.updateMyDutyStatus(),
       setTimeout:fn=>tasks.push(fn),showToast:()=>{},
+      showLocalMakeupReminder:()=>{},
     });
     nodes['btn-in']={disabled:false}; nodes['btn-out']={disabled:false};
     nodes['handover-reminder-modal']={classList:{add:value=>classes.add(value)},setAttribute(){}};

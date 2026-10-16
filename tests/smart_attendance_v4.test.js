@@ -231,6 +231,62 @@ test('勤務摘要只統計有真實上班與下班事件的完整勤務', () =>
 
 const handoverOptions = { timeZone: 'Asia/Taipei', clockInSucceeded: true };
 
+test('自主補卡只取本人前次 missing_out，跨日跨月且不修改來源', () => {
+  const records = [event('old', '上班', '2026-01-31', '20:00'), event('other', '上班', '2026-02-01', '07:00', {empId:'E2'})];
+  const current = event('new', '上班', '2026-02-01', '08:00');
+  const snapshot = JSON.stringify(records);
+  const candidate = core.findPreviousMissingOut([...records, current], current, {clockInSucceeded:true});
+  assert.equal(candidate.empId, 'E1');
+  assert.equal(candidate.originalClockIn.timestamp, '2026-01-31T12:00:00.000Z');
+  assert.equal(candidate.originalClockIn.eventId, 'old');
+  assert.equal(JSON.stringify(records), snapshot);
+  assert.equal(core.findPreviousMissingOut(records, current, {}), null);
+});
+
+test('自主補卡排除已下班、歧義、重複與已建 case，不跳回更舊勤務', () => {
+  const old = event('old', '上班', '2026-01-31', '20:00');
+  const current = event('new', '上班', '2026-02-02', '08:00');
+  const opts = {clockInSucceeded:true};
+  for (const records of [
+    [old, event('out', '下班', '2026-02-01', '08:00'), current],
+    [old, event('conflict', '上班', '2026-02-01', '01:00'), current],
+    [old, {...old}, current],
+    [old, event('repeat', '上班', '2026-01-31', '20:01'), current],
+    [old, event('unknown', '換班', '2026-02-01', '01:00'), current],
+    [old, event('invalid', '下班', null, 'broken'), current],
+  ]) assert.equal(core.findPreviousMissingOut(records, current, opts), null);
+  const candidate = core.findPreviousMissingOut([old,current], current, opts);
+  assert.equal(core.findPreviousMissingOut([old,current], current, {...opts,cases:[{...candidate,id:'case-existing'}]}), null);
+  assert.equal(core.findPreviousMissingOut([old], current, opts), null, '本次上班必須已在來源快照');
+});
+
+test('自主補卡追加 draft、稍後及跨日填寫版本，原版本與原始卡不可覆寫', () => {
+  const old = event('old', '上班', '2026-01-31', '20:00');
+  const current = event('new', '上班', '2026-02-02', '08:00');
+  const candidate = core.findPreviousMissingOut([old,current], current, {clockInSucceeded:true});
+  const opts = {empId:'E1',id:'opaque-id',now:'2026-02-02T00:00:00Z'};
+  const draft = core.appendMakeupCase([], candidate, 'draft', opts);
+  assert.equal(draft[0].status, 'draft');
+  assert.equal(draft[0].id, 'opaque-id');
+  assert.equal(draft[0].createdAt, opts.now);
+  const snapshot = JSON.stringify(draft);
+  const deferred = core.appendMakeupCase(draft, draft[0], 'deferred', opts);
+  assert.equal(deferred.length, 2);
+  assert.equal(deferred[1].status, 'deferred');
+  assert.equal(deferred[1].confirmations[0].action, 'deferred');
+  const requested = core.appendMakeupCase(deferred, deferred[1], 'requested', {...opts,endedDate:'2026-02-01',endedTime:'08:00'});
+  assert.equal(requested.length, 3);
+  assert.equal(requested[2].status, 'requested');
+  assert.equal(requested[2].confirmations.length, 2);
+  assert.equal(requested[2].confirmations[1].proposedEndedAt, '2026-02-01T00:00:00.000Z');
+  assert.equal(JSON.stringify(draft), snapshot);
+  assert.equal(old.time, '20:00');
+  assert.throws(() => core.appendMakeupCase(deferred, deferred[1], 'requested', {...opts,endedDate:'2026-01-31',endedTime:'19:59'}), /time/);
+  assert.throws(() => core.appendMakeupCase(deferred, deferred[1], 'requested', {...opts,empId:'E2',endedDate:'2026-02-01',endedTime:'08:00'}), /identity/);
+  assert.throws(() => core.appendMakeupCase(requested, requested[2], 'requested', {...opts,endedDate:'2026-02-01',endedTime:'09:00'}), /requested/);
+  assert.throws(() => core.appendMakeupCase(draft, candidate, 'draft', opts), /exists/);
+});
+
 function incoming(extra = {}) {
   return event('incoming', '上班', '2026-10-15', '20:00', { empId: 'E2', ...extra });
 }
