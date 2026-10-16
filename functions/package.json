@@ -1,0 +1,8 @@
+{
+  "name": "dys-attendance-v4-local-simulator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Local-only attendance simulator; no deployed backend or credentials",
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/*.test.js" }
+}
