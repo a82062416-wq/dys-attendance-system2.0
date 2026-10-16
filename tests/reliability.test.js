@@ -119,6 +119,43 @@ test('上班先完成本機寫入與成功畫面，再非阻塞排入交接提�
   assert.equal(events.includes('reminder'),false);
 });
 
+test('成功打卡不提升上次儲存的身分，僅已確認本人可更新勤務卡與交接提醒',async()=>{
+  for(const confirmed of [false,true]){
+    const previous=ownPunch('上班','2026-10-15','08:00:00',{empId:'other',postName:'東哨D2'});
+    const {context,nodes,storage}=myDutyContext([previous,ownPunch('下班','2026-10-14','04:00:00',{siteId:'A002'})]);
+    const tasks=[],classes=new Set();
+    context._myDutyEmpId=confirmed?'70000001':'';
+    Object.assign(context,{
+      Date:class extends Date{constructor(...args){super(...(args.length?args:['2026-10-15T12:00:00Z']));}},
+      currentId:'',getSites:()=>[{id:'A001',active:true}],CURRENT_SITE_ID:'A001',IS_DEMO:false,SCRIPT_URL:'',
+      employees:[{id:'70000001'}],getYangjiPostSelection:()=> '東哨D2',
+      pad:value=>String(value).padStart(2,'0'),fetchClientIP:async()=>null,
+      saveRecs:()=>{},uploadToFirebase:()=>{},pruneOldRecs:()=>{},vibratePunch:()=>{},
+      navigator:{onLine:true},showSuccess:()=>{},setEmpDisplay:()=>context.updateMyDutyStatus(),
+      setTimeout:fn=>tasks.push(fn),showToast:()=>{},
+    });
+    nodes['btn-in']={disabled:false}; nodes['btn-out']={disabled:false};
+    nodes['handover-reminder-modal']={classList:{add:value=>classes.add(value)},setAttribute(){}};
+    nodes['handover-reminder-message']={textContent:''}; nodes['handover-reminder-ok']={focus(){}};
+    context.updateMyDutyStatus();
+    vm.runInNewContext(extractFunction(inlineScript,'doPunch'),context);
+    await context.doPunch('上班');
+    for(const task of tasks) task();
+    assert.equal(context.localRecs.length,3,'QR 打卡仍成功儲存');
+    assert.equal(context._myDutyEmpId,confirmed?'70000001':'','打卡成功不得取代本次身分確認');
+    assert.equal(nodes['my-duty-card'].hidden,!confirmed);
+    assert.equal(classes.has('show'),confirmed);
+    if(confirmed){
+      assert.match(nodes['my-duty-in'].textContent,/10\/15.*20:00/);
+      assert.equal(nodes['my-duty-status'].textContent,'已儲存待同步');
+    }else{
+      assert.equal(nodes['my-duty-in'].textContent,'');
+      assert.equal(nodes['my-duty-out'].textContent,'');
+      assert.equal(storage.has('smart_attendance_v4_handover_seen'),false);
+    }
+  }
+});
+
 test('洋基出勤列保留六欄格式，晚班跨日歸上班月份，舊紀錄哨點留空', () => {
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'isYangjiReportSite')}; ${extractFunction(inlineScript, 'buildYangjiAttendanceRows')}; this.build = buildYangjiAttendanceRows;`, context);

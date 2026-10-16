@@ -211,6 +211,47 @@ def verify_local_duty_status_and_handover(browser):
     assert not page_errors, f"頁面 JavaScript 錯誤：{page_errors}"
     page.close()
 
+
+def verify_restored_identity_punch_privacy(browser):
+    for confirmed in (False, True):
+        page = new_test_page(browser, {"width": 390, "height": 844})
+        page.add_init_script("""
+          localStorage.setItem('guide_done', '1');
+          localStorage.setItem('last_emp_id', '70000001');
+          localStorage.setItem('employees', JSON.stringify([{id:'70000001',name:'本人同仁'}]));
+          localStorage.setItem('sites_catalog_version', '2026-09-10');
+          localStorage.setItem('sites', JSON.stringify([{id:'C151',name:'洋基美光－早',active:true}]));
+          const prior = new Date(Date.now() - 12*60*60*1000);
+          const record = {empId:'other',siteId:'C151',postName:'東哨D2',type:'上班',date:'2026-10-14',time:'08:00:00',timestamp:prior.toISOString(),synced:true,fbSynced:true};
+          localStorage.setItem('local_records', JSON.stringify([record,
+            {...record,empId:'70000001',siteId:'A001',type:'下班',timestamp:new Date(prior.getTime()-60*60*1000).toISOString()}
+          ]));
+        """)
+        page.goto(BASE_URL, wait_until="domcontentloaded")
+        assert page.evaluate("_myDutyEmpId") == ""
+        assert not page.locator("#my-duty-card").is_visible()
+        if confirmed:
+            page.evaluate("() => { currentId='70000001'; confirmId(); }")
+        page.evaluate("""async () => {
+          CURRENT_SITE_ID='C151'; IS_DEMO=false; SCRIPT_URL='';
+          saveYangjiPostSelection('70000001','C151','東哨D2');
+          fetchClientIP=async()=>null; uploadToFirebase=()=>{};
+          await doPunch('上班');
+        }""")
+        page.wait_for_timeout(3400)
+        assert page.evaluate("localRecs.length") == 3, "恢復上次編號仍可成功 QR 打卡"
+        assert page.evaluate("_myDutyEmpId") == ("70000001" if confirmed else "")
+        assert page.locator("#my-duty-card").is_visible() == confirmed
+        assert page.locator("#handover-reminder-modal").is_visible() == confirmed
+        if confirmed:
+            assert page.locator("#my-duty-status").inner_text() == "已儲存待同步"
+            assert page.evaluate("document.querySelector('#my-duty-in').textContent.endsWith(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(localRecs[0].timestamp)))")
+        else:
+            for field in ("my-duty-in", "my-duty-out", "my-duty-status"):
+                assert page.locator(f"#{field}").text_content() == ""
+            assert page.evaluate("localStorage.getItem('smart_attendance_v4_handover_seen')") is None
+        page.close()
+
 with sync_playwright() as playwright:
     import shutil
     browser = playwright.chromium.launch(headless=True, executable_path=shutil.which("chromium"))
@@ -218,6 +259,7 @@ with sync_playwright() as playwright:
     verify_login_layout_on_short_phone(browser)
     verify_supervisor_home(browser)
     verify_yangji_post_selection(browser)
+    verify_restored_identity_punch_privacy(browser)
     verify_local_duty_status_and_handover(browser)
     verify_viewport(browser, {"width": 390, "height": 844})
     verify_viewport(browser, {"width": 1440, "height": 900})

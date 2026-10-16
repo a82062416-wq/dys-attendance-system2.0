@@ -3451,7 +3451,7 @@ async function doPunch(type){
     $('btn-in').disabled=$('btn-out').disabled=true;
     vibratePunch();
     showSuccess(name,type,timeStr,type==='上班',!navigator.onLine);
-    if(emp){ _myDutyEmpId=emp.id; setTimeout(updateMyDutyStatus,0); }
+    if(emp) setTimeout(updateMyDutyStatus,0);
     if(type==='上班') setTimeout(()=>showLocalHandoverReminder(rec),3200);
     CURRENT_SITE_ID = null; // 打卡完成後清除，下次打卡需重新掃描 QR Code
     if(emp) setTimeout(()=>setEmpDisplay(emp),3100);
