@@ -439,6 +439,104 @@ test('延後備份提醒不應更新上次備份日期，立即備份只呼叫�
   assert.match(inlineScript, /onclick="dismissBackupReminder\(\)"[^>]*>稍後再說/);
 });
 
+function adminCloudContext({authReady=Promise.resolve(true),authData={admin_pwd_hash:'cloud-hash'},supervisors=[],readSupervisors}={}){
+  const nodes=Object.fromEntries(['tab-admin','guide-overlay','keyboard-overlay','login-cloud-status','login-supervisor-status','lock-screen','lock-input','sup-emp-input','lock-hint','role-supervisor'].map(id=>[id,{style:{},textContent:'',classList:{remove(){}}}]));
+  const reads=[],timers=[],messages=[];
+  const storage=createStorage({admin_pwd_hash:'cached-hash',supervisors:'[{"empId":"local","active":true}]'});
+  const context={
+    FB_AUTH_READY:authReady,FB_DB:{ref:path=>({once:async()=>{
+      reads.push(path);
+      if(path==='config/supervisors'&&readSupervisors) return readSupervisors();
+      return {val:()=>path==='config/auth'?authData:supervisors};
+    }})},
+    adminOpening:false,_guideDrawerTimer:null,drawerOpen:false,ADMIN_UNLOCKED:false,
+    $:id=>nodes[id],localStorage:storage,normalizeSupervisors:data=>data,
+    getPwdHash:()=>storage.getItem('admin_pwd_hash'),getSupervisors:()=>JSON.parse(storage.getItem('supervisors')),
+    setTimeout:(callback,delay)=>{timers.push({callback,delay});return timers.length;},clearTimeout(){},
+    navigateTo:page=>{context.destination=page;},showAdminMenu(){},switchRole(){},
+    resetIdleTimer(){},checkBackupReminder(){},syncRecentAdminRecords(){},
+    openSetup:()=>{context.setupOpened=true;},showToast:(message,type)=>messages.push({message,type}),console:{warn(){}},
+  };
+  vm.runInNewContext(['syncAuthFromFirebase','syncSupervisorsFromFirebase','goAdmin'].map(name=>extractFunction(inlineScript,name)).join(';'),context);
+  return {context,nodes,storage,reads,timers,messages};
+}
+
+test('手機後台等待匿名登入完成才讀取雲端密碼與幹部，總等待上限仍為十秒',async()=>{
+  let finishAuth;
+  const state=adminCloudContext({authReady:new Promise(resolve=>{finishAuth=resolve;})});
+  const opening=state.context.goAdmin();
+  assert.deepEqual(state.reads,[],'匿名登入未完成不可先讀取受保護資料');
+  assert.equal(state.timers[0].delay,10000);
+  finishAuth(true);
+  await opening;
+  assert.deepEqual(state.reads.sort(),['config/auth','config/supervisors']);
+  assert.equal(state.storage.getItem('admin_pwd_hash'),'cloud-hash');
+});
+
+test('管理員密碼雲端確認不受幹部名單空白或讀取失敗影響',async()=>{
+  for(const readSupervisors of [undefined,()=>Promise.reject(new Error('permission denied'))]){
+    const state=adminCloudContext({readSupervisors});
+    await state.context.goAdmin();
+    assert.match(state.nodes['login-cloud-status'].textContent,/管理員登入資料已從雲端確認/);
+    assert.doesNotMatch(state.nodes['login-cloud-status'].textContent,/本機|未確認/);
+    assert.match(state.nodes['login-supervisor-status'].textContent,/幹部名單尚未確認，幹部功能可能不是最新/);
+    assert.equal(state.nodes['lock-screen'].style.display,'flex');
+    assert.equal(state.storage.getItem('admin_pwd_hash'),'cloud-hash');
+  }
+});
+
+test('幹部讀取逾時仍保留已確認的管理員雲端狀態',async()=>{
+  const state=adminCloudContext({readSupervisors:()=>new Promise(()=>{})});
+  const opening=state.context.goAdmin();
+  for(let i=0;i<8;i++) await Promise.resolve();
+  state.timers[0].callback();
+  await opening;
+  assert.match(state.nodes['login-cloud-status'].textContent,/管理員登入資料已從雲端確認/);
+  assert.match(state.nodes['login-supervisor-status'].textContent,/尚未確認/);
+  assert.ok(state.messages.every(item=>!item.message.includes('本機密碼')));
+});
+
+test('匿名登入一直未完成時十秒後可用本機登入且晚到登入不再讀雲端',async()=>{
+  let finishAuth;
+  const state=adminCloudContext({authReady:new Promise(resolve=>{finishAuth=resolve;})});
+  const opening=state.context.goAdmin();
+  state.timers[0].callback();
+  await opening;
+  assert.equal(state.nodes['lock-screen'].style.display,'flex');
+  finishAuth(true);
+  for(let i=0;i<8;i++) await Promise.resolve();
+  assert.deepEqual(state.reads,[]);
+  assert.equal(state.storage.getItem('admin_pwd_hash'),'cached-hash');
+});
+
+test('新手機雲端沒有管理員密碼時不可開啟初始設定',async()=>{
+  for(const authData of [null,{}, {supervisor_pwd_hash:'supervisor-only'}]){
+    const state=adminCloudContext({authData});
+    state.storage.removeItem('admin_pwd_hash');
+    await state.context.goAdmin();
+    assert.equal(state.context.setupOpened,undefined);
+    assert.equal(state.context.destination,undefined);
+    assert.ok(state.messages.some(item=>item.type==='error'));
+  }
+});
+
+test('Firebase 匿名登入 ready 可等待成功或安全失敗，初始化與 QR 監聽不等待登入',async()=>{
+  for(const success of [true,false]){
+    let resolveAuth,rejectAuth,listenerStarted=false;
+    const authPending=new Promise((resolve,reject)=>{resolveAuth=resolve;rejectAuth=reject;});
+    const context={FB_AUTH_READY:null,FB_APP:null,FB_DB:null,FIREBASE_CONFIG:{},
+      firebase:{initializeApp:()=>({}),database:()=>({}),auth:()=>({signInAnonymously:()=>authPending})},
+      startTodayListener:()=>{listenerStarted=true;},console:{log(){},warn(){}},
+    };
+    vm.runInNewContext(extractFunction(inlineScript,'initFirebase'),context);
+    context.initFirebase();
+    assert.equal(listenerStarted,true);
+    assert.ok(context.FB_AUTH_READY&&typeof context.FB_AUTH_READY.then==='function');
+    if(success) resolveAuth({}); else rejectAuth({code:'auth/network-request-failed'});
+    assert.equal(await context.FB_AUTH_READY,success);
+  }
+});
+
 test('後台雲端同步逾時但有本機密碼時仍可進入登入頁並標示未確認', async () => {
   const messages=[];
   let supervisorStatus,authStatus;
@@ -451,7 +549,7 @@ test('後台雲端同步逾時但有本機密碼時仍可進入登入頁並標�
     'lock-hint':{textContent:'old'},'role-supervisor':{style:{}},
   };
   const context={
-    adminOpening:false,_guideDrawerTimer:null,drawerOpen:false,
+    adminOpening:false,_guideDrawerTimer:null,drawerOpen:false,FB_AUTH_READY:Promise.resolve(true),
     $:id=>id==='tab-admin'?lockButton:id==='guide-overlay'||id==='keyboard-overlay'?overlay:elements[id],
     syncSupervisorsFromFirebase:status=>{supervisorStatus=status;return new Promise(()=>{});},
     syncAuthFromFirebase:status=>{authStatus=status;return new Promise(()=>{});},
@@ -506,7 +604,7 @@ test('新裝置雲端登入資料讀取失敗時不可誤開初始設定', async
     'login-cloud-status':{textContent:'',style:{}},
   };
   const context={
-    adminOpening:false,_guideDrawerTimer:null,drawerOpen:false,
+    adminOpening:false,_guideDrawerTimer:null,drawerOpen:false,FB_AUTH_READY:Promise.resolve(true),
     $:id=>elements[id],clearTimeout(){},setTimeout:()=>1,
     syncSupervisorsFromFirebase:async status=>{status.verified=false;},
     syncAuthFromFirebase:async status=>{status.verified=false;status.loaded=false;},
@@ -601,7 +699,7 @@ test('從引導進後台會取消延遲彈出的員工編號鍵盤', () => {
   let next=0,drawerOpens=0;
   const overlay={classList:{remove(){}}};
   const context={
-    adminOpening:false,_guideDrawerTimer:null,drawerOpen:false,
+    adminOpening:false,_guideDrawerTimer:null,drawerOpen:false,FB_AUTH_READY:Promise.resolve(true),
     localStorage:createStorage(),
     $:()=>overlay,
     setTimeout:callback=>{const id=++next;timers.set(id,callback);return id;},

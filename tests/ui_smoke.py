@@ -80,6 +80,35 @@ def verify_admin_entry_over_overlays(browser):
     page.close()
 
 
+def verify_admin_cloud_confirmation(browser):
+    for supervisor_failure in (False, True):
+        page = new_test_page(browser, {"width": 390, "height": 844})
+        page.set_default_timeout(3000)
+        page.goto(BASE_URL, wait_until="domcontentloaded")
+        page.evaluate("""failure => {
+          window.cloudReads = [];
+          FB_AUTH_READY = new Promise(resolve => { window.finishTestAuth = resolve; });
+          FB_DB = { ref: path => ({ once: async () => {
+            cloudReads.push(path);
+            if(path === 'config/supervisors' && failure) throw new Error('test permission denied');
+            return { val: () => path === 'config/auth' ? {admin_pwd_hash: 'cloud-test-hash'} : [] };
+          } }) };
+        }""", supervisor_failure)
+        page.locator("#tab-admin").click()
+        assert page.evaluate("cloudReads.length") == 0, "匿名登入完成前不可讀取後台資料"
+        assert page.locator("#tab-admin").is_disabled()
+        page.evaluate("finishTestAuth(true)")
+        page.locator("#lock-screen").wait_for()
+        assert page.locator("#login-cloud-status").inner_text() == "✓ 管理員登入資料已從雲端確認"
+        assert "幹部名單尚未確認，幹部功能可能不是最新" in page.locator("#login-supervisor-status").inner_text()
+        assert page.evaluate("localStorage.getItem('admin_pwd_hash')") == "cloud-test-hash"
+        page.locator("#role-supervisor").click()
+        page.locator("#sup-emp-input").fill(page.evaluate("getSupervisors().find(s => s.active).empId"))
+        page.locator("#login-submit-btn").click()
+        assert "登入資料未經雲端確認" in page.locator("#supervisor-home-sync").inner_text(), "管理員密碼確認不可誤認為幹部權限也已確認"
+        page.close()
+
+
 def verify_login_layout_on_short_phone(browser):
     page = new_test_page(browser, {"width": 320, "height": 568})
     page.add_init_script("localStorage.setItem('guide_done', '1')")
@@ -137,6 +166,7 @@ def verify_yangji_post_selection(browser):
     """)
     page.goto(BASE_URL, wait_until="domcontentloaded")
     page.evaluate("""() => {
+      FB_AUTH_READY = new Promise(() => {});
       CURRENT_SITE_ID = 'C151'; currentId = '70000001';
       fetchClientIP = async () => null;
       uploadToFirebase = () => {};
@@ -351,6 +381,7 @@ with sync_playwright() as playwright:
     import shutil
     browser = playwright.chromium.launch(headless=True, executable_path=shutil.which("chromium"))
     verify_local_makeup_draft(browser)
+    verify_admin_cloud_confirmation(browser)
     verify_admin_entry_over_overlays(browser)
     verify_login_layout_on_short_phone(browser)
     verify_supervisor_home(browser)

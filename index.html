@@ -1055,7 +1055,8 @@ button,input,select{font-family:var(--font)}
         <button class="lock-role-btn active" id="role-admin" onclick="switchRole('admin')">👑 管理員</button>
         <button class="lock-role-btn" id="role-supervisor" onclick="switchRole('supervisor')">📋 幹部</button>
       </div>
-      <div id="login-cloud-status" role="status" aria-live="polite" style="font-size:12px;line-height:1.5;color:var(--t2);margin:-4px 0 14px"></div>
+      <div id="login-cloud-status" role="status" aria-live="polite" style="font-size:12px;line-height:1.5;color:var(--t2);margin:-4px 0 4px"></div>
+      <div id="login-supervisor-status" role="status" aria-live="polite" style="font-size:12px;line-height:1.5;color:var(--t2);margin:0 0 14px"></div>
       <!-- 管理員：密碼輸入 -->
       <div class="pwd-wrap" id="admin-pwd-wrap">
         <input class="lock-input" id="lock-input" type="password" placeholder="••••••" maxlength="20"
@@ -2190,20 +2191,22 @@ const FIREBASE_CONFIG = {
   appId: '1:154006700150:web:13b6e6c31c43f5e5fd9f57'
 };
 let FB_APP = null, FB_DB = null, _fbTodayUnsub = null;
+let FB_AUTH_READY = Promise.resolve(false);
 
 function initFirebase(){
+  FB_AUTH_READY = Promise.resolve(false);
   try{
     if(typeof firebase === 'undefined'){ console.warn('Firebase SDK 未載入'); return; }
     FB_APP = firebase.initializeApp(FIREBASE_CONFIG);
     FB_DB  = firebase.database();
     startTodayListener();
     console.log('Firebase 初始化成功 ✓');
-    // 匿名登入：為之後鎖資料庫規則（僅限已登入使用者）預備。
-    // 尚未在 Firebase 後台開啟「匿名登入」前，這段會靜默失敗，不影響現有任何功能。
+    // QR 與打卡不等待匿名登入；後台在十秒上限內等此 Promise 再讀取。
+    // 匿名登入未啟用或連線失敗時安全回傳 false，仍可使用可用的本機資料。
     if(firebase.auth){
-      firebase.auth().signInAnonymously()
-        .then(()=>console.log('Firebase 匿名登入成功 ✓'))
-        .catch(e=>console.warn('Firebase 匿名登入尚未啟用（不影響現有功能）:', e.code));
+      FB_AUTH_READY = Promise.resolve(firebase.auth().signInAnonymously())
+        .then(()=>{console.log('Firebase 匿名登入成功 ✓');return true;})
+        .catch(e=>{console.warn('Firebase 匿名登入未完成，將依可用的雲端或本機資料繼續:', e.code);return false;});
     }
   }catch(e){ console.warn('Firebase 初始化失敗:', e); }
 }
@@ -4106,17 +4109,27 @@ async function goAdmin(el){
   try{
     // 先嘗試雲端同步；逾時時只容許已有本機密碼的裝置進入登入畫面。
     const synced=await Promise.race([
-      Promise.all([syncSupervisorsFromFirebase(supervisorStatus), syncAuthFromFirebase(authStatus)]).then(()=>true),
+      (async()=>{
+        await FB_AUTH_READY;
+        // 等待登入也計入十秒；逾時後不再啟動晚到的同步。
+        if(!authStatus.active) return false;
+        await Promise.all([syncSupervisorsFromFirebase(supervisorStatus), syncAuthFromFirebase(authStatus)]);
+        return true;
+      })(),
       new Promise(resolve=>{syncTimeout=setTimeout(()=>resolve(false),10000)})
     ]);
-    if(!synced) showToast('雲端連線逾時，請以本機密碼登入；資料可能不是最新','warn');
-    const cloudVerified=synced&&supervisorStatus.verified&&authStatus.verified;
+    if(!synced&&!authStatus.verified) showToast('雲端連線逾時，請以本機密碼登入；資料可能不是最新','warn');
+    const cloudVerified=authStatus.verified;
     const cloudStatus=$('login-cloud-status');
-    cloudStatus.textContent=cloudVerified?'✓ 雲端資料讀取成功':'⚠ 雲端資料未確認，使用本機登入資料';
+    cloudStatus.textContent=cloudVerified?'✓ 管理員登入資料已從雲端確認':'⚠ 管理員雲端登入資料尚未確認，使用本機登入資料';
     cloudStatus.style.color=cloudVerified?'var(--success)':'var(--warn)';
+    const supervisorCloudStatus=$('login-supervisor-status');
+    if(supervisorCloudStatus){
+      supervisorCloudStatus.textContent=supervisorStatus.verified?'✓ 幹部名單已從雲端確認':'⚠ 幹部名單尚未確認，幹部功能可能不是最新';
+      supervisorCloudStatus.style.color=supervisorStatus.verified?'var(--success)':'var(--warn)';
+    }
     if(!getPwdHash()){
-      if(!authStatus.loaded){showToast('雲端登入資料未確認，請連網後重試','error');return}
-      openSetup();return;
+      showToast('雲端管理員登入資料未確認，請連網後重試或聯絡管理員','error');return;
     }
     if(ADMIN_UNLOCKED && cloudVerified){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();syncRecentAdminRecords();return}
     navigateTo('admin');showAdminMenu();
@@ -5639,7 +5652,7 @@ function renderSupervisorHome(){
   $('supervisor-home-scope').textContent=sup.viewAll
     ? '查看範圍：全部案場'
     : `負責範圍：${visibleSites.length} 個案場${visibleSites.length===0?' · 尚無可查看的案場':''}`;
-  const cloudConfirmed=$('login-cloud-status').textContent.startsWith('✓');
+  const cloudConfirmed=$('login-supervisor-status').textContent.startsWith('✓');
   $('supervisor-home-sync').textContent=cloudConfirmed
     ? '登入資料已確認；出勤紀錄請以各頁更新結果為準'
     : '登入資料未經雲端確認；案場與權限可能不是最新';
