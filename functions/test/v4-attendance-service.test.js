@@ -20,6 +20,9 @@ function setup() {
       { dutyId: 'duty-2', empId: 'E2', siteId: 'site-1', postName: 'gate', status: 'missing_out', startedAt: NOW, endedAt: null, sourceRecordIds: ['original-in-2'] },
       { dutyId: 'legacy', empId: 'E1', postName: 'gate', status: 'missing_out', startedAt: NOW, endedAt: null },
     ],
+    handoverCandidates: [
+      { candidateId: 'handover-1', fromDutyId: 'duty-1', toDutyId: 'duty-2', siteId: 'site-1', postName: 'gate', status: 'proposed', expiresAt: '2026-10-16T08:00:00.000Z' },
+    ],
   };
   const original = structuredClone(seed);
   const store = createInMemoryStore(seed);
@@ -126,4 +129,46 @@ test('one device winning a cancellation prevents a second device confirming stal
   assert.equal(cancelled.status, 'cancelled');
   fails('VERSION_CONFLICT', () => secondDevice.transitionMakeupCase(owner, { caseId: current.caseId, expectedVersion: 1, action: 'confirm', effectiveAt: NOW, reason: '本人確認', idempotencyKey: 'confirm' }));
   fails('INVALID_TRANSITION', () => secondDevice.transitionMakeupCase(owner, { caseId: current.caseId, expectedVersion: 2, action: 'cancel', idempotencyKey: 'cancel-again' }));
+});
+
+test('cross-device handover only returns one generic reminder to the verified incoming colleague', () => {
+  const { firstDevice, secondDevice } = setup();
+  const first = firstDevice.consumeHandoverReminder(colleague, { dutyId: 'duty-2', idempotencyKey: 'handover-1' });
+  assert.deepEqual(first, {
+    candidateId: 'handover-1',
+    message: '交接勤務時，請順便提醒上一班同仁記得完成下班打卡。',
+  });
+  assert.deepEqual(secondDevice.consumeHandoverReminder(colleague, { dutyId: 'duty-2', idempotencyKey: 'handover-2' }), { dismissed: true });
+  assert.deepEqual(firstDevice.consumeHandoverReminder(colleague, { dutyId: 'duty-2', idempotencyKey: 'handover-1' }), first);
+  fails('FORBIDDEN', () => firstDevice.consumeHandoverReminder(owner, { dutyId: 'duty-2', idempotencyKey: 'not-owner' }));
+});
+
+test('ambiguous, expired or inconsistent handover candidates do not create a reminder', () => {
+  for (const change of [
+    { expiresAt: '2026-10-15T00:00:00.000Z' },
+    { siteId: 'site-2' },
+    { postName: 'other' },
+    { status: 'resolved' },
+  ]) {
+    const { firstDevice } = setup();
+    const state = createInMemoryStore;
+    // Build a fresh fixture without mutating trusted data shared by the service.
+    const seed = {
+      principals: [{ ...colleague, role: 'employee' }],
+      duties: [{ dutyId: 'duty-1', empId: 'E1', siteId: 'site-1', postName: 'gate', status: 'missing_out', startedAt: '2026-10-15T08:00:00.000Z' }, { dutyId: 'duty-2', empId: 'E2', siteId: 'site-1', postName: 'gate', status: 'missing_out', startedAt: NOW }],
+      handoverCandidates: [{ candidateId: 'candidate', fromDutyId: 'duty-1', toDutyId: 'duty-2', siteId: 'site-1', postName: 'gate', status: 'proposed', expiresAt: '2026-10-16T08:00:00.000Z', ...change }],
+    };
+    const service = createAttendanceService({ store: state(seed), clock: () => NOW });
+    assert.deepEqual(service.consumeHandoverReminder(colleague, { dutyId: 'duty-2', idempotencyKey: `case-${Object.keys(change)[0]}` }), { dismissed: true });
+  }
+  const store = createInMemoryStore({
+    principals: [{ ...colleague, role: 'employee' }],
+    duties: [{ dutyId: 'duty-1', empId: 'E1', siteId: 'site-1', postName: 'gate', status: 'missing_out', startedAt: '2026-10-15T08:00:00.000Z' }, { dutyId: 'duty-2', empId: 'E2', siteId: 'site-1', postName: 'gate', status: 'missing_out', startedAt: NOW }],
+    handoverCandidates: [
+      { candidateId: 'first', fromDutyId: 'duty-1', toDutyId: 'duty-2', siteId: 'site-1', postName: 'gate', status: 'proposed', expiresAt: '2026-10-16T08:00:00.000Z' },
+      { candidateId: 'second', fromDutyId: 'duty-1', toDutyId: 'duty-2', siteId: 'site-1', postName: 'gate', status: 'proposed', expiresAt: '2026-10-16T08:00:00.000Z' },
+    ],
+  });
+  const service = createAttendanceService({ store, clock: () => NOW });
+  assert.deepEqual(service.consumeHandoverReminder(colleague, { dutyId: 'duty-2', idempotencyKey: 'ambiguous' }), { dismissed: true });
 });

@@ -148,6 +148,32 @@ function createAttendanceService({ store, clock = () => new Date().toISOString()
       return [...state.cases.values()].map(latest).filter(record => canRead(actor, record)).map(copy);
     },
 
+    consumeHandoverReminder(actorClaim, request) {
+      const actor = principal(actorClaim);
+      input(request, ['dutyId', 'idempotencyKey']);
+      if (!nonempty(request.dutyId)) reject('INVALID_ARGUMENT');
+      const incoming = state.duties.get(request.dutyId);
+      if (!incoming || incoming.empId !== actor.empId) reject('FORBIDDEN');
+      return idempotent(actor, 'consume-handover', request, () => {
+        const at = now();
+        const candidates = state.candidates.filter(candidate => {
+          if (!candidate || candidate.status !== 'proposed' || candidate.toDutyId !== incoming.dutyId ||
+              candidate.siteId !== incoming.siteId || candidate.postName !== incoming.postName || !timestamp(candidate.expiresAt) ||
+              Date.parse(candidate.expiresAt) < Date.parse(at)) return false;
+          const previous = state.duties.get(candidate.fromDutyId);
+          return previous && previous.status === 'missing_out' && !previous.endedAt &&
+            previous.siteId === incoming.siteId && previous.postName === incoming.postName;
+        });
+        if (candidates.length !== 1 || state.seenHints.has(candidates[0].candidateId)) return { dismissed: true };
+        const candidate = candidates[0];
+        state.seenHints.add(candidate.candidateId);
+        return {
+          candidateId: candidate.candidateId,
+          message: '交接勤務時，請順便提醒上一班同仁記得完成下班打卡。',
+        };
+      });
+    },
+
     readCaseHistory(actorClaim, caseId) {
       const actor = principal(actorClaim);
       return copy(entryFor(actor, caseId));
