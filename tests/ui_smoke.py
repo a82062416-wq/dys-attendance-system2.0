@@ -146,6 +146,14 @@ def verify_yangji_post_selection(browser):
     page.wait_for_function("localRecs.length === 1")
     assert page.evaluate("localRecs[0].postName") == "東哨D2"
 
+    page.evaluate("CURRENT_SITE_ID = 'C151'; updateYangjiPostControl()")
+    assert page.locator("#yangji-post-control.show").is_visible()
+    assert "東哨D2" in page.locator("#yangji-post-current").inner_text()
+    page.get_by_role("button", name="更換哨點").click()
+    page.locator("#yangji-post-modal.show").wait_for()
+    page.locator("#yangji-post-options").get_by_role("button", name="西南哨A").click()
+    assert "西南哨A" in page.locator("#yangji-post-current").inner_text()
+
     page.evaluate("""() => {
       CURRENT_SITE_ID = 'A001';
       doPunch('下班');
@@ -155,6 +163,29 @@ def verify_yangji_post_selection(browser):
     assert page.evaluate("localRecs[0].postName") is None
     page.close()
 
+
+def verify_collapsed_announcement(browser):
+    page = new_test_page(browser, {"width": 390, "height": 844})
+    page.add_init_script("localStorage.setItem('guide_done', '1')")
+    page.goto(BASE_URL, wait_until="domcontentloaded")
+    assert not page.locator("#announcement-toggle").is_visible()
+    assert not page.locator("#announce-bar").is_visible()
+    page.close()
+
+    page = new_test_page(browser, {"width": 390, "height": 844})
+    page.add_init_script("""
+      localStorage.setItem('guide_done', '1');
+      localStorage.setItem('site_announcement', '測試公告');
+      localStorage.setItem('site_announcement_level', 'urgent');
+    """)
+    page.goto(BASE_URL, wait_until="domcontentloaded")
+    assert page.locator("#announcement-toggle").is_visible()
+    assert not page.locator("#announce-bar").is_visible()
+    page.locator("#announcement-toggle").click()
+    assert page.locator("#announce-bar").is_visible()
+    assert "測試公告" in page.locator("#announce-bar").inner_text()
+    page.close()
+
 with sync_playwright() as playwright:
     import shutil
     browser = playwright.chromium.launch(headless=True, executable_path=shutil.which("chromium"))
@@ -162,6 +193,7 @@ with sync_playwright() as playwright:
     verify_login_layout_on_short_phone(browser)
     verify_supervisor_home(browser)
     verify_yangji_post_selection(browser)
+    verify_collapsed_announcement(browser)
     verify_viewport(browser, {"width": 390, "height": 844})
     verify_viewport(browser, {"width": 1440, "height": 900})
     browser.close()

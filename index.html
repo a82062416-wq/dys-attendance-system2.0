@@ -174,6 +174,15 @@ body:has(#page-checkin.active) nav{z-index:560}
   font-size:10px;color:var(--t3);opacity:.55;letter-spacing:.3px;pointer-events:none;z-index:50;
   font-family:var(--font);
 }
+.announcement-toggle{
+  position:fixed;top:calc(10px + var(--safe-top));right:calc(54px + var(--safe-right));z-index:55;
+  display:none;align-items:center;gap:5px;min-height:34px;padding:7px 10px;border:1px solid var(--border);
+  border-radius:999px;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--t2);box-shadow:0 4px 14px rgba(0,0,0,.08);
+  font:600 13px var(--font);cursor:pointer;
+}
+.announcement-toggle.show{display:inline-flex}
+.announcement-dot{width:7px;height:7px;border-radius:50%;background:#ff3b30;display:none}
+.announcement-toggle.urgent .announcement-dot{display:block}
 .announce-bar{
   background:linear-gradient(90deg,rgba(0,122,255,.08),rgba(0,122,255,.04));
   border-left:3px solid var(--accent);
@@ -182,8 +191,9 @@ body:has(#page-checkin.active) nav{z-index:560}
   font-size:13px;color:var(--t2);
   line-height:1.45;
   margin-bottom:2px;
-  display:flex;align-items:flex-start;justify-content:space-between;gap:8px;
+  display:none;align-items:flex-start;justify-content:space-between;gap:8px;
 }
+.announce-bar.show{display:flex}
 .announce-bar.level-important{
   background:linear-gradient(90deg,rgba(255,149,0,.1),rgba(255,149,0,.04));
   border-left-color:#ff9500;
@@ -743,6 +753,9 @@ tr:hover td{background:var(--surface2)}
 .yangji-post-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
 .yangji-post-option{min-height:58px;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);color:var(--t1);font:inherit;font-size:15px;font-weight:700;cursor:pointer}
 .yangji-post-option:active{transform:scale(.98);background:var(--fill2)}
+.yangji-post-option.is-current{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.yangji-post-control{display:none;align-items:center;justify-content:space-between;gap:10px;margin:0 0 2px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--accent) 26%,var(--border));border-radius:12px;background:color-mix(in srgb,var(--accent) 6%,var(--surface));font-size:13px;color:var(--t2)}
+.yangji-post-control.show{display:flex}.yangji-post-control strong{display:block;color:var(--t1);font-size:14px;margin-top:2px}.yangji-post-change{border:0;border-radius:9px;background:var(--surface);color:var(--accent);padding:8px 10px;font:700 13px var(--font);white-space:nowrap;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 @media(max-width:380px){.yangji-post-options{grid-template-columns:1fr}.yangji-post-option{min-height:52px}}
 .btn-secondary{padding:13px 18px;background:var(--fill2);color:var(--t2);border:none;border-radius:var(--rxs);font-size:15px;font-weight:500;cursor:pointer;font-family:var(--font)}
 .cfg-bar{background:color-mix(in srgb,var(--warn) 8%,var(--surface));border:.5px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:var(--rsm);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;font-size:13px;gap:10px}
@@ -1035,7 +1048,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.21 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.4.22 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1229,7 +1242,8 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.4.21 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.4.22 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <button type="button" class="announcement-toggle" id="announcement-toggle" onclick="toggleAnnouncement()" aria-expanded="false" aria-controls="announce-bar"><span class="announcement-dot" aria-hidden="true"></span>公告</button>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -1247,26 +1261,25 @@ button,input,select{font-family:var(--font)}
     </div>
 
     <!-- 系統公告 -->
-    <div class="announce-bar" id="announce-bar">
-      📢 系統公告：打卡系統正式上線，有問題請聯絡主管
-    </div>
+    <div class="announce-bar" id="announce-bar" aria-live="polite"></div>
     <script>
       (function(){
         var bar = document.getElementById('announce-bar');
+        var toggle = document.getElementById('announcement-toggle');
         var todayStr = new Date().toISOString().slice(0,10);
-        // 今天已關閉
-        if(sessionStorage.getItem('ann_dismissed') === todayStr){ bar.style.display='none'; return; }
+        var saved = String(localStorage.getItem('site_announcement') || '').trim();
+        if(!saved){ bar.style.display='none'; toggle.style.display='none'; return; }
         // 到期檢查
         var expiry = localStorage.getItem('site_announcement_expiry');
-        if(expiry && todayStr > expiry){ bar.style.display='none'; return; }
-        var saved  = localStorage.getItem('site_announcement') || '打卡系統正式上線，有問題請聯絡主管';
+        if(expiry && todayStr > expiry){ bar.style.display='none'; toggle.style.display='none'; return; }
         var level  = localStorage.getItem('site_announcement_level') || 'normal';
         var icon   = level==='urgent' ? '🚨' : level==='important' ? '⚠️' : '📢';
         var escSaved = String(saved).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
         if(level==='important') bar.classList.add('level-important');
-        if(level==='urgent')    bar.classList.add('level-urgent');
+        if(level==='urgent'){ bar.classList.add('level-urgent'); toggle.classList.add('urgent'); }
         bar.innerHTML = '<span class="announce-text">'+icon+' 系統公告：'+escSaved+'</span>'
-          + '<span class="announce-dismiss" onclick="dismissAnnouncement()" title="今日不再顯示">✕</span>';
+          + '<button type="button" class="announce-dismiss" onclick="toggleAnnouncement(false)" title="收合公告" aria-label="收合公告">✕</button>';
+        toggle.classList.add('show');
       })();
     </script>
 
@@ -1283,6 +1296,10 @@ button,input,select{font-family:var(--font)}
             <div class="emp-disp-id"   id="emp-disp-id">請點下方按鈕輸入員工編號</div>
           </div>
         </div>
+      </div>
+      <div class="yangji-post-control" id="yangji-post-control" aria-live="polite">
+        <div><span>本次值班哨點</span><strong id="yangji-post-current">尚未確認</strong></div>
+        <button type="button" class="yangji-post-change" onclick="changeYangjiPost()">更換哨點</button>
       </div>
 
       <!-- 大打卡按鈕（永遠顯示，填滿剩餘空間） -->
@@ -3026,6 +3043,7 @@ function setEmpDisplay(emp){
     $('emp-disp-id').textContent = '⚠️ 已停用，請聯絡主管';
     disp.className = 'emp-display disabled-emp';
     $('btn-in').disabled = $('btn-out').disabled = true;
+    updateYangjiPostControl();
     return;
   }
   const todayDup = localRecs.filter(r=>r.empId===emp.id&&r.date===today());
@@ -3038,6 +3056,7 @@ function setEmpDisplay(emp){
     disp.className = 'emp-display has-emp';
   }
   $('btn-in').disabled = $('btn-out').disabled = false;
+  updateYangjiPostControl();
 }
 
 function setNoEmpDisplay(){
@@ -3048,6 +3067,7 @@ function setNoEmpDisplay(){
   $('emp-display').className = 'emp-display';
   $('change-btn').innerHTML = '🔢 輸入員工編號';
   $('btn-in').disabled = $('btn-out').disabled = true;
+  updateYangjiPostControl();
 }
 
 function openDrawer(){
@@ -3336,9 +3356,10 @@ async function doPunch(type){
   const name=emp?emp.name:id;
   const site=getSiteById(CURRENT_SITE_ID);
   const yangjiPosts=getYangjiPostOptions(site);
-  let postName=getYangjiPostSelection(id,CURRENT_SITE_ID);
-  if(yangjiPosts.length && !postName){
-    openYangjiPostPicker(type,id,site,yangjiPosts);
+  const postResolution=resolveYangjiPostForPunch(type,id,CURRENT_SITE_ID,localRecs,new Date());
+  let postName=postResolution.postName;
+  if(yangjiPosts.length && postResolution.needsConfirmation){
+    openYangjiPostPicker(type,id,site,yangjiPosts,postResolution.defaultPost);
     return;
   }
   const n=new Date();
@@ -3361,6 +3382,7 @@ async function doPunch(type){
     vibratePunch();
     showSuccess(name,type,timeStr,type==='上班',!navigator.onLine);
     CURRENT_SITE_ID = null; // 打卡完成後清除，下次打卡需重新掃描 QR Code
+    updateYangjiPostControl();
     if(emp) setTimeout(()=>setEmpDisplay(emp),3100);
     setTimeout(()=>{ $('btn-in').disabled=$('btn-out').disabled=false; },2000);
 
@@ -4806,11 +4828,28 @@ function clearLocal(){
   localRecs=[];saveRecs();loadRecords();showToast('本地紀錄已清除','');
 }
 
-// ── 關閉公告（今日） ──
-function dismissAnnouncement(){
-  sessionStorage.setItem('ann_dismissed', new Date().toISOString().slice(0,10));
-  const bar=$('announce-bar');
-  if(bar) bar.style.display='none';
+// ── 系統公告（預設收合，只有有效公告才顯示入口） ──
+function renderAnnouncement(){
+  const bar=$('announce-bar'),toggle=$('announcement-toggle');
+  if(!bar||!toggle) return;
+  const saved=String(localStorage.getItem('site_announcement')||'').trim();
+  const expiry=localStorage.getItem('site_announcement_expiry')||'';
+  const expired=expiry&&today()>expiry;
+  bar.className='announce-bar'; toggle.className='announcement-toggle';
+  if(!saved||expired){ bar.innerHTML=''; bar.classList.remove('show'); toggle.classList.remove('show'); toggle.setAttribute('aria-expanded','false'); return; }
+  const level=localStorage.getItem('site_announcement_level')||'normal';
+  const icon=level==='urgent'?'🚨':level==='important'?'⚠️':'📢';
+  if(level==='important') bar.classList.add('level-important');
+  if(level==='urgent'){ bar.classList.add('level-urgent'); toggle.classList.add('urgent'); }
+  bar.innerHTML='<span class="announce-text">'+icon+' 系統公告：'+escapeHtml(saved)+'</span><button type="button" class="announce-dismiss" onclick="toggleAnnouncement(false)" title="收合公告" aria-label="收合公告">✕</button>';
+  toggle.classList.add('show');
+}
+function toggleAnnouncement(forceOpen){
+  const bar=$('announce-bar'),toggle=$('announcement-toggle');
+  if(!bar||!toggle||!toggle.classList.contains('show')) return;
+  const open=typeof forceOpen==='boolean'?forceOpen:!bar.classList.contains('show');
+  bar.classList.toggle('show',open);
+  toggle.setAttribute('aria-expanded',String(open));
 }
 
 // ── 補打卡 ──
@@ -5326,16 +5365,8 @@ function saveSettings(){
   localStorage.setItem('site_announcement_level', annLevel);
   if(annExpiry){ localStorage.setItem('site_announcement_expiry', annExpiry); }
   else { localStorage.removeItem('site_announcement_expiry'); }
-  // 立即更新公告列
-  const bar = $('announce-bar');
-  if(bar){
-    bar.style.display='';
-    bar.className='announce-bar'+(annLevel==='important'?' level-important':annLevel==='urgent'?' level-urgent':'');
-    const icon = annLevel==='urgent'?'🚨':annLevel==='important'?'⚠️':'📢';
-    const txt = escapeHtml(announcement||'打卡系統正式上線，有問題請聯絡主管');
-    bar.innerHTML='<span class="announce-text">'+icon+' 系統公告：'+txt+'</span>'
-      +'<span class="announce-dismiss" onclick="dismissAnnouncement()" title="今日不再顯示">✕</span>';
-  }
+  // 公告設定儲存後維持收合，避免影響打卡畫面。
+  renderAnnouncement();
   $('nav-brand').textContent=co;
   updateCfgBar();
   if(!supNew) showToast('設定已儲存 ✓','success');
@@ -5477,6 +5508,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.4.22',date:'2026.10',changes:['洋基美光哨點可在掃碼後查看並更換；上班沿用最近選擇，下班優先帶入本次上班哨點','沒有有效公告時首頁不再顯示預設橫幅；有公告時改由右上角入口展開','其他案場、QR 驗證、原始打卡紀錄與後台公告設定維持原樣']},
     {version:'v1.4.21',date:'2026.10',changes:['洋基美光早班、晚班掃 QR Code 後，首次打卡須選擇值班哨點；同一員工的上下班自動帶入','哨點同步寫入 Firebase 與 Google Sheets，洋基六欄出勤表可顯示後續打卡的哨點','其他案場、QR 驗證與長按打卡流程維持原樣']},
     {version:'v1.4.20',date:'2026.10',changes:['後台查打卡與月度報表按所選日期核對雲端紀錄，讀取失敗時標示資料未確認','待上傳紀錄在開啟網站、恢復網路與返回頁面時自動補傳，改善雲端同步','洋基美光案場新增六欄 Excel 出勤表匯出；舊紀錄未存哨點時留空','員工長按打卡與 QR 驗證流程維持原樣']},
     {version:'v1.4.19',date:'2026.10',changes:['幹部登入後先看到簡潔的幹部工作台與負責案場範圍','待處理、案場狀態與查打卡入口直接說明可查資訊，其餘功能收進更多功能','幹部首頁異常提醒只計入已分配案場，打卡流程不變']},
@@ -6577,6 +6609,37 @@ function getYangjiPostSelection(empId,siteId){
   }catch(e){ return ''; }
 }
 
+function getRecordMoment(record){
+  const source=String(record&&record.timestamp||'');
+  const parsed=source ? new Date(source) : new Date(`${record&&record.date||''}T${record&&record.time||'00:00:00'}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function findOpenYangjiDutyPost(records,empId,siteId,now){
+  const entries=(Array.isArray(records)?records:[])
+    .filter(record=>record&&record.empId===empId&&record.siteId===siteId&&['上班','下班'].includes(record.type))
+    .map(record=>({record,moment:getRecordMoment(record)})).filter(entry=>entry.moment)
+    .sort((a,b)=>a.moment-b.moment);
+  let open=null;
+  entries.forEach(entry=>{ if(entry.record.type==='上班') open=entry; else if(open) open=null; });
+  if(!open||!open.record.postName) return '';
+  const age=now instanceof Date ? now-open.moment : 0;
+  return age>=0&&age<=36*60*60*1000 ? String(open.record.postName) : '';
+}
+
+function resolveYangjiPostForPunch(type,empId,siteId,records,now){
+  const site=getSiteById(siteId);
+  const options=getYangjiPostOptions(site);
+  if(!options.length) return {postName:'',needsConfirmation:false,defaultPost:''};
+  const saved=getYangjiPostSelection(empId,siteId);
+  if(type==='下班'){
+    const dutyPost=findOpenYangjiDutyPost(records,empId,siteId,now||new Date());
+    if(dutyPost&&options.includes(dutyPost)) return {postName:dutyPost,needsConfirmation:false,defaultPost:dutyPost};
+    return {postName:'',needsConfirmation:true,defaultPost:saved};
+  }
+  return saved ? {postName:saved,needsConfirmation:false,defaultPost:saved} : {postName:'',needsConfirmation:true,defaultPost:''};
+}
+
 function saveYangjiPostSelection(empId,siteId,postName){
   if(!empId||!siteId||!postName) return;
   let selections={};
@@ -6586,11 +6649,29 @@ function saveYangjiPostSelection(empId,siteId,postName){
 }
 
 let _yangjiPendingPunch=null;
-function openYangjiPostPicker(type,empId,site,options){
+function updateYangjiPostControl(){
+  const control=$('yangji-post-control');
+  const id=localStorage.getItem('last_emp_id')||currentId.trim();
+  const site=getSiteById(CURRENT_SITE_ID);
+  if(!control||!id||!getYangjiPostOptions(site).length){ if(control) control.classList.remove('show'); return; }
+  const post=getYangjiPostSelection(id,CURRENT_SITE_ID);
+  $('yangji-post-current').textContent=post||'尚未確認（打卡時選擇）';
+  control.classList.add('show');
+}
+
+function changeYangjiPost(){
+  const id=localStorage.getItem('last_emp_id')||currentId.trim();
+  const site=getSiteById(CURRENT_SITE_ID);
+  const options=getYangjiPostOptions(site);
+  if(!id||!options.length){ showToast('請先掃描洋基美光案場 QR Code','error'); return; }
+  openYangjiPostPicker(null,id,site,options,getYangjiPostSelection(id,CURRENT_SITE_ID));
+}
+
+function openYangjiPostPicker(type,empId,site,options,defaultPost=''){
   closeDrawer();
   _yangjiPendingPunch={type,empId,siteId:CURRENT_SITE_ID};
-  $('yangji-post-site').textContent=`${site.name}：請選擇值班哨點（只需選一次）`;
-  $('yangji-post-options').innerHTML=options.map(post=>`<button type="button" class="yangji-post-option" onclick='selectYangjiPost(${JSON.stringify(post)})'>${escapeHtml(post)}</button>`).join('');
+  $('yangji-post-site').textContent=defaultPost?`${site.name}：目前為「${defaultPost}」，可直接沿用或更換。`:`${site.name}：請確認本次值班哨點。`;
+  $('yangji-post-options').innerHTML=options.map(post=>`<button type="button" class="yangji-post-option${post===defaultPost?' is-current':''}" onclick='selectYangjiPost(${JSON.stringify(post)})'>${escapeHtml(post)}${post===defaultPost?'（目前）':''}</button>`).join('');
   const modal=$('yangji-post-modal');
   modal.classList.add('show');
   modal.setAttribute('aria-hidden','false');
@@ -6604,7 +6685,8 @@ function selectYangjiPost(postName){
   const modal=$('yangji-post-modal');
   modal.classList.remove('show');
   modal.setAttribute('aria-hidden','true');
-  doPunch(pending.type);
+  updateYangjiPostControl();
+  if(pending.type) doPunch(pending.type);
 }
 
 /** 與洋基原始出勤表相同的六欄；夜班隔日早上的下班記在上班月份。 */
@@ -7067,7 +7149,7 @@ setInterval(runPendingSync,60000);
   history.replaceState({}, '', location.pathname);
   const site = getSiteById(CURRENT_SITE_ID);
   const siteName = site ? site.name : CURRENT_SITE_ID;
-  window.addEventListener('load',()=>{
+  const renderQrSiteBadge=()=>{
     // 更新打卡頁顯示的案場資訊
     const badge = document.createElement('div');
     badge.style.cssText='background:var(--accent);color:#fff;border-radius:50px;padding:4px 14px;font-size:12px;font-weight:600;display:inline-block;margin-bottom:10px';
@@ -7077,7 +7159,10 @@ setInterval(runPendingSync,60000);
     badge.className='qr-site-badge';
     const checkinHost = document.querySelector('#page-checkin .emp-display, #page-checkin');
     if(checkinHost) checkinHost.insertAdjacentElement('beforebegin', badge);
-  },{once:true});
+    updateYangjiPostControl();
+  };
+  if(document.readyState==='loading') window.addEventListener('load',renderQrSiteBadge,{once:true});
+  else renderQrSiteBadge();
 })();
 
 </script>

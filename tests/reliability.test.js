@@ -45,6 +45,30 @@ test('洋基早晚班只提供各自可選的哨點，其他案場不要求選�
   assert.deepEqual(Array.from(context.getOptions({name:'一般案場'})), []);
 });
 
+test('洋基下班優先使用本次未完成上班的哨點，資料不足才要求確認', () => {
+  const sites={C151:{name:'洋基美光－早'},N151:{name:'洋基美光－晚'}};
+  const context={
+    Date,
+    getSiteById:id=>sites[id],
+    getYangjiPostSelection:()=> '西南哨A',
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'isYangjiReportSite')}; ${extractFunction(inlineScript, 'getYangjiPostOptions')}; ${extractFunction(inlineScript, 'getRecordMoment')}; ${extractFunction(inlineScript, 'findOpenYangjiDutyPost')}; ${extractFunction(inlineScript, 'resolveYangjiPostForPunch')}; this.resolve = resolveYangjiPostForPunch;`, context);
+  const records=[
+    {empId:'7001',siteId:'N151',type:'上班',postName:'東哨D2',timestamp:'2026-10-16T18:55:00+08:00'},
+  ];
+  const result=context.resolve('下班','7001','N151',records,new Date('2026-10-17T06:55:00+08:00'));
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {postName:'東哨D2',needsConfirmation:false,defaultPost:'東哨D2'});
+  const noEvidence=context.resolve('下班','7001','N151',[],new Date('2026-10-17T06:55:00+08:00'));
+  assert.deepEqual(JSON.parse(JSON.stringify(noEvidence)), {postName:'',needsConfirmation:true,defaultPost:'西南哨A'});
+});
+
+test('首頁公告沒有設定時不保留預設公告，公告入口預設收合', () => {
+  assert.doesNotMatch(html, /打卡系統正式上線，有問題請聯絡主管/);
+  assert.match(html, /id="announcement-toggle"/);
+  assert.match(extractFunction(inlineScript, 'renderAnnouncement'), /!saved\|\|expired/);
+  assert.match(extractFunction(inlineScript, 'toggleAnnouncement'), /classList\.toggle\('show',open\)/);
+});
+
 test('月度報表只在指定月份雲端資料完整時返回紀錄', async () => {
   const calls = [];
   const notices = [];
@@ -973,8 +997,8 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.21');
-  assert.match(notes[0].changes.join(' '), /Firebase.*Google Sheets/);
+  assert.equal(notes[0].version, 'v1.4.22');
+  assert.match(notes[0].changes.join(' '), /公告/);
   assert.match(notes[0].changes.join(' '), /洋基.*哨點/);
   assert.equal(notes[0].date, '2026.10');
   assert.ok(notes.find(note => note.version==='v1.4.19').changes.some(change => change.includes('幹部工作台')));
