@@ -297,10 +297,48 @@ def verify_local_makeup_draft(browser):
     }""")
     page.locator('#makeup-date').fill(date)
     page.locator('#makeup-time').fill(time)
+    page.evaluate("""() => {
+      window.beforeFailureLedger=localStorage.getItem('smart_attendance_v4_makeup_cases');
+      window.beforeFailureRecords=JSON.stringify(localRecs);
+      window.originalStorageSetItem=Storage.prototype.setItem;
+      Storage.prototype.setItem=function(key,value){
+        if(key==='smart_attendance_v4_makeup_cases') throw new DOMException('Storage full','QuotaExceededError');
+        return window.originalStorageSetItem.call(this,key,value);
+      };
+    }""")
+    for action in ('儲存本機補卡申請', '稍後處理'):
+        page.get_by_role('button', name=action, exact=True).click()
+        assert '尚未儲存' in page.locator('#makeup-error').inner_text()
+        assert page.locator('#makeup-modal').is_visible()
+        page.get_by_role('button', name='取消（不儲存）', exact=True).click()
+        assert not page.locator('#makeup-modal').is_visible()
+        assert page.evaluate("localStorage.getItem('smart_attendance_v4_makeup_cases')===beforeFailureLedger")
+        assert page.evaluate('JSON.stringify(localRecs)===beforeFailureRecords')
+        page.evaluate("() => { openDrawer();currentId='70000001';confirmId(); }")
+        page.locator('#makeup-modal.show').wait_for()
+        page.locator('#makeup-date').fill(date)
+        page.locator('#makeup-time').fill(time)
+    page.get_by_role('button', name='取消（不儲存）', exact=True).click()
+    page.evaluate("""async () => {
+      CURRENT_SITE_ID='A001';
+      await doPunch('下班');
+      employees.push({id:'70000002',name:'換班同仁'});
+      openDrawer();currentId='70000002';confirmId();
+      CURRENT_SITE_ID='A001';
+      await doPunch('上班');
+    }""")
+    assert page.evaluate('localRecs.length') == 4, '補卡額滿取消後仍可QR打卡及換人打卡'
+    assert page.evaluate("localRecs[0].empId") == '70000002'
+    assert page.evaluate("localStorage.getItem('smart_attendance_v4_makeup_cases')===beforeFailureLedger")
+    page.evaluate("() => { openDrawer();currentId='70000001';confirmId(); }")
+    page.locator('#makeup-modal.show').wait_for()
+    page.locator('#makeup-date').fill(date)
+    page.locator('#makeup-time').fill(time)
+    page.evaluate('() => { Storage.prototype.setItem=window.originalStorageSetItem; }')
     page.get_by_role('button', name='儲存本機補卡申請', exact=True).click()
     assert page.locator('#makeup-message').inner_text() == '已儲存待主管核實，本裝置尚未送至雲端'
-    assert page.evaluate('JSON.stringify(localRecs[1]) === originalPrior')
-    assert page.evaluate('localRecs.length') == 2
+    assert page.evaluate('JSON.stringify(localRecs[3]) === originalPrior')
+    assert page.evaluate('localRecs.length') == 4
     assert page.evaluate("JSON.parse(localStorage.getItem('smart_attendance_v4_makeup_cases')).at(-1).status") == 'requested'
     page.get_by_role('button', name='關閉', exact=True).click()
     page.reload(wait_until='domcontentloaded')

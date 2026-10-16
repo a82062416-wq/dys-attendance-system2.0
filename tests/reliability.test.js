@@ -36,7 +36,7 @@ function ownPunch(type,date,time,extra={}) {
 function makeupContext(records = []) {
   const state = myDutyContext(records);
   const {context,nodes} = state;
-  for(const id of ['makeup-modal','makeup-summary','makeup-date','makeup-time','makeup-error','makeup-form','makeup-message','makeup-defer','makeup-submit']){
+  for(const id of ['makeup-modal','makeup-summary','makeup-date','makeup-time','makeup-error','makeup-form','makeup-message','makeup-defer','makeup-submit','makeup-close']){
     const classes = new Set();
     nodes[id] = {textContent:'',value:'',hidden:false,focus(){},setAttribute(){},classList:{add:key=>classes.add(key),remove:key=>classes.delete(key),contains:key=>classes.has(key)}};
   }
@@ -50,7 +50,7 @@ function makeupContext(records = []) {
 }
 
 test('本人成功上班才建立不可猜 id 的本機補卡 draft，僅還原上次編號不顯示',()=>{
-  const old=ownPunch('上班','2026-01-31','20:00:00');
+  const old=ownPunch('上班','2026-01-30','20:00:00');
   const current=ownPunch('上班','2026-02-01','08:00:00');
   for(const confirmed of [false,true]){
     const {context,nodes,storage}=makeupContext([old,current]);
@@ -62,7 +62,7 @@ test('本人成功上班才建立不可猜 id 的本機補卡 draft，僅還原�
     if(confirmed){
       const cases=JSON.parse(storage.get('smart_attendance_v4_makeup_cases'));
       assert.match(cases[0].id,/^[0-9a-f-]{36}$/);
-      assert.match(nodes['makeup-summary'].textContent,/2026.*01.*31.*20:00/);
+      assert.match(nodes['makeup-summary'].textContent,/2026.*01.*30.*20:00/);
       context.showLocalMakeupReminder(current);
       assert.equal(JSON.parse(storage.get('smart_attendance_v4_makeup_cases')).length,1);
     }
@@ -71,7 +71,7 @@ test('本人成功上班才建立不可猜 id 的本機補卡 draft，僅還原�
 });
 
 test('補卡稍後可在再次確認本人恢復同一 case，填寫跨日只追加本機申請並誠實提示',()=>{
-  const old=ownPunch('上班','2026-01-31','20:00:00');
+  const old=ownPunch('上班','2026-01-30','20:00:00');
   const current=ownPunch('上班','2026-02-01','08:00:00');
   const {context,nodes,storage}=makeupContext([old,current]);
   context.showLocalMakeupReminder(current);
@@ -84,7 +84,7 @@ test('補卡稍後可在再次確認本人恢復同一 case，填寫跨日只追
   assert.equal(nodes['makeup-modal'].classList.contains('show'),false);
   context._myDutyEmpId='70000001';context.resumeLocalMakeupCase();
   assert.equal(nodes['makeup-modal'].classList.contains('show'),true);
-  nodes['makeup-date'].value='2026-01-31';nodes['makeup-time'].value='19:59';
+  nodes['makeup-date'].value='2026-01-30';nodes['makeup-time'].value='19:59';
   context.saveLocalMakeupConfirmation('requested');
   assert.match(nodes['makeup-error'].textContent,/不得早於/);
   assert.equal(JSON.parse(storage.get('smart_attendance_v4_makeup_cases')).length,2);
@@ -103,7 +103,7 @@ test('補卡稍後可在再次確認本人恢復同一 case，填寫跨日只追
 });
 
 test('換人或未確認本人不可提交或恢復他人的本機補卡',()=>{
-  const {context,nodes,storage}=makeupContext([ownPunch('上班','2026-01-31','20:00:00'),ownPunch('上班','2026-02-01','08:00:00')]);
+  const {context,nodes,storage}=makeupContext([ownPunch('上班','2026-01-30','20:00:00'),ownPunch('上班','2026-02-01','08:00:00')]);
   context.showLocalMakeupReminder(context.localRecs[1]);
   const snapshot=storage.get('smart_attendance_v4_makeup_cases');
   context._myDutyEmpId='other';
@@ -114,8 +114,45 @@ test('換人或未確認本人不可提交或恢復他人的本機補卡',()=>{
   assert.equal(nodes['makeup-modal'].classList.contains('show'),false);
 });
 
+test('補卡申請或稍後處理寫入額滿時誠實提示，仍可不寫入關閉並保留原草稿與打卡',()=>{
+  for(const action of ['requested','deferred']){
+    const {context,nodes,storage}=makeupContext([ownPunch('上班','2026-01-30','20:00:00'),ownPunch('上班','2026-02-01','08:00:00')]);
+    context.showLocalMakeupReminder(context.localRecs[1]);
+    const ledger=storage.get('smart_attendance_v4_makeup_cases');
+    const records=JSON.stringify(context.localRecs);
+    nodes['makeup-date'].value='2026-02-01';nodes['makeup-time'].value='07:00';
+    let writes=0;
+    context.localStorage.setItem=()=>{writes++;throw new DOMException('Storage full','QuotaExceededError');};
+    context.saveLocalMakeupConfirmation(action);
+    assert.match(nodes['makeup-error'].textContent,/尚未儲存/);
+    assert.equal(nodes['makeup-modal'].classList.contains('show'),true);
+    assert.equal(nodes['makeup-close'].hidden,false,'儲存失敗仍須提供可見關閉按鈕');
+    assert.match(html,/<button id="makeup-close"[^>]*onclick="clearLocalMakeup\(\)"/);
+    context.clearLocalMakeup();
+    assert.equal(nodes['makeup-modal'].classList.contains('show'),false);
+    assert.equal(writes,1,'取消不得再嘗試寫入');
+    assert.equal(storage.get('smart_attendance_v4_makeup_cases'),ledger);
+    assert.equal(JSON.parse(ledger).at(-1).status,'draft');
+    assert.equal(JSON.stringify(context.localRecs),records);
+    context.resumeLocalMakeupCase();
+    assert.equal(nodes['makeup-modal'].classList.contains('show'),true,'未儲存的原草稿仍可恢復');
+  }
+});
+
+test('一分鐘重複上班與同日班次衝突不建立自主補卡草稿也不改寫打卡',()=>{
+  for(const time of ['08:01:00','20:00:00']){
+    const records=[ownPunch('上班','2026-02-01','08:00:00'),ownPunch('上班','2026-02-01',time)];
+    const {context,nodes,storage}=makeupContext(records);
+    const snapshot=JSON.stringify(records);
+    context.showLocalMakeupReminder(records[1]);
+    assert.equal(storage.has('smart_attendance_v4_makeup_cases'),false);
+    assert.equal(nodes['makeup-modal'].classList.contains('show'),false);
+    assert.equal(JSON.stringify(context.localRecs),snapshot);
+  }
+});
+
 test('交接與自主補卡提醒依序顯示，不覆蓋已顯示的交接提醒',()=>{
-  const {context,nodes,storage}=makeupContext([ownPunch('上班','2026-01-31','20:00:00'),ownPunch('上班','2026-02-01','08:00:00')]);
+  const {context,nodes,storage}=makeupContext([ownPunch('上班','2026-01-30','20:00:00'),ownPunch('上班','2026-02-01','08:00:00')]);
   const classes=new Set(['show']);
   nodes['handover-reminder-modal']={classList:{contains:key=>classes.has(key),remove:key=>classes.delete(key)},setAttribute(){}};
   context.showLocalMakeupReminder(context.localRecs[1]);

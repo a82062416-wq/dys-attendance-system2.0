@@ -968,7 +968,7 @@ button,input,select{font-family:var(--font)}
       <button id="makeup-defer" type="button" class="btn-s bs-ghost" style="margin-top:12px;width:100%" onclick="saveLocalMakeupConfirmation('deferred')">稍後處理</button>
     </div>
     <p id="makeup-message" role="status">僅儲存在本裝置，尚未送至雲端；不會新增正式打卡。</p>
-    <button id="makeup-close" type="button" class="confirm-btn" hidden onclick="clearLocalMakeup()">關閉</button>
+    <button id="makeup-close" type="button" class="confirm-btn" onclick="clearLocalMakeup()">取消（不儲存）</button>
   </div>
 </div>
 <div id="yangji-post-modal" class="lookup-modal" aria-hidden="true">
@@ -3077,7 +3077,7 @@ function showMakeupCase(item){
   $('makeup-error').textContent='';
   $('makeup-message').textContent='僅儲存在本裝置，尚未送至雲端；不會新增正式打卡。';
   $('makeup-form').hidden=false;
-  if($('makeup-close')) $('makeup-close').hidden=true;
+  if($('makeup-close')){$('makeup-close').hidden=false;$('makeup-close').textContent='取消（不儲存）';}
   $('makeup-modal').classList.add('show');$('makeup-modal').setAttribute('aria-hidden','false');
   $('makeup-defer').focus();
   return true;
@@ -3107,6 +3107,11 @@ function showLocalMakeupReminder(rec){
     const incoming=own.find(record=>record.timestamp===rec.timestamp&&record.type==='上班');
     const candidate=SmartAttendanceV4.findPreviousMissingOut(own,incoming,{clockInSucceeded:true,cases});
     if(!candidate) return;
+    // 納入本次上班後仍須明確漏下班；重複或班次衝突不建立補卡草稿。
+    const duties=SmartAttendanceV4.buildDutyPairs(own);
+    const previousDuty=duties.find(duty=>duty.startedAt===candidate.originalClockIn.timestamp&&duty.siteId===candidate.originalClockIn.siteId&&duty.postName===candidate.originalClockIn.postName);
+    if(!previousDuty||previousDuty.status!=='missing_out'||previousDuty.sourceRecordIds.length!==1||
+        duties.some(duty=>duty.eventAt===new Date(incoming.timestamp).toISOString()&&['duplicate','ambiguous'].includes(duty.status))) return;
     const id=crypto.randomUUID?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),byte=>byte.toString(16).padStart(2,'0')).join('');
     const next=SmartAttendanceV4.appendMakeupCase(cases,candidate,'draft',{empId:_myDutyEmpId,id,now:new Date().toISOString()});
     localStorage.setItem('smart_attendance_v4_makeup_cases',JSON.stringify(next));
@@ -3134,10 +3139,10 @@ function saveLocalMakeupConfirmation(action){
     localStorage.setItem('smart_attendance_v4_makeup_cases',JSON.stringify(next));
     if(action==='deferred'){clearLocalMakeup();return;}
     $('makeup-error').textContent='';$('makeup-form').hidden=true;
-    if($('makeup-close')) $('makeup-close').hidden=false;
+    if($('makeup-close')){$('makeup-close').hidden=false;$('makeup-close').textContent='關閉';}
     $('makeup-message').textContent='已儲存待主管核實，本裝置尚未送至雲端';
   }catch(error){
-    $('makeup-error').textContent=error.message.includes('time')?'請填寫有效日期與時間，下班不得早於前次上班。':'尚未儲存，請重試或稍後處理。';
+    $('makeup-error').textContent=error.message.includes('time')?'請填寫有效日期與時間，下班不得早於前次上班。':'尚未儲存，請重試或取消（不儲存）關閉。';
   }
 }
 
