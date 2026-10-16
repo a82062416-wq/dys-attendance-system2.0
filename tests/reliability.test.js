@@ -231,6 +231,7 @@ test('上班先完成本機寫入與成功畫面，再非阻塞排入交接提�
   const context={
     localStorage:{getItem:()=> '70000001'},currentId:'',getSites:()=>[],CURRENT_SITE_ID:'A001',IS_DEMO:false,SCRIPT_URL:'test',
     employees:[{id:'70000001'}],findEmp:()=>({id:'70000001',name:'本人同仁'}),getSiteById:()=>({}),getYangjiPostOptions:()=>[],getYangjiPostSelection:()=>null,
+    resolveYangjiPostForPunch:()=>({postName:'',needsConfirmation:false}),updateYangjiPostControl:()=>{},
     localRecs:[],pad:value=>String(value).padStart(2,'0'),fetchClientIP:async()=>null,
     saveRecs:()=>events.push('saved'),uploadToFirebase:()=>events.push('firebase'),pruneOldRecs:()=>{},
     $:()=>({disabled:false}),vibratePunch:()=>{},navigator:{onLine:true},showSuccess:()=>events.push('success'),
@@ -260,6 +261,7 @@ test('成功打卡不提升上次儲存的身分，僅已確認本人可更新�
       Date:class extends Date{constructor(...args){super(...(args.length?args:['2026-10-15T12:00:00Z']));}},
       currentId:'',getSites:()=>[{id:'A001',active:true}],CURRENT_SITE_ID:'A001',IS_DEMO:false,SCRIPT_URL:'',
       employees:[{id:'70000001'}],getYangjiPostSelection:()=> '東哨D2',
+      resolveYangjiPostForPunch:()=>({postName:'東哨D2',needsConfirmation:false}),updateYangjiPostControl:()=>{},
       pad:value=>String(value).padStart(2,'0'),fetchClientIP:async()=>null,
       saveRecs:()=>{},uploadToFirebase:()=>{},pruneOldRecs:()=>{},vibratePunch:()=>{},
       navigator:{onLine:true},showSuccess:()=>{},setEmpDisplay:()=>context.updateMyDutyStatus(),
@@ -319,6 +321,30 @@ test('洋基早晚班只提供各自可選的哨點，其他案場不要求選�
     ['工務所E','東門哨A2','西南哨A','東哨D2','管制哨C'],
   );
   assert.deepEqual(Array.from(context.getOptions({name:'一般案場'})), []);
+});
+
+test('洋基下班優先使用本次未完成上班的哨點，資料不足才要求確認', () => {
+  const sites={C151:{name:'洋基美光－早'},N151:{name:'洋基美光－晚'}};
+  const context={
+    Date,
+    getSiteById:id=>sites[id],
+    getYangjiPostSelection:()=> '西南哨A',
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript, 'isYangjiReportSite')}; ${extractFunction(inlineScript, 'getYangjiPostOptions')}; ${extractFunction(inlineScript, 'getRecordMoment')}; ${extractFunction(inlineScript, 'findOpenYangjiDutyPost')}; ${extractFunction(inlineScript, 'resolveYangjiPostForPunch')}; this.resolve = resolveYangjiPostForPunch;`, context);
+  const records=[
+    {empId:'7001',siteId:'N151',type:'上班',postName:'東哨D2',timestamp:'2026-10-16T18:55:00+08:00'},
+  ];
+  const result=context.resolve('下班','7001','N151',records,new Date('2026-10-17T06:55:00+08:00'));
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {postName:'東哨D2',needsConfirmation:false,defaultPost:'東哨D2'});
+  const noEvidence=context.resolve('下班','7001','N151',[],new Date('2026-10-17T06:55:00+08:00'));
+  assert.deepEqual(JSON.parse(JSON.stringify(noEvidence)), {postName:'',needsConfirmation:true,defaultPost:'西南哨A'});
+});
+
+test('首頁公告沒有設定時不保留預設公告，公告入口預設收合', () => {
+  assert.doesNotMatch(html, /打卡系統正式上線，有問題請聯絡主管/);
+  assert.match(html, /id="announcement-toggle"/);
+  assert.match(extractFunction(inlineScript, 'renderAnnouncement'), /!saved\|\|expired/);
+  assert.match(extractFunction(inlineScript, 'toggleAnnouncement'), /classList\.toggle\('show',open\)/);
 });
 
 test('月度報表只在指定月份雲端資料完整時返回紀錄', async () => {
@@ -1347,9 +1373,9 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.4.21');
-  assert.match(notes[0].changes.join(' '), /Firebase.*Google Sheets/);
-  assert.match(notes[0].changes.join(' '), /洋基.*哨點/);
+  assert.equal(notes[0].version, 'v1.5.0');
+  assert.match(notes[0].changes.join(' '), /交接班/);
+  assert.match(notes[0].changes.join(' '), /補卡/);
   assert.equal(notes[0].date, '2026.10');
   assert.ok(notes.find(note => note.version==='v1.4.19').changes.some(change => change.includes('幹部工作台')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));

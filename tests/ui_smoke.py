@@ -189,6 +189,29 @@ def verify_yangji_post_selection(browser):
     page.close()
 
 
+def verify_collapsed_announcement(browser):
+    page = new_test_page(browser, {"width": 390, "height": 844})
+    page.add_init_script("localStorage.setItem('guide_done', '1')")
+    page.goto(BASE_URL, wait_until="domcontentloaded")
+    assert not page.locator("#announcement-toggle").is_visible()
+    assert not page.locator("#announce-bar").is_visible()
+    page.close()
+
+    page = new_test_page(browser, {"width": 390, "height": 844})
+    page.add_init_script("""
+      localStorage.setItem('guide_done', '1');
+      localStorage.setItem('site_announcement', '測試公告');
+      localStorage.setItem('site_announcement_level', 'urgent');
+    """)
+    page.goto(BASE_URL, wait_until="domcontentloaded")
+    assert page.locator("#announcement-toggle").is_visible()
+    assert not page.locator("#announce-bar").is_visible()
+    page.locator("#announcement-toggle").click()
+    assert page.locator("#announce-bar").is_visible()
+    assert "測試公告" in page.locator("#announce-bar").inner_text()
+    page.close()
+
+
 def verify_local_duty_status_and_handover(browser):
     page = new_test_page(browser, {"width": 320, "height": 568})
     page_errors = []
@@ -386,6 +409,7 @@ with sync_playwright() as playwright:
     verify_login_layout_on_short_phone(browser)
     verify_supervisor_home(browser)
     verify_yangji_post_selection(browser)
+    verify_collapsed_announcement(browser)
     verify_restored_identity_punch_privacy(browser)
     verify_local_duty_status_and_handover(browser)
     verify_viewport(browser, {"width": 390, "height": 844})
