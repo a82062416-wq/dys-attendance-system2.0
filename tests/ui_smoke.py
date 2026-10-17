@@ -18,6 +18,7 @@ def new_test_page(browser, viewport):
 
 def stub_backend_sync(page):
     page.evaluate("""() => {
+      FB_AUTH_READY = Promise.resolve(true);
       syncSupervisorsFromFirebase = async status => { if(status) status.verified = true; return []; };
       syncAuthFromFirebase = async status => { if(status){ status.verified = true; status.loaded = true; } };
     }""")

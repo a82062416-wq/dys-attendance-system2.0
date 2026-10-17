@@ -2645,17 +2645,24 @@ function setSupPwdHash(p){
   logAudit('change_supervisor_password', '幹部登入密碼已變更');
 }
 async function syncAuthFromFirebase(status){
-  if(!FB_DB){if(status) status.verified=false;return;}
+  if(!FB_DB){if(status){status.verified=false;status.reason='firebase_unavailable';}return;}
   try{
     const snap = await FB_DB.ref('config/auth').once('value');
     if(status&&status.active===false) return;
     const data = snap.val();
-    if(status){status.loaded=true;status.verified=!!(data&&data.admin_pwd_hash);}
+    if(status){status.loaded=true;status.verified=!!(data&&data.admin_pwd_hash);status.reason=status.verified?'verified':'auth_record_missing';}
     if(data){
       if(data.admin_pwd_hash) localStorage.setItem('admin_pwd_hash', data.admin_pwd_hash);
       if(data.supervisor_pwd_hash) localStorage.setItem('supervisor_pwd_hash', data.supervisor_pwd_hash);
     }
-  }catch(e){ if(status) status.verified=false; console.warn('密碼從 Firebase 讀取失敗:',e); }
+  }catch(e){
+    if(status){
+      status.verified=false;
+      const code=String(e&&e.code||'').toUpperCase();
+      status.reason=code.includes('PERMISSION_DENIED')?'permission_denied':code.includes('NETWORK')?'network_failed':'read_failed';
+    }
+    console.warn('密碼從 Firebase 讀取失敗:',e&&e.code||'read_failed');
+  }
 }
 function getResetKeyHash(){return localStorage.getItem('reset_key_hash')||''}
 function setResetKeyHash(k){localStorage.setItem('reset_key_hash',hashPwd(k))}
@@ -4118,6 +4125,8 @@ let ADMIN_AUTH_VERIFIED=false;
 async function goAdmin(el){
   if(adminOpening) return;
   adminOpening=true;
+  // 每次開啟／重新連線都必須重新建立可信狀態，不能沿用前一次成功結果。
+  ADMIN_AUTH_VERIFIED=false;
   const button=$('tab-admin');
   button.disabled=true;
   button.textContent='⏳';
@@ -4129,12 +4138,13 @@ async function goAdmin(el){
   drawerOpen=false;
   showToast('正在確認後台資料…','info');
   let syncTimeout;
-  const supervisorStatus={verified:false,active:true}, authStatus={verified:false,loaded:false,active:true};
+  const supervisorStatus={verified:false,active:true}, authStatus={verified:false,loaded:false,active:true,reason:'pending'};
   try{
-    // 先嘗試雲端同步；逾時時只容許已有本機密碼的裝置進入登入畫面。
+    // 先嘗試雲端同步；逾時時僅開啟登入畫面，實際驗證仍必須等待可信雲端結果。
     const synced=await Promise.race([
       (async()=>{
-        await FB_AUTH_READY;
+        const signedIn=await FB_AUTH_READY;
+        if(!signedIn){authStatus.reason='anonymous_auth_failed';return false;}
         // 等待登入也計入十秒；逾時後不再啟動晚到的同步。
         if(!authStatus.active) return false;
         await Promise.all([syncSupervisorsFromFirebase(supervisorStatus), syncAuthFromFirebase(authStatus)]);
@@ -4146,7 +4156,8 @@ async function goAdmin(el){
     const cloudVerified=authStatus.verified;
     ADMIN_AUTH_VERIFIED=cloudVerified;
     const cloudStatus=$('login-cloud-status');
-    cloudStatus.textContent=cloudVerified?'✓ 管理員登入資料已從雲端確認':'⚠ 管理員登入資料尚未確認，請重新連線驗證';
+    const authMessage={anonymous_auth_failed:'Firebase 匿名登入失敗',permission_denied:'Firebase 權限不足',auth_record_missing:'雲端管理員驗證資料缺失',firebase_unavailable:'Firebase 無法使用',network_failed:'網路連線失敗',read_failed:'雲端資料讀取失敗',pending:'雲端連線逾時'}[authStatus.reason]||'雲端資料尚未確認';
+    cloudStatus.textContent=cloudVerified?'✓ 管理員登入資料已從雲端確認':`⚠ ${authMessage}，請重新連線驗證`;
     cloudStatus.style.color=cloudVerified?'var(--success)':'var(--warn)';
     const retryButton=$('retry-admin-cloud');
     if(retryButton) retryButton.style.display=cloudVerified?'none':'';

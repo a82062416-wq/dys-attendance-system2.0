@@ -589,7 +589,7 @@ test('後台雲端同步逾時但有本機密碼時仍可進入登入頁並標�
   assert.equal(lockButton.disabled,false);
   assert.equal(destination,'admin');
   assert.equal(elements['lock-screen'].style.display,'flex');
-  assert.match(elements['login-cloud-status'].textContent,/未確認/);
+  assert.match(elements['login-cloud-status'].textContent,/雲端連線逾時/);
   assert.ok(messages.some(item=>item.message.includes('逾時')));
   assert.equal(supervisorStatus.active,false);
   assert.equal(authStatus.active,false);
@@ -654,6 +654,38 @@ test('後台登入雲端讀取失敗時應標記為未確認', async () => {
   await context.run(status);
   assert.equal(status.verified,false);
   assert.equal(context.localStorage.getItem('admin_pwd_hash'),'local-hash');
+});
+
+test('Firebase 權限拒絕時保留快取但回報權限原因，不可把它當成已驗證', async () => {
+  const status={verified:true};
+  const context={
+    FB_DB:{ref:()=>({once:()=>Promise.reject({code:'PERMISSION_DENIED'})})},
+    localStorage:createStorage({admin_pwd_hash:'local-hash'}),
+    console:{warn(){}},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'syncAuthFromFirebase')}; this.run=syncAuthFromFirebase;`,context);
+  await context.run(status);
+  assert.equal(status.verified,false);
+  assert.equal(status.reason,'permission_denied');
+  assert.equal(context.localStorage.getItem('admin_pwd_hash'),'local-hash');
+});
+
+test('每次重新驗證一開始都要清除前一次成功狀態', async () => {
+  let releaseAuth;
+  const state=adminCloudContext({authReady:new Promise(resolve=>{releaseAuth=resolve;})});
+  state.context.ADMIN_AUTH_VERIFIED=true;
+  const opening=state.context.goAdmin();
+  assert.equal(state.context.ADMIN_AUTH_VERIFIED,false);
+  releaseAuth(true);
+  await opening;
+  assert.equal(state.context.ADMIN_AUTH_VERIFIED,true);
+});
+
+test('匿名登入失敗時顯示可判讀的雲端驗證原因', async () => {
+  const state=adminCloudContext({authReady:Promise.resolve(false)});
+  await state.context.goAdmin();
+  assert.match(state.nodes['login-cloud-status'].textContent,/匿名登入失敗/);
+  assert.notEqual(state.context.ADMIN_AUTH_VERIFIED,true);
 });
 
 test('後台登入雲端讀取成功時應標記為已確認', async () => {
