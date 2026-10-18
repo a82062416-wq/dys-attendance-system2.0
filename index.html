@@ -119,7 +119,7 @@ body:has(#page-checkin.active) nav{z-index:560}
 }
 .nav-tab:hover{background:var(--fill2);color:var(--t1)}
 .nav-tab.active{background:var(--accent);color:#fff}
-.nav-time{font-size:14px;color:var(--t2);font-variant-numeric:tabular-nums;min-width:48px;text-align:right}
+.nav-time{font-size:14px;color:var(--t2);font-variant-numeric:tabular-nums;min-width:48px;text-align:right;pointer-events:none}
 .nav-admin-btn{
   width:34px;height:34px;border-radius:50%;
   background:var(--fill2);
@@ -185,7 +185,7 @@ body:has(#page-checkin.active) nav{z-index:560}
   font-family:var(--font);
 }
 .announcement-toggle{
-  position:fixed;top:calc(10px + var(--safe-top));right:calc(54px + var(--safe-right));z-index:55;
+  position:fixed;top:calc(10px + var(--safe-top));right:calc(54px + var(--safe-right));z-index:561;
   display:none;align-items:center;gap:5px;min-height:34px;padding:7px 10px;border:1px solid var(--border);
   border-radius:999px;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--t2);box-shadow:0 4px 14px rgba(0,0,0,.08);
   font:600 13px var(--font);cursor:pointer;
@@ -1397,7 +1397,7 @@ button,input,select{font-family:var(--font)}
 
     <!-- ── 頁面標題列（選單 / 子頁共用） ── -->
     <div id="admin-page-header" style="display:flex;align-items:center;gap:6px;padding:8px 0 10px;min-height:40px">
-      <button id="sub-back-btn" class="sub-back-btn" onclick="showAdminMenu()" style="display:none">‹ 列表</button>
+      <button id="sub-back-btn" class="sub-back-btn" onclick="goBack()" style="display:none">‹ 返回</button>
       <span id="admin-page-title" style="font-size:15px;color:var(--t2);font-weight:600">管理後台</span>
     </div>
 
@@ -5621,12 +5621,17 @@ let pageHistory = ['checkin'];
 /** 管理後台子頁狀態：'menu' 顯示清單，'sub' 顯示子頁面 */
 let adminViewState = 'menu';
 
+/** 管理後台子頁歷史；只保存目前工作階段已確認可看的頁面。 */
+let adminSubHistory = [];
+
 /** 更新全局返回按鈕可見度 */
 function updateNavBackBtn(){
   const btn = $('globalBackBtn');
   if(!btn) return;
   const isHome = (pageHistory.length <= 1 || pageHistory[pageHistory.length-1] === 'checkin');
-  btn.style.visibility = isHome ? 'hidden' : 'visible';
+  // 在後台子頁只顯示頁面標題列的返回鍵，避免同一位置有兩顆相同功能按鈕。
+  const useSubBack = pageHistory[pageHistory.length-1] === 'admin' && adminViewState === 'sub';
+  btn.style.visibility = (isHome || useSubBack) ? 'hidden' : 'visible';
 }
 
 /**
@@ -5688,8 +5693,9 @@ function renderSupervisorHome(){
     ? '登入資料已確認；出勤紀錄請以各頁更新結果為準'
     : '登入資料未經雲端確認；案場與權限可能不是最新';
 }
-function showAdminMenu(){
+function showAdminMenu(options={}){
   adminViewState = 'menu';
+  if(!options.preserveHistory) adminSubHistory=[];
   document.querySelectorAll('.sub-page').forEach(p => p.classList.remove('active'));
   const menu = $('admin-menu');
   const isSupervisor=CURRENT_ROLE==='supervisor'&&!!CURRENT_SUPERVISOR;
@@ -5724,11 +5730,43 @@ function showAdminMenu(){
   updateAnomalyBanner(); // 每次回到首頁都更新異常橫幅
 }
 
+/**
+ * 關閉目前最上層覆蓋畫面。這個函式只做取消／關閉，不會送出打卡或表單。
+ * @returns {boolean} 是否已關閉一個覆蓋畫面
+ */
+function closeTopOverlay(){
+  const layers=[
+    ['idle-modal',()=>{const el=$('idle-modal');if(el) el.remove();}],
+    ['qr-detail-modal',()=>{const el=$('qr-detail-modal');if(el) el.remove();}],
+    ['sup-modal',closeSupModal],
+    ['sub-punch-modal',closeSubModal],
+    ['manual-punch-modal',closeManualPunch],
+    ['add-site-modal',closeAddSite],
+    ['yangji-post-modal',closeYangjiPostModal],
+    ['makeup-modal',clearLocalMakeup],
+    ['handover-reminder-modal',closeLocalHandoverReminder],
+    ['employee-lookup-modal',closeEmployeeLookup],
+    ['keyboard-overlay',closeDrawer],
+  ];
+  for(const [id,close] of layers){
+    const el=$(id);
+    if(!el) continue;
+    const active=el.classList.contains('show')||el.style.display==='flex'||el.style.display==='block';
+    if(active){close();return true;}
+  }
+  return false;
+}
+
 /** 返回上一頁（如已在首頁則無動作） */
 function goBack(){
-  // 在管理後台子頁面 → 返回清單
+  // 視窗優先於頁面：按返回只關閉最上層，不改動底層資料或導覽位置。
+  if(closeTopOverlay()) return;
+  // 在管理後台子頁面 → 前一個子頁；沒有前一個才回清單。
   if(pageHistory[pageHistory.length-1] === 'admin' && adminViewState === 'sub'){
-    showAdminMenu();
+    adminSubHistory.pop();
+    const previous=adminSubHistory[adminSubHistory.length-1];
+    if(previous){showSub(previous,null,{restore:true});}
+    else{showAdminMenu({preserveHistory:true});}
     return;
   }
   if(pageHistory.length <= 1) return;
@@ -5776,7 +5814,10 @@ function renderReleaseNotes(){
   if(!list) return;
   list.innerHTML=getReleaseNotes().map((note,index)=>`<div style="background:var(--surface);border-radius:var(--r);border:.5px solid ${index===0?'var(--accent)':'var(--border)'};padding:16px 18px;box-shadow:var(--sh1);margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:17px;color:var(--t1)">${escapeHtml(note.version)}${index===0?' <span style=\"font-size:11px;color:var(--accent);background:var(--fill2);padding:3px 7px;border-radius:99px;margin-left:6px\">目前使用中</span>':''}</strong><span style="font-size:12px;color:var(--t3);white-space:nowrap">${escapeHtml(note.date)}</span></div><ul style="margin:0;padding-left:20px;color:var(--t2);font-size:14px;line-height:1.75">${note.changes.map(change=>`<li>${escapeHtml(change)}</li>`).join('')}</ul></div>`).join('');
 }
-function showSub(name,el){
+function showSub(name,el,options={}){
+  if(!options.restore && adminSubHistory[adminSubHistory.length-1]!==name){
+    adminSubHistory.push(name);
+  }
   adminViewState = 'sub';
   // 隱藏分類清單，顯示子頁面
   const menu = $('admin-menu');
