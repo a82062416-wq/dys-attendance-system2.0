@@ -1407,6 +1407,44 @@ test('新 iPhone 沒有本機設定時，員工打卡不可誤跳初始設定', 
   assert.equal(context.IS_DEMO, false);
 });
 
+test('後台子頁返回依序回到上一個子頁、清單與打卡首頁', () => {
+  const calls=[];
+  const context={
+    pageHistory:['checkin','admin'],adminViewState:'sub',adminSubHistory:['month-close','anomaly'],
+    closeTopOverlay:()=>false,
+    showSub:(name,el,options)=>calls.push({name,options}),
+    showAdminMenu:options=>calls.push({menu:true,options}),
+    showPage:name=>calls.push({page:name}),updateNavBackBtn(){},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'goBack')}; this.run=goBack;`,context);
+  context.run();
+  const first=calls.shift();
+  assert.equal(first.name,'month-close');
+  assert.equal(first.options.restore,true);
+  assert.deepEqual(context.adminSubHistory,['month-close']);
+  context.adminSubHistory=[];
+  context.run();
+  const second=calls.shift();
+  assert.equal(second.menu,true);
+  assert.equal(second.options.preserveHistory,true);
+  context.adminViewState='menu';
+  context.run();
+  assert.equal(calls.shift().page,'checkin');
+});
+
+test('站內返回會先關閉最上層視窗，不切換底層頁面', () => {
+  let pageChanged=false;
+  const context={
+    pageHistory:['checkin','admin'],adminViewState:'sub',adminSubHistory:['records'],
+    closeTopOverlay:()=>true,showSub(){throw new Error('不應返回子頁');},showAdminMenu(){throw new Error('不應返回清單');},
+    showPage:()=>{pageChanged=true;},updateNavBackBtn(){},
+  };
+  vm.runInNewContext(`${extractFunction(inlineScript,'goBack')}; this.run=goBack;`,context);
+  context.run();
+  assert.equal(pageChanged,false);
+  assert.deepEqual(context.pageHistory,['checkin','admin']);
+});
+
 test('後台登入提示應清楚區分管理員密碼與幹部員工編號', () => {
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getLoginRoleGuide')}; this.run = getLoginRoleGuide;`, context);
