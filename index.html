@@ -990,6 +990,7 @@ button,input,select{font-family:var(--font)}
     <h2 id="yangji-post-title">選擇值班哨點</h2>
     <p id="yangji-post-site">請選擇本次值班的哨點；選擇後上下班都會自動帶入。</p>
     <div id="yangji-post-options" class="yangji-post-options"></div>
+    <button type="button" class="btn-s bs-ghost" style="margin-top:12px;width:100%" onclick="closeYangjiPostModal()">取消</button>
   </div>
 </div>
 
@@ -1087,7 +1088,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.5.0 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.5.1 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1281,7 +1282,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.5.0 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.5.1 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <button type="button" class="announcement-toggle" id="announcement-toggle" onclick="toggleAnnouncement()" aria-expanded="false" aria-controls="announce-bar"><span class="announcement-dot" aria-hidden="true"></span>公告</button>
   <div class="checkin-wrap">
 
@@ -5785,6 +5786,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.5.1',date:'2026.10',changes:['修正後台「返回」按鈕：洋基美光哨點選擇視窗可安全取消，不再讓返回流程因 JavaScript 錯誤中斷','返回不會寫入或改動既有打卡紀錄；QR Code、上下班打卡與同步流程維持原樣']},
     {version:'v1.5.0',date:'2026.10',changes:['新增個人本班打卡狀態、交接班互助提醒與下次上班自主補卡；原始打卡紀錄保持不變','智慧功能只在原本打卡成功後背景執行，資料不足時不猜測、不阻擋 QR 打卡','跨裝置交接與補卡安全資料層先以模擬驗證，正式 Firebase Rules、正式資料與推播服務未變更']},
     {version:'v1.4.22',date:'2026.10',changes:['洋基美光哨點可在掃碼後查看並更換；上班沿用最近選擇，下班優先帶入本次上班哨點','沒有有效公告時首頁不再顯示預設橫幅；有公告時改由右上角入口展開','其他案場、QR 驗證、原始打卡紀錄與後台公告設定維持原樣']},
     {version:'v1.4.21',date:'2026.10',changes:['洋基美光早班、晚班掃 QR Code 後，首次打卡須選擇值班哨點；同一員工的上下班自動帶入','哨點同步寫入 Firebase 與 Google Sheets，洋基六欄出勤表可顯示後續打卡的哨點','其他案場、QR 驗證與長按打卡流程維持原樣']},
@@ -6956,6 +6958,15 @@ function openYangjiPostPicker(type,empId,site,options,defaultPost=''){
   const modal=$('yangji-post-modal');
   modal.classList.add('show');
   modal.setAttribute('aria-hidden','false');
+}
+
+/** 關閉哨點選擇而不寫入或改動任何既有打卡紀錄。 */
+function closeYangjiPostModal(){
+  _yangjiPendingPunch=null;
+  const modal=$('yangji-post-modal');
+  if(!modal) return;
+  modal.classList.remove('show');
+  modal.setAttribute('aria-hidden','true');
 }
 
 function selectYangjiPost(postName){

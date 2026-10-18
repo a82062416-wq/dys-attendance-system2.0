@@ -1373,9 +1373,10 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.5.0');
-  assert.match(notes[0].changes.join(' '), /交接班/);
-  assert.match(notes[0].changes.join(' '), /補卡/);
+  assert.equal(notes[0].version, 'v1.5.1');
+  assert.match(notes[0].changes.join(' '), /返回/);
+  assert.match(notes.find(note => note.version==='v1.5.0').changes.join(' '), /交接班/);
+  assert.match(notes.find(note => note.version==='v1.5.0').changes.join(' '), /補卡/);
   assert.equal(notes[0].date, '2026.10');
   assert.ok(notes.find(note => note.version==='v1.4.19').changes.some(change => change.includes('幹部工作台')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
@@ -1443,6 +1444,20 @@ test('站內返回會先關閉最上層視窗，不切換底層頁面', () => {
   context.run();
   assert.equal(pageChanged,false);
   assert.deepEqual(context.pageHistory,['checkin','admin']);
+});
+
+test('返回前盤點覆蓋視窗時，洋基哨點選擇視窗可安全取消', () => {
+  const modal={style:{},attrs:{},setAttribute(key,value){this.attrs[key]=value;},classList:{contains:key=>key==='show',remove(){}}};
+  const context={$:id=>id==='yangji-post-modal'?modal:null,_yangjiPendingPunch:{type:'上班'}};
+  vm.runInNewContext(`${extractFunction(inlineScript,'closeYangjiPostModal')}; this.run=closeYangjiPostModal;`,context);
+  context.run();
+  assert.equal(context._yangjiPendingPunch,null);
+  assert.equal(modal.attrs['aria-hidden'],'true');
+});
+
+test('返回不會因洋基哨點關閉函式缺失而中斷', () => {
+  assert.match(inlineScript,/\['yangji-post-modal',closeYangjiPostModal\]/);
+  assert.match(inlineScript,/function closeYangjiPostModal\(\)/);
 });
 
 test('後台登入提示應清楚區分管理員密碼與幹部員工編號', () => {
