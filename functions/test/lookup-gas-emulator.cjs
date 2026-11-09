@@ -24,7 +24,7 @@ vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../../l
 c.PROJECT_='demo-dys-private-lookup';c.BASE_='http://127.0.0.1:18081/v1/projects/demo-dys-private-lookup/databases/(default)/documents';c.ENABLED_=true;
 const key=Buffer.alloc(32,7),id='00000001',name='虛構同仁',suffix='0042',docId=c.docId_(key,id);
 function put(path,fields){return c.api_('patch','/'+path,{fields});}
-put('secureLookupSecrets/v1',{key:{stringValue:key.toString('base64')}});
+put('secureLookupSecrets/v1',{key:{stringValue:key.toString('base64')},webApiKey:{stringValue:'AIza'+'A'.repeat(35)}});
 put('secureLookupAdmins/test-admin',{active:{booleanValue:true}});
 put('secureLookupCandidates/'+docId,{employee_id:{stringValue:id},name:{stringValue:name},fingerprint:{stringValue:c.hmacHex_(key,JSON.stringify([id,name,suffix]))},verification_status:{stringValue:'pending'},active:{booleanValue:false}});
 put('secureLookupSnapshots/current',{ids:{arrayValue:{values:[{stringValue:docId}]}},checked_at:{stringValue:new Date().toISOString()},count:{integerValue:'1'}});

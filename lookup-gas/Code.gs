@@ -1,10 +1,12 @@
 /* Standalone, isolated Apps Script candidate. Not yet deployed or enabled. */
 var PROJECT_='dys-attendance-a5be6';
-var WEB_API_KEY_='__PUBLIC_FIREBASE_WEB_API_KEY__'; // replaced at build time with the current website's public key
 var ENABLED_=false;
 var BASE_='https://firestore.googleapis.com/v1/projects/'+PROJECT_+'/databases/(default)/documents';
 
-function doGet(){return HtmlService.createHtmlOutputFromFile('Lookup').setTitle('同仁工號查詢');}
+function doGet(){
+ var html=HtmlService.createHtmlOutputFromFile('Lookup').getContent();
+ return HtmlService.createHtmlOutput(html.replace('__PUBLIC_FIREBASE_WEB_API_KEY__',publicApiKey_())).setTitle('同仁工號查詢');
+}
 
 // The only RPC methods: issue requires a verified manager; lookup requires a
 // one-time manager grant or a previously bound device, plus name and suffix.
@@ -80,6 +82,7 @@ function decode_(fields){
 }
 function getDoc_(path,transaction){var doc=api_('get','/'+path+(transaction?'?transaction='+encodeURIComponent(transaction):''));return doc?{data:decode_(doc.fields),version:doc.updateTime,name:doc.name}:null;}
 function key_(){var doc=getDoc_('secureLookupSecrets/v1');if(!doc||typeof doc.data.key!=='string')throw Error('key unavailable');var bytes=Utilities.base64Decode(doc.data.key);if(bytes.length!==32)throw Error('invalid key');return bytes;}
+function publicApiKey_(){var doc=getDoc_('secureLookupSecrets/v1'),value=doc&&doc.data.webApiKey;if(typeof value!=='string'||!/^AIza[A-Za-z0-9_-]{30,60}$/.test(value))throw Error('web configuration unavailable');return value;}
 function bytes_(value){return Utilities.newBlob(value,'text/plain').getBytes();}
 function hex_(bytes){return bytes.map(function(n){return ('0'+((n+256)%256).toString(16)).slice(-2);}).join('');}
 function hmacHex_(key,value){return hex_(Utilities.computeHmacSha256Signature(bytes_(value),key));}
@@ -124,7 +127,7 @@ function usableSnapshot_(id,candidate,snap){
 }
 function verifiedAdmin_(token){
  if(token.length>4096)return null;
- var res=UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='+encodeURIComponent(WEB_API_KEY_),{method:'post',contentType:'application/json',payload:JSON.stringify({idToken:token}),muteHttpExceptions:true});
+ var res=UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='+encodeURIComponent(publicApiKey_()),{method:'post',contentType:'application/json',payload:JSON.stringify({idToken:token}),muteHttpExceptions:true});
  if(res.getResponseCode()!==200)return null;
  var users=JSON.parse(res.getContentText()).users||[];if(users.length!==1)return null;
  var u=users[0],uid=u.localId;
