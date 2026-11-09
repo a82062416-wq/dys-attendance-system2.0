@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant"><head><base target="_top"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>同仁工號查詢</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;background:#f3f5f8;color:#182230;margin:0;padding:20px 16px 32px}main{max-width:520px;margin:auto;background:white;border-radius:18px;padding:24px;box-shadow:0 4px 20px #0001;box-sizing:border-box}h1{font-size:24px;margin-top:0}label{display:block;font-weight:600;margin:16px 0 6px}input,button{box-sizing:border-box;width:100%;font:inherit;border-radius:10px;min-height:48px}input{border:1px solid #9aa4b2;padding:10px}button{border:0;background:#0876ec;color:white;font-weight:700;margin-top:14px;cursor:pointer}button:disabled{opacity:.5}details{margin-top:28px;border-top:1px solid #ddd;padding-top:16px}summary{cursor:pointer;font-weight:600}p{line-height:1.5}#result,#admin-result{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#556}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+</head><body><main>
+<h1>查詢同仁工號</h1><p>請輸入您的姓名與身分證後四碼。第一次使用，請先向主管取得一次性開通碼。</p>
+<form id="lookup-form"><label for="name">姓名</label><input id="name" autocomplete="name" required maxlength="80">
+<label for="suffix">身分證後四碼</label><input id="suffix" inputmode="numeric" autocomplete="off" pattern="[0-9]{4}" maxlength="4" required>
+<div id="code-wrap"><label for="code">主管開通碼</label><input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"><small>開通碼 10 分鐘內有效，只能使用一次。</small></div>
+<button id="lookup-btn" type="submit">查詢工號</button><p id="result" role="status" aria-live="polite"></p></form>
+<button type="button" id="forget" style="background:#eef2f7;color:#344">改用新的主管開通碼</button>
+<details><summary>主管：核實本人後提供開通碼</summary><p>請先透過公司既有方式確認同仁身分及在職狀態。</p>
+<label for="admin-email">公告／管理帳號</label><input type="email" id="admin-email" autocomplete="username">
+<label for="admin-password">管理密碼</label><input type="password" id="admin-password" autocomplete="current-password">
+<button type="button" id="login">登入管理帳號</button><label for="employee-id">已核實的同仁工號</label><input id="employee-id" inputmode="numeric" maxlength="8" pattern="[0-9]{8}">
+<button type="button" id="issue">產生一次性開通碼</button><button type="button" id="revoke" style="background:#eef2f7;color:#344">撤銷此同仁的裝置綁定</button><p id="admin-result" role="status" aria-live="polite"></p></details>
+</main>
+<script>
+(function(){'use strict';var tokenKey='dys_lookup_device_v1',device='';var $=function(id){return document.getElementById(id);};
+try{device=localStorage.getItem(tokenKey)||'';}catch(e){}
+function showCode(){ $('code-wrap').style.display=device?'none':'block';$('code').required=!device; }
+showCode();
+$('forget').onclick=function(){device='';try{localStorage.removeItem(tokenKey);}catch(e){}$('result').textContent='';showCode();};
+$('lookup-form').onsubmit=function(e){e.preventDefault();var btn=$('lookup-btn');if(btn.disabled)return;btn.disabled=true;$('result').textContent='查詢中…';
+ var req={name:$('name').value.trim(),suffix:$('suffix').value};if(device)req.deviceToken=device;else req.code=$('code').value;
+ google.script.run.withSuccessHandler(function(data){btn.disabled=false;if(!data||!data.ok){$('result').textContent='無法完成查詢，請確認資料或聯絡主管協助。';return;}
+ if(data.deviceToken){device=data.deviceToken;try{localStorage.setItem(tokenKey,device);}catch(e){}showCode();}
+ $('suffix').value='';$('code').value='';$('result').textContent='您的同仁工號：'+data.employeeId+'\n請返回打卡頁輸入此工號。';
+ }).withFailureHandler(function(){btn.disabled=false;$('result').textContent='目前無法查詢，請稍後重試或聯絡主管。';}).lookupEmployee(req);
+};
+var auth=null;
+$('login').onclick=function(){var btn=$('login');btn.disabled=true;$('admin-result').textContent='正在登入…';
+ try{if(!firebase.apps.length)firebase.initializeApp({apiKey:'__PUBLIC_FIREBASE_WEB_API_KEY__',projectId:'dys-attendance-a5be6'});auth=firebase.auth();
+ auth.setPersistence(firebase.auth.Auth.Persistence.NONE).then(function(){return auth.signInWithEmailAndPassword($('admin-email').value.trim(),$('admin-password').value);}).then(function(){$('admin-password').value='';$('admin-result').textContent='已登入；請確認本人後輸入同仁工號。';},function(){$('admin-result').textContent='登入失敗，請確認帳號密碼。';}).then(function(){btn.disabled=false;});
+ }catch(e){btn.disabled=false;$('admin-result').textContent='登入服務暫時無法使用。';}
+};
+$('issue').onclick=function(){var btn=$('issue'),id=$('employee-id').value;if(!/^\d{8}$/.test(id)){ $('admin-result').textContent='請輸入 8 碼同仁工號。';return; }
+ if(!auth||!auth.currentUser){$('admin-result').textContent='請先登入管理帳號。';return;}btn.disabled=true;$('admin-result').textContent='正在確認權限…';
+ auth.currentUser.getIdToken().then(function(token){google.script.run.withSuccessHandler(function(data){btn.disabled=false;$('admin-result').textContent=data&&data.ok?'開通碼：'+data.code+'\n請以公司既有安全方式提供同仁，10 分鐘內有效。':'無法產生開通碼，請確認權限與名冊。';}).withFailureHandler(function(){btn.disabled=false;$('admin-result').textContent='目前無法產生開通碼，請稍後重試。';}).issuePairCode({token:token,employeeId:id});},function(){btn.disabled=false;$('admin-result').textContent='管理登入已失效，請重新登入。';});
+};
+$('revoke').onclick=function(){var btn=$('revoke'),id=$('employee-id').value;if(!/^\d{8}$/.test(id)||!auth||!auth.currentUser){$('admin-result').textContent='請先登入並輸入 8 碼同仁工號。';return;}
+ if(!window.confirm('確定撤銷這位同仁的所有裝置綁定？此操作不影響打卡。'))return;
+ btn.disabled=true;$('admin-result').textContent='正在撤銷…';auth.currentUser.getIdToken().then(function(token){google.script.run.withSuccessHandler(function(data){btn.disabled=false;$('admin-result').textContent=data&&data.ok?'已撤銷 '+data.revoked+' 個裝置綁定。':'無法撤銷，請確認權限後重試。';}).withFailureHandler(function(){btn.disabled=false;$('admin-result').textContent='目前無法撤銷，請稍後重試。';}).revokePairings({token:token,employeeId:id});},function(){btn.disabled=false;$('admin-result').textContent='管理登入已失效。';});
+};
+})();
+</script></body></html>
