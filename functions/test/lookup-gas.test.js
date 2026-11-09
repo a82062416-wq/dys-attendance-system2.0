@@ -24,16 +24,24 @@ test('current snapshot and explicit block control eligibility',()=>{
  assert.equal(c.usable_(id,{status:'blocked',blocked:false}),false);
  c.getDoc_=()=>({data:{ids:[id],checked_at:'2001-01-01T00:00:00Z'}});assert.equal(c.usable_(id,candidate),false);
 });
+test('yesterday snapshot expires when the 05:30 daily update is due',()=>{
+ const c=build();
+ c.Utilities.formatDate=d=>new Date(d.getTime()+8*3600000).toISOString().slice(0,10);
+ const previous=Date.parse('2026-11-08T05:31:00+08:00');
+ assert.equal(c.sameOperationalDate_(previous,Date.parse('2026-11-09T05:29:00+08:00')),true);
+ assert.equal(c.sameOperationalDate_(previous,Date.parse('2026-11-09T05:30:00+08:00')),false);
+});
 test('rate limit stops sixth attempt using persistent locked state',()=>{
  const c=build();for(let i=0;i<5;i++)assert.equal(c.takeAttempt_('虛構同仁'),true);assert.equal(c.takeAttempt_('虛構同仁'),false);
 });
 test('one-time redemption requires exact grant and creates binding atomically',()=>{
- const c=build(),key=Buffer.alloc(32,7),id='a'.repeat(64),code='123456',token='b'.repeat(64);let writes;
- c.getDoc_=()=>({data:{used:false,expiresAt:Date.now()+60000,codeHash:c.hmacHex_(key,'grant:'+id+':'+code)},version:'2026-11-09T00:00:00Z'});
- c.api_=(method,path,body)=>{assert.equal(method,'post');assert.equal(path,':commit');writes=body.writes;return {ok:true};};
- assert.equal(c.redeemGrant_(id,code,token,key),true);
+ const c=build(),key=Buffer.alloc(32,7),id='a'.repeat(64),code='123456',token='b'.repeat(64),name='虛構',suffix='0042';let writes;
+ c.getTransactionDocs_=()=>({['secureLookupGrants/'+id]:{data:{used:false,expiresAt:Date.now()+60000,codeHash:c.hmacHex_(key,'grant:'+id+':'+code)},version:'2026-11-09T00:00:00Z'},['secureLookupCandidates/'+id]:{data:{}},'secureLookupSnapshots/current':{data:{}}});
+ c.candidateFromDoc_=()=>({employeeId:'00000001',name,fingerprint:c.hmacHex_(key,JSON.stringify(['00000001',name,suffix]))});c.usableSnapshot_=()=>true;
+ c.api_=(method,path,body)=>{assert.equal(method,'post');if(path===':beginTransaction')return {transaction:'test-transaction'};if(path===':rollback')return {};assert.equal(path,':commit');assert.equal(body.transaction,'test-transaction');writes=body.writes;return {ok:true};};
+ assert.equal(c.redeemGrant_(id,code,token,key,name,suffix),true);
  assert.equal(writes.length,2);assert.equal(writes[0].currentDocument.updateTime,'2026-11-09T00:00:00Z');assert.equal(writes[1].currentDocument.exists,false);
- assert.equal(c.redeemGrant_(id,'999999',token,key),false);
+ assert.equal(c.redeemGrant_(id,'999999',token,key,name,suffix),false);
 });
 test('lookup needs correct name, four digits and one-time or bound device proof',()=>{
  const c=build(),key=Buffer.alloc(32,7),id='a'.repeat(64),employeeId='00000001',name='虛構同仁';let redeemed=false;

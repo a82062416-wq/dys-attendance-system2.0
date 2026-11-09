@@ -191,6 +191,7 @@ body:has(#page-checkin.active) nav{z-index:560}
   font:600 13px var(--font);cursor:pointer;
 }
 .announcement-toggle.show{display:inline-flex}
+#secure-id-lookup-link:not([hidden]){display:block}
 .announcement-dot{width:7px;height:7px;border-radius:50%;background:#ff3b30;display:none}
 .announcement-toggle.urgent .announcement-dot{display:block}
 .announce-bar{
@@ -1001,6 +1002,7 @@ button,input,select{font-family:var(--font)}
     <button class="ko-close" style="position:absolute;right:18px;top:14px" onclick="closeEmployeeLookup()">×</button>
     <h2 id="lookup-title">查詢員工編號</h2>
     <p>輸入姓名與驗證資料，系統只會顯示您的員工編號。</p>
+    <a id="secure-id-lookup-link" hidden target="_blank" rel="noopener noreferrer" style="text-align:center;background:var(--accent);color:#fff;border-radius:10px;padding:12px;text-decoration:none;margin:12px 0">身分證後四碼查詢</a>
     <div class="mf">
       <label for="lookup-name">姓名</label>
       <input id="lookup-name" class="fi" type="text" autocomplete="name" placeholder="請輸入完整姓名" maxlength="20"/>
@@ -3326,9 +3328,20 @@ function toggleDrawer(){
 }
 
 let _employeeLookupSeq = 0;
+// Only an approved, tested deployment URL is configured at release time.
+const SECURE_LOOKUP_URL = '';
+function configureSecureLookupEntry(url){
+  const link=document.getElementById('secure-id-lookup-link');
+  if(!link)return;
+  if(typeof url!=='string'||!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url)){
+    link.hidden=true;link.removeAttribute('href');return;
+  }
+  link.href=url;link.hidden=false;
+}
 function openEmployeeLookup(){
   const modal = $('employee-lookup-modal');
   if(!modal) return;
+  if(typeof configureSecureLookupEntry==='function')configureSecureLookupEntry(SECURE_LOOKUP_URL);
   // 查詢視窗由員工編號鍵盤開啟時，先收起鍵盤覆蓋層，避免查詢視窗被遮住而無法操作。
   closeDrawer();
   $('lookup-name').value = '';

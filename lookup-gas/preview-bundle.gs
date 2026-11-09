@@ -33,12 +33,11 @@ function lookupEmployee(request){
   var fp=hmacHex_(key,JSON.stringify([candidate.employeeId,name,request.suffix]));
   if(!equal_(fp,candidate.fingerprint))return {ok:false};
   if(hasToken){
-   var binding=getDoc_('secureLookupBindings/'+shaHex_(request.deviceToken));
-   if(!binding||binding.data.active!==true||binding.data.candidateId!==candidate.id||binding.data.expiresAt<=Date.now())return {ok:false};
+   if(!verifyBoundLookup_(candidate.id,request.deviceToken,key,name,request.suffix))return {ok:false};
    return {ok:true,employeeId:candidate.employeeId};
   }
   var token=hmacHex_(key,'device:'+Utilities.getUuid()+':'+Utilities.getUuid()+':'+Date.now());
-  if(!redeemGrant_(candidate.id,request.code,token,key))return {ok:false};
+  if(!redeemGrant_(candidate.id,request.code,token,key,name,request.suffix))return {ok:false};
   return {ok:true,employeeId:candidate.employeeId,deviceToken:token};
  }catch(e){return {ok:false};}
 }
@@ -79,7 +78,7 @@ function decode_(fields){
   else if(f.arrayValue)data[k]=(f.arrayValue.values||[]).map(function(x){return x.stringValue;});
  });return data;
 }
-function getDoc_(path){var doc=api_('get','/'+path);return doc?{data:decode_(doc.fields),version:doc.updateTime,name:doc.name}:null;}
+function getDoc_(path,transaction){var doc=api_('get','/'+path+(transaction?'?transaction='+encodeURIComponent(transaction):''));return doc?{data:decode_(doc.fields),version:doc.updateTime,name:doc.name}:null;}
 function key_(){var doc=getDoc_('secureLookupSecrets/v1');if(!doc||typeof doc.data.key!=='string')throw Error('key unavailable');var bytes=Utilities.base64Decode(doc.data.key);if(bytes.length!==32)throw Error('invalid key');return bytes;}
 function bytes_(value){return Utilities.newBlob(value,'text/plain').getBytes();}
 function hex_(bytes){return bytes.map(function(n){return ('0'+((n+256)%256).toString(16)).slice(-2);}).join('');}
@@ -88,10 +87,20 @@ function shaHex_(value){return hex_(Utilities.computeDigest(Utilities.DigestAlgo
 function docId_(key,id){return hmacHex_(key,'DYS candidate key v1\u0000'+id);}
 function equal_(a,b){if(typeof a!=='string'||typeof b!=='string'||a.length!==b.length)return false;var mismatch=0;for(var i=0;i<a.length;i++)mismatch|=a.charCodeAt(i)^b.charCodeAt(i);return mismatch===0;}
 
-function candidateById_(id){
- var doc=getDoc_('secureLookupCandidates/'+id);if(!doc)return null;var d=doc.data;
+function candidateById_(id,transaction){
+ return candidateFromDoc_(id,getDoc_('secureLookupCandidates/'+id,transaction));
+}
+function candidateFromDoc_(id,doc){
+ if(!doc)return null;var d=doc.data;
  if(!/^\d{8}$/.test(d.employee_id||'')||typeof d.name!=='string'||!/^[a-f0-9]{64}$/.test(d.fingerprint||''))return null;
  return {id:id,employeeId:d.employee_id,name:d.name,fingerprint:d.fingerprint,status:d.verification_status,blocked:d.manual_blocked===true};
+}
+function getTransactionDocs_(transaction,paths){
+ var root='projects/'+PROJECT_+'/databases/(default)/documents/';
+ var rows=api_('post',':batchGet',{documents:paths.map(function(p){return root+p;}),transaction:transaction}),result={};
+ if(!Array.isArray(rows))throw Error('invalid transaction response');
+ rows.forEach(function(row){if(row.found){var doc=row.found,path=doc.name.slice(root.length);result[path]={data:decode_(doc.fields),version:doc.updateTime,name:doc.name};}});
+ return result;
 }
 function candidateByName_(name){
  var response=api_('post',':runQuery',{structuredQuery:{from:[{collectionId:'secureLookupCandidates'}],where:{fieldFilter:{field:{fieldPath:'name'},op:'EQUAL',value:{stringValue:name}}},limit:2}});
@@ -100,11 +109,18 @@ function candidateByName_(name){
  var id=docs[0].name.split('/').pop();if(!/^[a-f0-9]{64}$/.test(id))return null;
  return candidateById_(id);
 }
+function sameOperationalDate_(checkedAt,now){
+ var shift=19800000;
+ return Utilities.formatDate(new Date(checkedAt-shift),'Asia/Taipei','yyyy-MM-dd')===Utilities.formatDate(new Date(now-shift),'Asia/Taipei','yyyy-MM-dd');
+}
 function usable_(id,candidate){
+ return usableSnapshot_(id,candidate,getDoc_('secureLookupSnapshots/current'));
+}
+function usableSnapshot_(id,candidate,snap){
  if(!candidate||candidate.blocked||['pending','verified'].indexOf(candidate.status)<0)return false;
- var snap=getDoc_('secureLookupSnapshots/current');if(!snap||!Array.isArray(snap.data.ids))return false;
+ if(!snap||!Array.isArray(snap.data.ids))return false;
  var when=Date.parse(snap.data.checked_at),age=Date.now()-when;
- return isFinite(when)&&age>=-300000&&age<=129600000&&snap.data.ids.indexOf(id)>=0;
+ return isFinite(when)&&age>=-300000&&age<=129600000&&sameOperationalDate_(when,Date.now())&&snap.data.ids.indexOf(id)>=0;
 }
 function verifiedAdmin_(token){
  if(token.length>4096)return null;
@@ -120,19 +136,35 @@ function generateCode_(key){
  return ('000000'+(parseInt(seed.slice(0,12),16)%1000000)).slice(-6);
 }
 function saveGrant_(id,code,expires,uid,key){
- var old=getDoc_('secureLookupGrants/'+id),condition=old?'currentDocument.updateTime='+encodeURIComponent(old.version):'currentDocument.exists=false';
- var body={fields:{codeHash:{stringValue:hmacHex_(key,'grant:'+id+':'+code)},expiresAt:{integerValue:String(expires)},used:{booleanValue:false},managerUid:{stringValue:uid}}};
- return !!api_('patch','/secureLookupGrants/'+id+'?'+condition,body);
+ var old=getDoc_('secureLookupGrants/'+id),condition=old?{updateTime:old.version}:{exists:false};
+ var docRoot='projects/'+PROJECT_+'/databases/(default)/documents/';
+ var fields={codeHash:{stringValue:hmacHex_(key,'grant:'+id+':'+code)},expiresAt:{integerValue:String(expires)},used:{booleanValue:false},managerUid:{stringValue:uid}};
+ return !!api_('post',':commit',{writes:[{update:{name:docRoot+'secureLookupGrants/'+id,fields:fields},currentDocument:condition}]});
 }
-function redeemGrant_(id,code,token,key){
- var grant=getDoc_('secureLookupGrants/'+id);
- if(!grant||grant.data.used!==false||grant.data.expiresAt<=Date.now()||!equal_(grant.data.codeHash,hmacHex_(key,'grant:'+id+':'+code)))return false;
- var tokenId=shaHex_(token),docRoot='projects/'+PROJECT_+'/databases/(default)/documents/';
- var result=api_('post',':commit',{writes:[
-  {update:{name:docRoot+'secureLookupGrants/'+id,fields:{used:{booleanValue:true}}},updateMask:{fieldPaths:['used']},currentDocument:{updateTime:grant.version}},
-  {update:{name:docRoot+'secureLookupBindings/'+tokenId,fields:{candidateId:{stringValue:id},active:{booleanValue:true},expiresAt:{integerValue:String(Date.now()+15552000000)}}},currentDocument:{exists:false}}
- ]});
- return !!result;
+function redeemGrant_(id,code,token,key,name,suffix){
+ var begun=api_('post',':beginTransaction',{});if(!begun||!begun.transaction)return false;
+ var tx=begun.transaction,committed=false;
+ try{
+  var docs=getTransactionDocs_(tx,['secureLookupGrants/'+id,'secureLookupCandidates/'+id,'secureLookupSnapshots/current']);
+  var grant=docs['secureLookupGrants/'+id],candidate=candidateFromDoc_(id,docs['secureLookupCandidates/'+id]),snap=docs['secureLookupSnapshots/current'];
+  if(!grant||grant.data.used!==false||grant.data.expiresAt<=Date.now()||!equal_(grant.data.codeHash,hmacHex_(key,'grant:'+id+':'+code))||!usableSnapshot_(id,candidate,snap)||candidate.name!==name||!equal_(candidate.fingerprint,hmacHex_(key,JSON.stringify([candidate.employeeId,name,suffix]))))return false;
+  var tokenId=shaHex_(token),docRoot='projects/'+PROJECT_+'/databases/(default)/documents/';
+  var result=api_('post',':commit',{transaction:tx,writes:[
+   {update:{name:docRoot+'secureLookupGrants/'+id,fields:{used:{booleanValue:true}}},updateMask:{fieldPaths:['used']},currentDocument:{updateTime:grant.version}},
+   {update:{name:docRoot+'secureLookupBindings/'+tokenId,fields:{candidateId:{stringValue:id},active:{booleanValue:true},expiresAt:{integerValue:String(Date.now()+15552000000)}}},currentDocument:{exists:false}}
+  ]});
+  committed=!!result;return committed;
+ }finally{if(!committed)try{api_('post',':rollback',{transaction:tx});}catch(e){}}
+}
+function verifyBoundLookup_(id,token,key,name,suffix){
+ var begun=api_('post',':beginTransaction',{});if(!begun||!begun.transaction)return false;
+ var tx=begun.transaction,committed=false;
+ try{
+  var bindingPath='secureLookupBindings/'+shaHex_(token),docs=getTransactionDocs_(tx,['secureLookupCandidates/'+id,'secureLookupSnapshots/current',bindingPath]);
+  var candidate=candidateFromDoc_(id,docs['secureLookupCandidates/'+id]),snap=docs['secureLookupSnapshots/current'],binding=docs[bindingPath];
+  if(!usableSnapshot_(id,candidate,snap)||candidate.name!==name||!equal_(candidate.fingerprint,hmacHex_(key,JSON.stringify([candidate.employeeId,name,suffix])))||!binding||binding.data.active!==true||binding.data.candidateId!==id||binding.data.expiresAt<=Date.now())return false;
+  committed=!!api_('post',':commit',{transaction:tx,writes:[]});return committed;
+ }finally{if(!committed)try{api_('post',':rollback',{transaction:tx});}catch(e){}}
 }
 function takeAttempt_(name){
  var lock=LockService.getScriptLock();if(!lock.tryLock(5000))return false;
