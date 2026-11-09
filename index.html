@@ -212,7 +212,7 @@ body:has(#page-checkin.active) nav{z-index:560}
   background:linear-gradient(90deg,rgba(255,59,48,.12),rgba(255,59,48,.05));
   border-left-color:#ff3b30;
 }
-.announce-text{flex:1}
+.announce-text{flex:1;min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}
 .announce-dismiss{
   cursor:pointer;opacity:.5;font-size:15px;line-height:1;flex-shrink:0;
   padding:0 2px;transition:opacity .15s;
@@ -1088,7 +1088,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.5.1 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.5.2 &nbsp;·&nbsp; 2026.11 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1282,7 +1282,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.5.1 &nbsp;·&nbsp; 2026.10 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.5.2 &nbsp;·&nbsp; 2026.11 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <button type="button" class="announcement-toggle" id="announcement-toggle" onclick="toggleAnnouncement()" aria-expanded="false" aria-controls="announce-bar"><span class="announcement-dot" aria-hidden="true"></span>公告</button>
   <div class="checkin-wrap">
 
@@ -2121,13 +2121,30 @@ button,input,select{font-family:var(--font)}
             <option value="important">⚠️ 重要（橘色）</option>
             <option value="urgent">🚨 緊急（紅色）</option>
           </select>
-          <textarea id="s-announcement" class="fi" rows="3" placeholder="輸入公告內容（空白則顯示預設文字）" style="width:100%;resize:vertical;font-family:var(--font);font-size:14px"></textarea>
+          <textarea id="s-announcement" class="fi" rows="3" maxlength="1000" placeholder="輸入要發布給所有同仁的公告" style="width:100%;resize:vertical;font-family:var(--font);font-size:14px"></textarea>
           <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
             <label style="font-size:13px;color:var(--t2);font-weight:400;white-space:nowrap">到期日：</label>
             <input type="date" id="s-announcement-expiry" class="fi" style="width:160px"/>
             <span style="font-size:12px;color:var(--t3)">留空 = 永久顯示</span>
           </div>
-          <span class="mf-hint">員工可按 ✕ 當天關閉。儲存後本裝置立即生效；推上 GitHub 後全員裝置更新。</span>
+          <span class="mf-hint">公告預設收合。同仁可從首頁右上角開啟；離線時顯示上次讀取的副本。下方「儲存設定」不會發布公告。</span>
+          <details style="margin-top:12px">
+            <summary>公告管理員登入</summary>
+            <label for="announcement-email">公告帳號</label>
+            <input id="announcement-email" type="email" class="fi" autocomplete="username" style="width:100%"/>
+            <label for="announcement-password">公告密碼</label>
+            <input id="announcement-password" type="password" class="fi" autocomplete="current-password" style="width:100%"/>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+              <button type="button" class="btn-s" id="announcement-login">登入公告管理員</button>
+              <button type="button" class="btn-s" id="announcement-logout">登出公告管理員</button>
+            </div>
+          </details>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+            <button type="button" class="btn-s bs-accent" id="announcement-publish">發布給所有同仁</button>
+            <button type="button" class="btn-s" id="announcement-withdraw">撤回公告</button>
+            <button type="button" class="btn-s" id="announcement-refresh">重新讀取公告</button>
+          </div>
+          <p id="announcement-status" role="status" aria-live="polite" style="font-size:13px;overflow-wrap:anywhere">共用公告載入中；公告功能不影響打卡。</p>
         </div>
         <div class="mf">
           <label>☀️ 上班打卡提醒</label>
@@ -4227,6 +4244,7 @@ function tryUnlock(){
   }
 }
 function lockAdmin(){
+  if(window.DysAnnouncement)window.DysAnnouncement.signOut();
   ADMIN_UNLOCKED=false; stopTodayListener();
   CURRENT_SUPERVISOR=null;
   CURRENT_ROLE='admin';
@@ -5070,6 +5088,7 @@ function clearLocal(){
 
 // ── 系統公告（預設收合，只有有效公告才顯示入口） ──
 function renderAnnouncement(){
+  if(window.DysAnnouncement){window.DysAnnouncement.render();return;}
   const bar=$('announce-bar'),toggle=$('announcement-toggle');
   if(!bar||!toggle) return;
   const saved=String(localStorage.getItem('site_announcement')||'').trim();
@@ -5530,9 +5549,12 @@ function loadSettingsFields(){
   $('s-absent-limit').value=ABSENT_LIMIT||'';
   $('s-msg-in').value=MSG_IN||'';
   $('s-msg-out').value=MSG_OUT||'';
-  $('s-announcement').value=localStorage.getItem('site_announcement')||'';
-  $('s-announcement-level').value=localStorage.getItem('site_announcement_level')||'normal';
-  $('s-announcement-expiry').value=localStorage.getItem('site_announcement_expiry')||'';
+  if(window.DysAnnouncement)window.DysAnnouncement.fillDraft();
+  else {
+    $('s-announcement').value=localStorage.getItem('site_announcement')||'';
+    $('s-announcement-level').value=localStorage.getItem('site_announcement_level')||'normal';
+    $('s-announcement-expiry').value=localStorage.getItem('site_announcement_expiry')||'';
+  }
   $('s-qr-warn-1').value=localStorage.getItem('qr_warn_1')||'';
   $('s-qr-warn-2').value=localStorage.getItem('qr_warn_2')||'';
   $('s-qr-warn-3').value=localStorage.getItem('qr_warn_3')||'';
@@ -5586,9 +5608,6 @@ function saveSettings(){
   SCRIPT_URL=url;COMPANY=co;IS_DEMO=!url;ABSENT_LIMIT=al;
   MSG_IN  = $('s-msg-in').value.trim();
   MSG_OUT = $('s-msg-out').value.trim();
-  const announcement = $('s-announcement').value.trim();
-  const annLevel  = $('s-announcement-level').value || 'normal';
-  const annExpiry = $('s-announcement-expiry').value || '';
   localStorage.setItem('script_url',url);
   localStorage.setItem('company',co);
   localStorage.setItem('absent_limit',al);
@@ -5600,13 +5619,7 @@ function saveSettings(){
   if(w1) localStorage.setItem('qr_warn_1',w1); else localStorage.removeItem('qr_warn_1');
   if(w2) localStorage.setItem('qr_warn_2',w2); else localStorage.removeItem('qr_warn_2');
   if(w3) localStorage.setItem('qr_warn_3',w3); else localStorage.removeItem('qr_warn_3');
-  if(announcement){ localStorage.setItem('site_announcement', announcement); }
-  else { localStorage.removeItem('site_announcement'); }
-  localStorage.setItem('site_announcement_level', annLevel);
-  if(annExpiry){ localStorage.setItem('site_announcement_expiry', annExpiry); }
-  else { localStorage.removeItem('site_announcement_expiry'); }
-  // 公告設定儲存後維持收合，避免影響打卡畫面。
-  renderAnnouncement();
+  // 共用公告由獨立發布按鈕送出；一般設定儲存不修改公告。
   $('nav-brand').textContent=co;
   updateCfgBar();
   if(!supNew) showToast('設定已儲存 ✓','success');
@@ -5786,6 +5799,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.5.2',date:'2026.11',changes:['沿用首頁公告，授權管理員發布後同仁可共同閱讀','公告發布、撤回與到期獨立處理；雲端失敗保留輸入，離線顯示上次讀取副本','公告登入與打卡登入分開；不修改打卡紀錄與待補傳資料']},
     {version:'v1.5.1',date:'2026.10',changes:['修正後台「返回」按鈕：洋基美光哨點選擇視窗可安全取消，不再讓返回流程因 JavaScript 錯誤中斷','返回不會寫入或改動既有打卡紀錄；QR Code、上下班打卡與同步流程維持原樣']},
     {version:'v1.5.0',date:'2026.10',changes:['新增個人本班打卡狀態、交接班互助提醒與下次上班自主補卡；原始打卡紀錄保持不變','智慧功能只在原本打卡成功後背景執行，資料不足時不猜測、不阻擋 QR 打卡','跨裝置交接與補卡安全資料層先以模擬驗證，正式 Firebase Rules、正式資料與推播服務未變更']},
     {version:'v1.4.22',date:'2026.10',changes:['洋基美光哨點可在掃碼後查看並更換；上班沿用最近選擇，下班優先帶入本次上班哨點','沒有有效公告時首頁不再顯示預設橫幅；有公告時改由右上角入口展開','其他案場、QR 驗證、原始打卡紀錄與後台公告設定維持原樣']},
@@ -7458,5 +7472,6 @@ setInterval(runPendingSync,60000);
 })();
 
 </script>
+<script src="shared-announcement.js?v=1" defer></script>
 </body>
 </html>

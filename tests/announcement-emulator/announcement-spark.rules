@@ -1,0 +1,34 @@
+// Demo only. Never replace the shared production rules with this file.
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  // Synthetic snapshot of previously observed shared-app rules; re-read the
+  // production rules before any deployment. This fixture is not deployable.
+  match /blacklist/{doc} { allow read: if true; allow write: if request.auth != null; }
+  match /pending/{doc} { allow read, write: if request.auth != null; }
+  match /companies/{doc} { allow read: if true; allow write: if request.auth != null; }
+  match /query_logs/{doc} { allow read, write: if request.auth != null; }
+  function isPublisher() {
+   return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous'
+    && exists(/databases/$(database)/documents/announcementAdmins/$(request.auth.uid))
+    && get(/databases/$(database)/documents/announcementAdmins/$(request.auth.uid)).data.active == true;
+  }
+  function validNotice() {
+   let d = request.resource.data;
+   return (d.keys().hasOnly(['published']) && d.published == false)
+    || (d.keys().hasOnly(['published','text','level','expiresAt'])
+        && d.keys().hasAll(['published','text','level','expiresAt']) && d.published == true
+        && d.text is string && d.text.size() > 0 && d.text.size() <= 1000
+        && d.level in ['normal','important','urgent'] && d.expiresAt is timestamp && d.expiresAt > request.time);
+  }
+  match /announcementAdmins/{id} {
+   allow get: if request.auth != null && request.auth.uid == id && request.auth.token.firebase.sign_in_provider != 'anonymous';
+   allow list, write: if false;
+  }
+  match /publicAnnouncements/current {
+   allow get: if true;
+   allow list, delete: if false;
+   allow create, update: if isPublisher() && validNotice();
+  }
+ }
+}

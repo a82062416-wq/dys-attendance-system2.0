@@ -1373,11 +1373,12 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.5.1');
-  assert.match(notes[0].changes.join(' '), /返回/);
+  assert.equal(notes[0].version, 'v1.5.2');
+  assert.match(notes[0].changes.join(' '), /公告/);
+  assert.match(notes.find(note => note.version==='v1.5.1').changes.join(' '), /返回/);
   assert.match(notes.find(note => note.version==='v1.5.0').changes.join(' '), /交接班/);
   assert.match(notes.find(note => note.version==='v1.5.0').changes.join(' '), /補卡/);
-  assert.equal(notes[0].date, '2026.10');
+  assert.equal(notes[0].date, '2026.11');
   assert.ok(notes.find(note => note.version==='v1.4.19').changes.some(change => change.includes('幹部工作台')));
   assert.ok(notes.every(note => Array.isArray(note.changes) && note.changes.length > 0));
 });

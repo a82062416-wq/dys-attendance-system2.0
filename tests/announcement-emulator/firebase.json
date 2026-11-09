@@ -1,0 +1,1 @@
+{"firestore":{"rules":"announcement-spark.rules"},"emulators":{"firestore":{"host":"127.0.0.1","port":18081},"ui":{"enabled":false},"singleProjectMode":true}}

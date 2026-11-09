@@ -200,8 +200,7 @@ def verify_collapsed_announcement(browser):
     page = new_test_page(browser, {"width": 390, "height": 844})
     page.add_init_script("""
       localStorage.setItem('guide_done', '1');
-      localStorage.setItem('site_announcement', '測試公告');
-      localStorage.setItem('site_announcement_level', 'urgent');
+      localStorage.setItem('dys_shared_announcement_v1', JSON.stringify({text:'測試公告',level:'urgent',expiresAt:Date.now()+3600000}));
     """)
     page.goto(BASE_URL, wait_until="domcontentloaded")
     assert page.locator("#announcement-toggle").is_visible()
