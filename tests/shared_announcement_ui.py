@@ -45,23 +45,20 @@ def verify(browser,width):
     page.evaluate("""() => {
       window.announcementAuthCalls=[];
       const a={currentUser:null,setPersistence:()=>Promise.resolve(),signInWithEmailAndPassword:()=>{a.currentUser={uid:'synthetic-admin',getIdToken:()=>Promise.resolve('synthetic-token')};return Promise.resolve({user:a.currentUser});},signOut:()=>{a.currentUser=null;return Promise.resolve();}};
-      window.firebase={apps:[],initializeApp:(config,name)=>{announcementAuthCalls.push(name);return {auth:()=>a};},auth:{Auth:{Persistence:{SESSION:'session'}}}};
+      window.firebase={apps:[],initializeApp:(config,name)=>{announcementAuthCalls.push(name);return {auth:()=>a};},auth:{Auth:{Persistence:{NONE:'none'}}}};
       ADMIN_UNLOCKED=true;CURRENT_ROLE='admin';showPage('admin');showSub('settings');loadSettingsFields();
       window.originalQueue=localStorage.getItem('local_records');
     }""")
     page.locator('#s-announcement').fill('新的共用公告')
     page.locator('#announcement-publish').click()
-    assert '先登入' in page.locator('#announcement-status').inner_text()
+    assert '公告發布權限尚未確認' in page.locator('#announcement-status').inner_text()
     assert not writes
-    page.locator('details:has(#announcement-login) summary').click()
-    page.locator('#announcement-email').fill('synthetic@example.invalid')
-    page.locator('#announcement-password').fill('test-only')
-    page.locator('#announcement-login').click()
+    assert page.evaluate("window.DysAnnouncement.authenticateAdmin('synthetic')")
     if os.environ.get('DYS_UI_DEBUG'):
         page.wait_for_timeout(1500)
         print('login-status:',page.locator('#announcement-status').inner_text(), 'calls:',page.evaluate('announcementAuthCalls'))
-    page.wait_for_function("document.getElementById('announcement-status').textContent.includes('已登入')")
-    assert page.evaluate('announcementAuthCalls')==['dys-announcement-publisher']
+    page.wait_for_function("document.getElementById('announcement-status').textContent.includes('已確認管理員')")
+    assert page.evaluate('announcementAuthCalls.length===1 && announcementAuthCalls[0].startsWith("dys-admin-session-")')
     state['deny']=True
     page.locator('#announcement-publish').click()
     page.wait_for_function("document.getElementById('announcement-status').textContent.includes('發布被拒絕')")

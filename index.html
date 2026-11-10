@@ -1089,7 +1089,7 @@ button,input,select{font-family:var(--font)}
       <div id="login-supervisor-status" role="status" aria-live="polite" style="font-size:12px;line-height:1.5;color:var(--t2);margin:0 0 14px"></div>
       <!-- 管理員：密碼輸入 -->
       <div class="pwd-wrap" id="admin-pwd-wrap">
-        <input class="lock-input" id="lock-input" type="password" placeholder="••••••" maxlength="20"
+        <input class="lock-input" id="lock-input" type="password" placeholder="••••••" maxlength="128"
                onkeydown="if(event.key==='Enter')tryUnlock()"/>
         <button class="pwd-eye" type="button" tabindex="-1" onclick="togglePwd('lock-input',this)">👁</button>
       </div>
@@ -1104,14 +1104,14 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.5.3 &nbsp;·&nbsp; 2026.11 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.5.4 &nbsp;·&nbsp; 2026.11 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
     <div id="lock-panel-reset" style="display:none">
       <div class="lock-icon">🔑</div>
-      <h2>重置密碼</h2>
-      <p>請輸入公司驗證碼，驗證正確後可設定新密碼</p>
+      <h2>重置後台密碼</h2>
+      <p>重置後若暫時無法發布公告，請聯絡管理員確認公告權限。</p>
 
       <!-- Step 1：輸入重置密鑰 -->
       <div id="reset-step1">
@@ -1298,7 +1298,7 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.5.3 &nbsp;·&nbsp; 2026.11 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+  <div class="version-tag">v1.5.4 &nbsp;·&nbsp; 2026.11 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
@@ -2126,17 +2126,6 @@ button,input,select{font-family:var(--font)}
             <span style="font-size:12px;color:var(--t3)">留空 = 永久顯示</span>
           </div>
           <span class="mf-hint">公告預設收合。同仁可從首頁打卡時間旁開啟；離線時顯示上次讀取的副本。下方「儲存設定」不會發布公告。</span>
-          <details style="margin-top:12px">
-            <summary>公告管理員登入</summary>
-            <label for="announcement-email">公告帳號</label>
-            <input id="announcement-email" type="email" class="fi" autocomplete="username" style="width:100%"/>
-            <label for="announcement-password">公告密碼</label>
-            <input id="announcement-password" type="password" class="fi" autocomplete="current-password" style="width:100%"/>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
-              <button type="button" class="btn-s" id="announcement-login">登入公告管理員</button>
-              <button type="button" class="btn-s" id="announcement-logout">登出公告管理員</button>
-            </div>
-          </details>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
             <button type="button" class="btn-s bs-accent" id="announcement-publish">發布給所有同仁</button>
             <button type="button" class="btn-s" id="announcement-withdraw">撤回公告</button>
@@ -2171,7 +2160,7 @@ button,input,select{font-family:var(--font)}
           </div>
         </div>
         <div class="mf">
-          <label>修改管理者密碼</label>
+          <label id="admin-password-label">修改管理者密碼</label>
           <input id="s-pwd-old" class="fi" type="password" placeholder="目前管理者密碼" style="width:100%;margin-bottom:6px"/>
           <input id="s-pwd-new" class="fi" type="password" placeholder="新密碼（留空不修改）" style="width:100%"/>
         </div>
@@ -2651,6 +2640,15 @@ function setPwdHash(p){
   localStorage.setItem('admin_pwd_hash',h);
   if(FB_DB) FB_DB.ref('config/auth/admin_pwd_hash').set(h).catch(e=>console.warn('管理密碼同步失敗:',e));
   logAudit('change_admin_password', '管理員密碼已變更');
+}
+function setPwdHashConfirmed(p,expectedHash){
+  if(!FB_DB)return Promise.reject(Error('legacy-write-failed'));
+  const h=hashPwd(p);
+  return FB_DB.ref('config/auth/admin_pwd_hash').transaction(current=>current===expectedHash?h:undefined,null,false).then(result=>{
+    if(!result.committed)throw Error('legacy-write-conflict');
+    localStorage.setItem('admin_pwd_hash',h);
+    logAudit('change_admin_password', '管理員密碼已變更');
+  });
 }
 function getSupPwdHash(){return localStorage.getItem('supervisor_pwd_hash')||''}
 function setSupPwdHash(p){
@@ -4106,8 +4104,10 @@ function getLoginRoleGuide(role){
     : {title:'管理員登入',hint:'請輸入管理員密碼',button:'登入管理後台'};
 }
 
+let secureAdminAttempt=0,secureAdminPending=false,secureAdminTimer=null,adminUsesLegacyPassword=false;
 // 角色切換
 function switchRole(role){
+  if(typeof secureAdminPending!=='undefined'&&secureAdminPending)cancelSecureAdminLogin();
   CURRENT_ROLE = role;
   const guide=getLoginRoleGuide(role);
   $('login-role-title').textContent=guide.title;
@@ -4167,7 +4167,7 @@ async function goAdmin(el){
       supervisorCloudStatus.textContent=supervisorStatus.verified?'✓ 幹部名單已從雲端確認':'⚠ 幹部名單尚未確認，幹部功能可能不是最新';
       supervisorCloudStatus.style.color=supervisorStatus.verified?'var(--success)':'var(--warn)';
     }
-    if(!getPwdHash()){
+    if(!getPwdHash()&&!(typeof window!=='undefined'&&window.DysAnnouncement&&typeof window.DysAnnouncement.authenticateAdmin==='function')){
       showToast('雲端管理員登入資料未確認，請連網後重試或聯絡管理員','error');return;
     }
     if(ADMIN_UNLOCKED && cloudVerified){navigateTo('admin');showAdminMenu();resetIdleTimer();checkBackupReminder();syncRecentAdminRecords();return}
@@ -4193,6 +4193,22 @@ async function goAdmin(el){
   }
 }
 let lockTries=0;
+function cancelSecureAdminLogin(){
+  secureAdminAttempt++;secureAdminPending=false;clearTimeout(secureAdminTimer);secureAdminTimer=null;
+  const button=$('login-submit-btn');if(button)button.disabled=false;
+  if(window.DysAnnouncement)window.DysAnnouncement.signOut();
+}
+function completeAdminLogin(){
+  ADMIN_UNLOCKED=true; lockTries=0; CURRENT_SUPERVISOR=null;
+  $('lock-screen').style.display='none';
+  applyRoleUI('admin');resetIdleTimer();checkBackupReminder();
+  checkAndAutoDisable();loadRecords();renderEmpList();syncRecentAdminRecords();
+}
+function adminLoginFailed(){
+  lockTries++;$('lock-input').className='lock-input shake';
+  $('lock-hint').textContent='密碼錯誤或暫時無法確認，請重試';
+  setTimeout(()=>$('lock-input').className='lock-input',500);$('lock-input').value='';
+}
 function togglePwd(id,btn){
   const el=$(id);
   const show=el.type==='password';
@@ -4203,24 +4219,40 @@ function togglePwd(id,btn){
 function tryUnlock(){
   const isAdmin = CURRENT_ROLE==='admin';
   if(isAdmin){
+    if(secureAdminPending)return;
     const pwd=$('lock-input').value;
     const hash = getPwdHash();
-    if(!hash){showToast('尚未設定密碼，請先完成初始設定','error');return}
-    if(hashPwd(pwd)===hash){
-      ADMIN_UNLOCKED=true; lockTries=0; CURRENT_SUPERVISOR=null;
-      $('lock-screen').style.display='none';
-      applyRoleUI('admin');
-      resetIdleTimer();
-      checkBackupReminder();
-      checkAndAutoDisable();loadRecords();renderEmpList();
-      syncRecentAdminRecords();
-    }else{
-      lockTries++;
-      $('lock-input').className='lock-input shake';
-      $('lock-hint').textContent=`密碼錯誤（第 ${lockTries} 次）`;
-      setTimeout(()=>$('lock-input').className='lock-input',500);
-      $('lock-input').value='';
+    if(hash&&hashPwd(pwd)===hash){
+      adminUsesLegacyPassword=true;
+      if(window.DysAnnouncement){
+        window.DysAnnouncement.signOut();
+        if(window.DysAnnouncement.legacySession)window.DysAnnouncement.legacySession();
+        if(typeof window.DysAnnouncement.authenticateAdmin==='function'){
+          const attempt=window.DysAnnouncement.authenticateAdmin(pwd),version=window.DysAnnouncement.sessionVersion();
+          attempt.then(allowed=>{
+            if(!allowed&&ADMIN_UNLOCKED&&window.DysAnnouncement.sessionVersion()===version&&window.DysAnnouncement.legacyUnavailable)window.DysAnnouncement.legacyUnavailable();
+          },()=>{
+            if(ADMIN_UNLOCKED&&window.DysAnnouncement.sessionVersion()===version&&window.DysAnnouncement.legacyUnavailable)window.DysAnnouncement.legacyUnavailable();
+          });
+        }
+      }
+      $('lock-input').value='';completeAdminLogin();return;
     }
+    if(!pwd||!window.DysAnnouncement||typeof window.DysAnnouncement.authenticateAdmin!=='function'){adminLoginFailed();return;}
+    const attempt=++secureAdminAttempt;secureAdminPending=true;$('login-submit-btn').disabled=true;
+    $('lock-hint').textContent='正在確認管理員身分…';
+    secureAdminTimer=setTimeout(()=>{
+      if(attempt!==secureAdminAttempt)return;
+      cancelSecureAdminLogin();$('lock-hint').textContent='無法確認管理員身分，請檢查網路後重試';
+    },10000);
+    window.DysAnnouncement.authenticateAdmin(pwd).then(allowed=>{
+      if(attempt!==secureAdminAttempt)return;
+      clearTimeout(secureAdminTimer);secureAdminTimer=null;secureAdminPending=false;$('login-submit-btn').disabled=false;
+      if(CURRENT_ROLE!=='admin'||!$('page-admin').classList.contains('active')||$('lock-screen').style.display==='none'){
+        if(allowed)window.DysAnnouncement.signOut();return;
+      }
+      if(allowed){adminUsesLegacyPassword=false;$('lock-input').value='';completeAdminLogin();}else adminLoginFailed();
+    },()=>{if(attempt===secureAdminAttempt){cancelSecureAdminLogin();adminLoginFailed();}});
   } else {
     // 幹部登入：用員工編號識別，不需密碼
     const empId = ($('sup-emp-input').value||'').trim();
@@ -4243,7 +4275,8 @@ function tryUnlock(){
   }
 }
 function lockAdmin(){
-  if(window.DysAnnouncement)window.DysAnnouncement.signOut();
+  cancelSecureAdminLogin();
+  adminUsesLegacyPassword=false;
   ADMIN_UNLOCKED=false; stopTodayListener();
   CURRENT_SUPERVISOR=null;
   CURRENT_ROLE='admin';
@@ -5559,6 +5592,8 @@ function loadSettingsFields(){
   $('s-qr-warn-2').value=localStorage.getItem('qr_warn_2')||'';
   $('s-qr-warn-3').value=localStorage.getItem('qr_warn_3')||'';
   $('s-pwd-old').value='';$('s-pwd-new').value='';
+  const passwordLabel=$('admin-password-label');
+  if(passwordLabel)passwordLabel.textContent=window.DysAnnouncement&&typeof window.DysAnnouncement.hasAdminSession==='function'&&window.DysAnnouncement.hasAdminSession()?'修改管理員密碼（至少 12 字元）':'修改管理員密碼';
   $('s-sup-pwd-old').value='';$('s-sup-pwd-new').value='';
 
   // 更新資料狀態
@@ -5578,7 +5613,9 @@ function loadSettingsFields(){
     $('si-size').style.color = '';
   }
 }
+let securePasswordChangePending=false;
 function saveSettings(){
+  if(securePasswordChangePending)return;
   const url=$('s-url').value.trim();
   const co=$('s-company').value.trim()||'打卡系統';
   const al=parseInt($('s-absent-limit').value)||7;
@@ -5591,6 +5628,24 @@ function saveSettings(){
 
   // 修改管理者密碼
   if(newPwd){
+    if(window.DysAnnouncement&&typeof window.DysAnnouncement.hasAdminSession==='function'&&window.DysAnnouncement.hasAdminSession()){
+      if(newPwd.length<12){showToast('新版管理員密碼至少需要 12 位','error');return}
+      if(adminUsesLegacyPassword&&hashPwd(oldPwd)!==getPwdHash()){showToast('管理者密碼輸入錯誤','error');return}
+      if(!adminUsesLegacyPassword&&getPwdHash()&&hashPwd(newPwd)===getPwdHash()){showToast('請使用與舊版不同的全新密碼','error');return}
+      const updateLegacy=adminUsesLegacyPassword;
+      const version=window.DysAnnouncement.sessionVersion();securePasswordChangePending=true;
+      window.DysAnnouncement.changeAdminPassword(oldPwd,newPwd).then(()=>{
+        if(!updateLegacy)return;
+        return setPwdHashConfirmed(newPwd,hashPwd(oldPwd)).catch(()=>window.DysAnnouncement.changeAdminPassword(newPwd,oldPwd).then(
+          ()=>{throw Error('legacy-write-failed');},()=>{throw Error('legacy-rollback-unconfirmed');}
+        ));
+      }).then(()=>{
+        securePasswordChangePending=false;
+        if(!ADMIN_UNLOCKED||CURRENT_ROLE!=='admin'||!window.DysAnnouncement.hasAdminSession()||window.DysAnnouncement.sessionVersion()!==version)return;
+        $('s-pwd-old').value='';$('s-pwd-new').value='';saveSettings();
+      },error=>{securePasswordChangePending=false;showToast(error.message==='legacy-write-failed'?'雲端未完成同步，原密碼未變更':error.message==='legacy-rollback-unconfirmed'?'密碼狀態未確認，請聯絡管理員':'無法確認密碼是否變更，請確認後重試','error');});
+      return;
+    }
     if(hashPwd(oldPwd)!==getPwdHash()){showToast('管理者密碼輸入錯誤','error');return}
     if(newPwd.length<4){showToast('新密碼至少需要 4 位','error');return}
     setPwdHash(newPwd);
@@ -5792,6 +5847,7 @@ function goBack(){
 }
 
 function showPage(name,el){
+  if(name!=='admin'&&typeof secureAdminPending!=='undefined'&&secureAdminPending)cancelSecureAdminLogin();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   $('page-'+name).classList.add('active');
@@ -5800,6 +5856,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.5.4',date:'2026.11',changes:['使用管理員密碼登入後台，即可直接發布或撤回公告','公告發布前由雲端確認權限；無法確認時仍可使用後台及打卡']},
     {version:'v1.5.3',date:'2026.11',changes:['公告入口固定顯示在打卡時間旁，點開查看共用公告','沒有公告或暫時無法連線時顯示清楚提示；公告浮層不推動打卡按鈕','較矮手機螢幕的工號鍵盤可捲動，避免關閉鍵被遮住']},
     {version:'v1.5.2',date:'2026.11',changes:['沿用首頁公告，授權管理員發布後同仁可共同閱讀','公告發布、撤回與到期獨立處理；雲端失敗保留輸入，離線顯示上次讀取副本','公告登入與打卡登入分開；不修改打卡紀錄與待補傳資料']},
     {version:'v1.5.1',date:'2026.10',changes:['修正後台「返回」按鈕：洋基美光哨點選擇視窗可安全取消，不再讓返回流程因 JavaScript 錯誤中斷','返回不會寫入或改動既有打卡紀錄；QR Code、上下班打卡與同步流程維持原樣']},
@@ -7474,6 +7531,6 @@ setInterval(runPendingSync,60000);
 })();
 
 </script>
-<script src="shared-announcement.js?v=2" defer></script>
+<script src="shared-announcement.js?v=3" defer></script>
 </body>
 </html>

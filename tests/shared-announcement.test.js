@@ -7,7 +7,7 @@ test('homepage loads the shared notice separately and has explicit publish contr
  const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
  assert.match(html,/src="shared-announcement.js/);
  assert.match(html,/id="announcement-publish"/);
- assert.match(html,/id="announcement-login"/);
+ assert.doesNotMatch(html,/id="announcement-login"/);
  const save=html.slice(html.indexOf('function saveSettings(){'),html.indexOf('//  Navigation'));
  assert.doesNotMatch(save,/localStorage\.setItem\('site_announcement'/);
 });

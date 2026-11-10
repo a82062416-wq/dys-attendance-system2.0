@@ -1373,7 +1373,7 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
   const context = {};
   vm.runInNewContext(`${extractFunction(inlineScript, 'getReleaseNotes')}; this.run = getReleaseNotes;`, context);
   const notes = context.run();
-  assert.equal(notes[0].version, 'v1.5.3');
+  assert.equal(notes[0].version, 'v1.5.4');
   assert.match(notes[0].changes.join(' '), /公告/);
   assert.match(notes.find(note => note.version==='v1.5.1').changes.join(' '), /返回/);
   assert.match(notes.find(note => note.version==='v1.5.0').changes.join(' '), /交接班/);
@@ -1386,7 +1386,7 @@ test('版本更新紀錄應將目前版本置頂，並提供可閱讀的異動�
 test('管理員登入不可建立固定預設密碼，且要先同步雲端密碼', () => {
   assert.doesNotMatch(inlineScript, /localStorage\.setItem\('admin_pwd_hash','aa8abcd'\)/);
   const goAdmin = extractFunction(inlineScript, 'goAdmin');
-  assert.ok(goAdmin.indexOf('syncAuthFromFirebase(authStatus)') < goAdmin.indexOf('if(!getPwdHash())'));
+  assert.ok(goAdmin.indexOf('syncAuthFromFirebase(authStatus)') < goAdmin.indexOf('if(!getPwdHash()'));
 });
 
 test('新 iPhone 沒有本機設定時，員工打卡不可誤跳初始設定', () => {
