@@ -185,37 +185,48 @@ body:has(#page-checkin.active) nav{z-index:560}
   font-family:var(--font);
 }
 .announcement-toggle{
-  position:fixed;top:calc(10px + var(--safe-top));right:calc(54px + var(--safe-right));z-index:561;
-  display:none;align-items:center;gap:5px;min-height:34px;padding:7px 10px;border:1px solid var(--border);
-  border-radius:999px;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--t2);box-shadow:0 4px 14px rgba(0,0,0,.08);
+  position:absolute;top:8px;right:10px;z-index:2;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:40px;padding:7px 10px;border:1px solid rgba(255,255,255,.36);
+  border-radius:999px;background:rgba(255,255,255,.12);color:#fff;
   font:600 13px var(--font);cursor:pointer;
 }
 .announcement-toggle.show{display:inline-flex}
+.announcement-toggle:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .announcement-dot{width:7px;height:7px;border-radius:50%;background:#ff3b30;display:none}
 .announcement-toggle.urgent .announcement-dot{display:block}
+.clock-announcement-wrap{position:relative;flex-shrink:0}
 .announce-bar{
-  background:linear-gradient(90deg,rgba(0,122,255,.08),rgba(0,122,255,.04));
+  position:absolute;top:calc(100% + 6px);right:0;z-index:20;box-sizing:border-box;
+  width:min(100%,420px);max-height:40vh;overflow-y:auto;
+  background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.2);
   border-left:3px solid var(--accent);
-  border-radius:0 10px 10px 0;
-  padding:9px 14px;
+  border-radius:10px;
+  padding:12px 14px;
   font-size:13px;color:var(--t2);
   line-height:1.45;
-  margin-bottom:2px;
   display:none;align-items:flex-start;justify-content:space-between;gap:8px;
 }
 .announce-bar.show{display:flex}
+/* 編號鍵盤開啟時保留公告入口；其他視窗仍在公告之上。 */
+#keyboard-overlay.show ~ #page-checkin .announcement-toggle{z-index:401}
+#keyboard-overlay.show ~ #page-checkin .announce-bar{z-index:402}
+@media(max-height:700px){
+  /* 小螢幕鍵盤可能占滿畫面，避免公告壓住輸入區或鍵盤關閉鍵。 */
+  #keyboard-overlay.show ~ #page-checkin .announcement-toggle{z-index:2}
+  #keyboard-overlay.show ~ #page-checkin .announce-bar{z-index:20}
+}
 .announce-bar.level-important{
-  background:linear-gradient(90deg,rgba(255,149,0,.1),rgba(255,149,0,.04));
   border-left-color:#ff9500;
 }
 .announce-bar.level-urgent{
-  background:linear-gradient(90deg,rgba(255,59,48,.12),rgba(255,59,48,.05));
   border-left-color:#ff3b30;
 }
 .announce-text{flex:1;min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}
 .announce-dismiss{
-  cursor:pointer;opacity:.5;font-size:15px;line-height:1;flex-shrink:0;
-  padding:0 2px;transition:opacity .15s;
+  position:sticky;top:0;cursor:pointer;opacity:.7;font-size:20px;line-height:1;flex-shrink:0;
+  min-width:40px;min-height:40px;margin:-5px -7px -5px 0;padding:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:0;border-radius:8px;background:transparent;color:inherit;transition:opacity .15s;
 }
 .announce-dismiss:hover{opacity:1}
 .badge-anomaly{
@@ -261,6 +272,7 @@ body:has(#page-checkin.active) nav{z-index:560}
 }
 .tc-date{font-size:12px;color:rgba(255,255,255,.6);margin-bottom:2px;letter-spacing:.3px;position:relative;z-index:1}
 .tc-clock{
+  display:inline-block;
   font-size:clamp(34px,9vw,44px);font-weight:300;
   letter-spacing:-2px;font-variant-numeric:tabular-nums;
   line-height:1;color:#ffffff;
@@ -416,6 +428,10 @@ body:has(#page-checkin.active) nav{z-index:560}
   transition:transform .3s cubic-bezier(.34,1.1,.64,1);
 }
 #keyboard-overlay.show .ko-panel{transform:translateY(0)}
+@media(max-height:600px){
+  /* 舊手機較矮時，讓整個鍵盤維持在導覽列下方並可捲動。 */
+  #keyboard-overlay .ko-panel{max-height:calc(100vh - 56px - var(--safe-top));max-height:calc(100dvh - 56px - var(--safe-top));overflow-y:auto}
+}
 
 .ko-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
 .ko-title{font-size:15px;font-weight:600;color:var(--t1)}
@@ -1088,7 +1104,7 @@ button,input,select{font-family:var(--font)}
       <button class="btn-unlock" id="login-submit-btn" onclick="tryUnlock()">登入管理後台</button>
       <div class="lock-hint" id="lock-hint"></div>
       <button id="btn-forgot-pwd" onclick="showResetPanel()" style="margin-top:14px;background:none;border:none;font-size:13px;color:var(--t3);cursor:pointer;font-family:var(--font)">忘記密碼？</button>
-      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.5.2 &nbsp;·&nbsp; 2026.11 &nbsp;·&nbsp; 大洋保全勤務系統</div>
+      <div style="margin-top:20px;font-size:11px;color:var(--t3);letter-spacing:.5px">v1.5.3 &nbsp;·&nbsp; 2026.11 &nbsp;·&nbsp; 大洋保全勤務系統</div>
     </div>
 
     <!-- 重置密碼面板 -->
@@ -1282,15 +1298,16 @@ button,input,select{font-family:var(--font)}
 
 <!-- ══ 打卡頁 ══ -->
 <div class="page active" id="page-checkin">
-  <div class="version-tag">v1.5.2 &nbsp;·&nbsp; 2026.11 &nbsp;·&nbsp; 大洋保全勤務系統</div>
-  <button type="button" class="announcement-toggle" id="announcement-toggle" onclick="toggleAnnouncement()" aria-expanded="false" aria-controls="announce-bar"><span class="announcement-dot" aria-hidden="true"></span>公告</button>
+  <div class="version-tag">v1.5.3 &nbsp;·&nbsp; 2026.11 &nbsp;·&nbsp; 大洋保全勤務系統</div>
   <div class="checkin-wrap">
 
     <!-- 時鐘卡片 -->
+    <div class="clock-announcement-wrap">
     <div class="time-card">
       <div class="tc-logo" id="tc-logo">
         <img src="icon-192.png" onerror="this.style.display='none'" alt="DYS"/>
       </div>
+      <button type="button" class="announcement-toggle show" id="announcement-toggle" onclick="toggleAnnouncement()" aria-expanded="false" aria-controls="announce-bar"><span class="announcement-dot" aria-hidden="true"></span>公告</button>
       <div class="tc-date" id="tc-date"></div>
       <div class="tc-clock" id="tc-clock">--:--:--</div>
       <div class="tc-week" id="tc-week"></div>
@@ -1301,27 +1318,8 @@ button,input,select{font-family:var(--font)}
     </div>
 
     <!-- 系統公告 -->
-    <div class="announce-bar" id="announce-bar" aria-live="polite"></div>
-    <script>
-      (function(){
-        var bar = document.getElementById('announce-bar');
-        var toggle = document.getElementById('announcement-toggle');
-        var todayStr = new Date().toISOString().slice(0,10);
-        var saved = String(localStorage.getItem('site_announcement') || '').trim();
-        if(!saved){ bar.style.display='none'; toggle.style.display='none'; return; }
-        // 到期檢查
-        var expiry = localStorage.getItem('site_announcement_expiry');
-        if(expiry && todayStr > expiry){ bar.style.display='none'; toggle.style.display='none'; return; }
-        var level  = localStorage.getItem('site_announcement_level') || 'normal';
-        var icon   = level==='urgent' ? '🚨' : level==='important' ? '⚠️' : '📢';
-        var escSaved = String(saved).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
-        if(level==='important') bar.classList.add('level-important');
-        if(level==='urgent'){ bar.classList.add('level-urgent'); toggle.classList.add('urgent'); }
-        bar.innerHTML = '<span class="announce-text">'+icon+' 系統公告：'+escSaved+'</span>'
-          + '<button type="button" class="announce-dismiss" onclick="toggleAnnouncement(false)" title="收合公告" aria-label="收合公告">✕</button>';
-        toggle.classList.add('show');
-      })();
-    </script>
+    <div class="announce-bar" id="announce-bar" aria-live="polite"><span class="announce-text">公告暫時無法載入，請稍後再試。</span><button type="button" class="announce-dismiss" onclick="toggleAnnouncement(false);document.getElementById('announcement-toggle').focus()" aria-label="收合公告">✕</button></div>
+    </div>
 
     <section id="my-duty-card" class="my-duty-card" hidden aria-labelledby="my-duty-title" aria-live="polite">
       <div class="my-duty-heading"><strong id="my-duty-title">我的本班打卡狀態</strong><span id="my-duty-status" class="my-duty-status"></span></div>
@@ -2127,7 +2125,7 @@ button,input,select{font-family:var(--font)}
             <input type="date" id="s-announcement-expiry" class="fi" style="width:160px"/>
             <span style="font-size:12px;color:var(--t3)">留空 = 永久顯示</span>
           </div>
-          <span class="mf-hint">公告預設收合。同仁可從首頁右上角開啟；離線時顯示上次讀取的副本。下方「儲存設定」不會發布公告。</span>
+          <span class="mf-hint">公告預設收合。同仁可從首頁打卡時間旁開啟；離線時顯示上次讀取的副本。下方「儲存設定」不會發布公告。</span>
           <details style="margin-top:12px">
             <summary>公告管理員登入</summary>
             <label for="announcement-email">公告帳號</label>
@@ -3310,6 +3308,7 @@ function setNoEmpDisplay(){
 }
 
 function openDrawer(){
+  if($('announce-bar')&&$('announce-bar').classList.contains('show'))toggleAnnouncement(false);
   clearLocalMakeup();
   _myDutyEmpId=''; updateMyDutyStatus();
   drawerOpen = true;
@@ -5086,7 +5085,7 @@ function clearLocal(){
   localRecs=[];saveRecs();loadRecords();showToast('本地紀錄已清除','');
 }
 
-// ── 系統公告（預設收合，只有有效公告才顯示入口） ──
+// ── 系統公告（預設收合，入口固定顯示） ──
 function renderAnnouncement(){
   if(window.DysAnnouncement){window.DysAnnouncement.render();return;}
   const bar=$('announce-bar'),toggle=$('announcement-toggle');
@@ -5094,8 +5093,8 @@ function renderAnnouncement(){
   const saved=String(localStorage.getItem('site_announcement')||'').trim();
   const expiry=localStorage.getItem('site_announcement_expiry')||'';
   const expired=expiry&&today()>expiry;
-  bar.className='announce-bar'; toggle.className='announcement-toggle';
-  if(!saved||expired){ bar.innerHTML=''; bar.classList.remove('show'); toggle.classList.remove('show'); toggle.setAttribute('aria-expanded','false'); return; }
+  bar.className='announce-bar'; toggle.className='announcement-toggle show';
+  if(!saved||expired){ bar.innerHTML='<span class="announce-text">公告暫時無法載入，請稍後再試。</span><button type="button" class="announce-dismiss" onclick="toggleAnnouncement(false);document.getElementById(\'announcement-toggle\').focus()" aria-label="收合公告">✕</button>'; toggle.setAttribute('aria-expanded','false'); return; }
   const level=localStorage.getItem('site_announcement_level')||'normal';
   const icon=level==='urgent'?'🚨':level==='important'?'⚠️':'📢';
   if(level==='important') bar.classList.add('level-important');
@@ -5105,10 +5104,11 @@ function renderAnnouncement(){
 }
 function toggleAnnouncement(forceOpen){
   const bar=$('announce-bar'),toggle=$('announcement-toggle');
-  if(!bar||!toggle||!toggle.classList.contains('show')) return;
+  if(!bar||!toggle) return;
   const open=typeof forceOpen==='boolean'?forceOpen:!bar.classList.contains('show');
   bar.classList.toggle('show',open);
   toggle.setAttribute('aria-expanded',String(open));
+  if(open&&window.DysAnnouncement)window.DysAnnouncement.refresh(true).catch(function(){});
 }
 
 // ── 補打卡 ──
@@ -5760,6 +5760,7 @@ function closeTopOverlay(){
     ['makeup-modal',clearLocalMakeup],
     ['handover-reminder-modal',closeLocalHandoverReminder],
     ['employee-lookup-modal',closeEmployeeLookup],
+    ['announce-bar',()=>{toggleAnnouncement(false);$('announcement-toggle').focus();}],
     ['keyboard-overlay',closeDrawer],
   ];
   for(const [id,close] of layers){
@@ -5799,6 +5800,7 @@ function showPage(name,el){
 }
 function getReleaseNotes(){
   return [
+    {version:'v1.5.3',date:'2026.11',changes:['公告入口固定顯示在打卡時間旁，點開查看共用公告','沒有公告或暫時無法連線時顯示清楚提示；公告浮層不推動打卡按鈕','較矮手機螢幕的工號鍵盤可捲動，避免關閉鍵被遮住']},
     {version:'v1.5.2',date:'2026.11',changes:['沿用首頁公告，授權管理員發布後同仁可共同閱讀','公告發布、撤回與到期獨立處理；雲端失敗保留輸入，離線顯示上次讀取副本','公告登入與打卡登入分開；不修改打卡紀錄與待補傳資料']},
     {version:'v1.5.1',date:'2026.10',changes:['修正後台「返回」按鈕：洋基美光哨點選擇視窗可安全取消，不再讓返回流程因 JavaScript 錯誤中斷','返回不會寫入或改動既有打卡紀錄；QR Code、上下班打卡與同步流程維持原樣']},
     {version:'v1.5.0',date:'2026.10',changes:['新增個人本班打卡狀態、交接班互助提醒與下次上班自主補卡；原始打卡紀錄保持不變','智慧功能只在原本打卡成功後背景執行，資料不足時不猜測、不阻擋 QR 打卡','跨裝置交接與補卡安全資料層先以模擬驗證，正式 Firebase Rules、正式資料與推播服務未變更']},
@@ -7472,6 +7474,6 @@ setInterval(runPendingSync,60000);
 })();
 
 </script>
-<script src="shared-announcement.js?v=1" defer></script>
+<script src="shared-announcement.js?v=2" defer></script>
 </body>
 </html>

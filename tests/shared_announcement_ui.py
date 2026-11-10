@@ -89,7 +89,8 @@ def verify(browser,width):
     page.on('dialog',lambda dialog:dialog.accept())
     page.locator('#announcement-withdraw').click()
     page.wait_for_function("document.getElementById('announcement-status').textContent.includes('已撤回')")
-    assert not page.locator('#announcement-toggle').is_visible()
+    assert page.locator('#announcement-toggle').evaluate("el => el.classList.contains('show')")
+    assert '目前沒有公告' in page.locator('#announce-bar').text_content()
     state['fail']=True
     page.locator('#announcement-refresh').click()
     page.wait_for_function("document.getElementById('announcement-status').textContent.includes('暫時讀不到')")

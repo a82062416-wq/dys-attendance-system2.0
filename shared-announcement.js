@@ -37,20 +37,21 @@
   function start() {
     if (!root.fetch || typeof FIREBASE_CONFIG === 'undefined') return;
     var transport=createTransport({projectId:FIREBASE_CONFIG.projectId,fetch:root.fetch.bind(root)});
-    var cacheKey='dys_shared_announcement_v1', notice=null,version=null,draftVersion=null,loaded=false,offline=true,busy=false,dirty=false,auth=null,lastRead=0,reading=null;
+    var cacheKey='dys_shared_announcement_v1', notice=null,version=null,draftVersion=null,loaded=false,offline=true,readFailed=false,busy=false,dirty=false,auth=null,lastRead=0,reading=null;
     var $=function(id){return document.getElementById(id);};
     function status(message){var el=$('announcement-status');if(el)el.textContent=message;}
     function controls(value){busy=value;['announcement-publish','announcement-withdraw','announcement-login','announcement-logout'].forEach(function(id){if($(id))$(id).disabled=value;});}
     function render() {
       var bar=$('announce-bar'),toggle=$('announcement-toggle'); if(!bar||!toggle)return;
       var open=bar.classList.contains('show');
-      bar.textContent='';bar.style.display='';toggle.style.display='';bar.className='announce-bar';toggle.className='announcement-toggle';
-      if(!notice||notice.expiresAt<=Date.now()){toggle.setAttribute('aria-expanded','false');return;}
-      if(notice.level!=='normal')bar.classList.add('level-'+notice.level);
-      if(notice.level==='urgent')toggle.classList.add('urgent');
-      var span=document.createElement('span');span.className='announce-text';span.textContent='📢 系統公告'+(offline?'（離線副本）':'')+'：'+notice.text;
-      var close=document.createElement('button');close.type='button';close.className='announce-dismiss';close.textContent='✕';close.setAttribute('aria-label','收合公告');close.onclick=function(){bar.classList.remove('show');toggle.setAttribute('aria-expanded','false');toggle.focus();};
-      bar.appendChild(span);bar.appendChild(close);toggle.classList.add('show');if(open)bar.classList.add('show');toggle.setAttribute('aria-expanded',String(open));
+      bar.style.display='';toggle.style.display='';bar.className='announce-bar';toggle.className='announcement-toggle show';
+      var current=notice&&notice.expiresAt>Date.now()?notice:null;
+      if(current&&current.level!=='normal')bar.classList.add('level-'+current.level);
+      if(current&&current.level==='urgent')toggle.classList.add('urgent');
+      var span=bar.querySelector('.announce-text')||document.createElement('span');span.className='announce-text';
+      span.textContent=current?'📢 系統公告'+(offline?'（離線副本）':'')+'：'+current.text:readFailed?'公告暫時無法載入，請稍後再試。':loaded?'目前沒有公告。':'公告載入中，請稍候。';
+      var close=bar.querySelector('.announce-dismiss')||document.createElement('button');close.type='button';close.className='announce-dismiss';close.textContent='✕';close.setAttribute('aria-label','收合公告');close.onclick=function(){bar.classList.remove('show');toggle.setAttribute('aria-expanded','false');toggle.focus();};
+      if(!span.parentNode)bar.appendChild(span);if(!close.parentNode)bar.appendChild(close);if(open)bar.classList.add('show');toggle.setAttribute('aria-expanded',String(open));
     }
     function fillDraft(){
       if(dirty||!loaded)return;
@@ -62,7 +63,7 @@
       if(reading)return reading;
       if(!force&&Date.now()-lastRead<120000){render();return Promise.resolve();}
       lastRead=Date.now();
-      reading=transport.read().then(function(result){notice=result.notice;version=result.version;loaded=true;offline=false;try{localStorage.setItem(cacheKey,JSON.stringify(notice));}catch(_){}render();fillDraft();return result;},function(error){offline=true;render();throw error;}).then(function(result){reading=null;return result;},function(error){reading=null;throw error;});
+      reading=transport.read().then(function(result){notice=result.notice;version=result.version;loaded=true;offline=false;readFailed=false;try{localStorage.setItem(cacheKey,JSON.stringify(notice));}catch(_){}render();fillDraft();return result;},function(error){offline=true;readFailed=true;render();throw error;}).then(function(result){reading=null;return result;},function(error){reading=null;throw error;});
       return reading;
     }
     function getAuth(){

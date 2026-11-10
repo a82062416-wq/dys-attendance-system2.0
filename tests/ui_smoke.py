@@ -193,7 +193,7 @@ def verify_collapsed_announcement(browser):
     page = new_test_page(browser, {"width": 390, "height": 844})
     page.add_init_script("localStorage.setItem('guide_done', '1')")
     page.goto(BASE_URL, wait_until="domcontentloaded")
-    assert not page.locator("#announcement-toggle").is_visible()
+    assert page.locator("#announcement-toggle").is_visible()
     assert not page.locator("#announce-bar").is_visible()
     page.close()
 

@@ -5,26 +5,24 @@
 // ══════════════════════════════════════════════
 
 // 每次正式發布都更新版本，讓已安裝的 iPhone PWA 立即淘汰舊首頁快取。
-const CACHE_NAME = 'attendance-v1.5.2';
+const CACHE_NAME = 'attendance-v1.5.3';
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache =>
-      cache.addAll(['./index.html', './manifest.json', './shared-announcement.js?v=1'])
-    )
+      cache.addAll(['./index.html', './manifest.json', './shared-announcement.js?v=2'])
+    ).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+        keys.filter(k => k.startsWith('attendance-v') && k !== CACHE_NAME).map(k => caches.delete(k))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
